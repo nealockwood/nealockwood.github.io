@@ -1,11 +1,286 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Your Name</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPI Forecast Revision Term Structure</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    background: #f7f5f0;
+    color: #333;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 60px 20px;
+  }
+  .container {
+    max-width: 880px;
+    width: 100%;
+  }
+  h1 {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 0.85em;
+    color: #888;
+    margin-bottom: 28px;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .control-label {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #555;
+  }
+  select {
+    font-size: 0.9em;
+    padding: 6px 12px;
+    border: 1px solid #d8d5ce;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select:hover { border-color: #8b9dc3; }
+  select:focus { border-color: #8b9dc3; box-shadow: 0 0 0 2px rgba(139,157,195,0.2); }
+  label.checkbox-label {
+    font-size: 0.85em;
+    color: #555;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  input[type="checkbox"] {
+    accent-color: #8b9dc3;
+    width: 15px;
+    height: 15px;
+  }
+  #plot {
+    width: 100%;
+    height: 460px;
+    border-radius: 8px;
+  }
+  .legend-note {
+    font-size: 0.78em;
+    color: #999;
+    margin-top: 8px;
+  }
+</style>
 </head>
 <body>
-    <h1>Hello</h1>
-    <p>This is my site.</p>
+
+<div class="container">
+  <h1>Revision Term Structure</h1>
+  <p class="subtitle">Cross-sectional distribution of CPI forecast revisions by horizon</p>
+
+  <div class="controls">
+    <div class="control-group">
+      <span class="control-label">Quarter</span>
+      <select id="quarter-select"></select>
+    </div>
+    <label class="checkbox-label">
+      <input type="checkbox" id="nonzero-check" checked>
+      Only forecasters who revised
+    </label>
+  </div>
+
+  <div id="plot"></div>
+  <p class="legend-note">Black dot = median  &middot;  Bars = 5th–95th percentile</p>
+</div>
+
+<script>
+let allData = [];
+
+const RCOLS = ['RCPI_0','RCPI_1','RCPI_2','RCPI_3','RCPI_4','RCPI_B','RCPI_C','RCPI_5Y','RCPI_10Y'];
+const XLABELS = ['h=0<br>nowcast','h=1<br>1Q','h=2<br>2Q','h=3<br>3Q','h=4<br>4Q','B<br>next yr','C<br>yr after','5Y','10Y'];
+
+function percentile(arr, p) {
+  const sorted = arr.slice().sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function updatePlot() {
+  const sel = document.getElementById('quarter-select').value;
+  const nonzeroOnly = document.getElementById('nonzero-check').checked;
+  const [year, quarter] = sel.split('Q');
+
+  const rows = allData.filter(r => String(r.YEAR) === year && String(r.QUARTER) === quarter);
+
+  const medians = [], p5s = [], p95s = [], counts = [];
+
+  for (const col of RCOLS) {
+    let vals = rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
+    if (nonzeroOnly) vals = vals.filter(v => v !== 0);
+    if (vals.length >= 2) {
+      medians.push(percentile(vals, 50));
+      p5s.push(percentile(vals, 5));
+      p95s.push(percentile(vals, 95));
+    } else {
+      medians.push(null);
+      p5s.push(null);
+      p95s.push(null);
+    }
+    counts.push(vals.length);
+  }
+
+  const xIdx = Array.from({length: RCOLS.length}, (_, i) => i);
+  const traces = [];
+
+  // Individual interval bars (no connected line)
+  for (let i = 0; i < RCOLS.length; i++) {
+    if (medians[i] === null) continue;
+
+    // Vertical stem
+    traces.push({
+      x: [i, i], y: [p5s[i], p95s[i]],
+      mode: 'lines',
+      line: { color: '#8b9dc3', width: 2 },
+      showlegend: false, hoverinfo: 'skip',
+    });
+
+    const capW = 0.1;
+    // Top cap
+    traces.push({
+      x: [i - capW, i + capW], y: [p95s[i], p95s[i]],
+      mode: 'lines',
+      line: { color: '#8b9dc3', width: 2 },
+      showlegend: false, hoverinfo: 'skip',
+    });
+    // Bottom cap
+    traces.push({
+      x: [i - capW, i + capW], y: [p5s[i], p5s[i]],
+      mode: 'lines',
+      line: { color: '#8b9dc3', width: 2 },
+      showlegend: false, hoverinfo: 'skip',
+    });
+  }
+
+  // Median dots
+  traces.push({
+    x: xIdx.filter((_, i) => medians[i] !== null),
+    y: medians.filter(m => m !== null),
+    mode: 'markers',
+    marker: { color: '#1a1a2e', size: 9 },
+    showlegend: false,
+    hovertemplate: xIdx
+      .map((idx, i) => medians[i] !== null ? `${XLABELS[i].replace('<br>', ' ')}<br>Median: ${medians[i].toFixed(2)}<br>n=${counts[i]}<extra></extra>` : null)
+      .filter(x => x !== null),
+  });
+
+  // Zero line
+  traces.push({
+    x: [-0.6, RCOLS.length - 0.4], y: [0, 0],
+    mode: 'lines',
+    line: { color: '#aaa', width: 0.8 },
+    showlegend: false, hoverinfo: 'skip',
+  });
+
+  const BG = '#f7f5f0';
+
+  const layout = {
+    title: {
+      text: `<b>${sel}</b>`,
+      font: { size: 15, color: '#1a1a2e', family: '-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica Neue, Arial, sans-serif' },
+      x: 0.01, xanchor: 'left', y: 0.97,
+    },
+    xaxis: {
+      tickvals: xIdx,
+      ticktext: XLABELS,
+      tickfont: { size: 10.5, color: '#555' },
+      range: [-0.6, RCOLS.length - 0.4],
+      showgrid: false,
+      zeroline: false,
+      linecolor: '#e0ddd6',
+      linewidth: 0.5,
+    },
+    yaxis: {
+      title: { text: 'Revision (pp)', font: { size: 11, color: '#555' }, standoff: 10 },
+      tickfont: { size: 10, color: '#666' },
+      gridcolor: '#e0ddd6',
+      gridwidth: 0.5,
+      zeroline: false,
+      linecolor: '#e0ddd6',
+      linewidth: 0.5,
+    },
+    shapes: [
+      { type: 'line', x0: 4.5, x1: 4.5, y0: 0, y1: 1, yref: 'paper', line: { color: '#e0ddd6', width: 0.8 } },
+      { type: 'line', x0: 6.5, x1: 6.5, y0: 0, y1: 1, yref: 'paper', line: { color: '#e0ddd6', width: 0.8 } },
+    ],
+    annotations: [
+      { x: 2, y: 1.06, xref: 'x', yref: 'paper', text: '<i>Quarterly</i>', showarrow: false, font: { size: 10, color: '#999' } },
+      { x: 5.5, y: 1.06, xref: 'x', yref: 'paper', text: '<i>Annual</i>', showarrow: false, font: { size: 10, color: '#999' } },
+      { x: 7.5, y: 1.06, xref: 'x', yref: 'paper', text: '<i>Long-run</i>', showarrow: false, font: { size: 10, color: '#999' } },
+    ],
+    plot_bgcolor: BG,
+    paper_bgcolor: BG,
+    margin: { t: 60, b: 70, l: 55, r: 20 },
+    hovermode: 'closest',
+    showlegend: false,
+  };
+
+  Plotly.react('plot', traces, layout, {
+    responsive: true,
+    displayModeBar: false,
+  });
+}
+
+const csvPath = 'Individual_CPI_with_revisions.csv';
+Papa.parse(csvPath, {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: function(results) {
+    allData = results.data;
+
+    const yqSet = new Set();
+    for (const r of allData) {
+      if (r.YEAR && r.QUARTER) yqSet.add(`${r.YEAR}Q${r.QUARTER}`);
+    }
+    const quarters = Array.from(yqSet).sort((a, b) => {
+      const [ay, aq] = a.split('Q').map(Number);
+      const [by, bq] = b.split('Q').map(Number);
+      return ay !== by ? ay - by : aq - bq;
+    });
+
+    const select = document.getElementById('quarter-select');
+    for (const q of quarters) {
+      const opt = document.createElement('option');
+      opt.value = q;
+      opt.textContent = q;
+      select.appendChild(opt);
+    }
+
+    select.value = quarters[quarters.length - 1];
+    updatePlot();
+  }
+});
+
+document.getElementById('quarter-select').addEventListener('change', updatePlot);
+document.getElementById('nonzero-check').addEventListener('change', updatePlot);
+</script>
 </body>
 </html>
