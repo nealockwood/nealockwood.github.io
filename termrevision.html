@@ -168,7 +168,7 @@ function updatePlot() {
   const pctAnnotations = xIdx.map((i) => ({
     x: i, y: -0.22, xref: 'x', yref: 'paper',
     text: pctNonzero[i] !== null ? `<b>${pctNonzero[i]}%</b>` : '<b>—</b>',
-    showarrow: false, font: { size: 9.5, color: '#999' }
+    showarrow: false, font: { size: 10, color: '#999', family: '-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica Neue, Arial, sans-serif' }
   }));
 
   const BG = '#f7f5f0';
@@ -200,11 +200,11 @@ function updatePlot() {
       { x: aMid, y: 1.06, xref: 'x', yref: 'paper', text: '<i>Annual</i>', showarrow: false, font: { size: 10, color: '#999' } },
       { x: lrMid, y: 1.06, xref: 'x', yref: 'paper', text: '<i>Long-run</i>', showarrow: false, font: { size: 10, color: '#999' } },
       { x: -0.55, y: -0.22, xref: 'x', yref: 'paper', xanchor: 'right',
-        text: '<b><i>% of forecasts revised</i></b>', showarrow: false, font: { size: 9.5, color: '#999' } },
+        text: '<b><i>% of forecasts revised</i></b>', showarrow: false, font: { size: 10, color: '#999' } },
       ...pctAnnotations,
     ],
     plot_bgcolor: BG, paper_bgcolor: BG,
-    margin: { t: 60, b: 110, l: 55, r: 20 },
+    margin: { t: 60, b: 110, l: 130, r: 20 },
     hovermode: 'closest', showlegend: false,
   };
 
