@@ -69,13 +69,14 @@
   <div id="plot"></div>
   <p class="legend-note">Black dot = median  &middot;  Bars = 5th&ndash;95th percentile</p>
   <p class="footnote" id="footnote">*h=&minus;1 is the real-time forecast error: the realized growth rate from consecutive LRGDP1 levels, (LRGDP1<sub>t</sub>&minus;LRGDP1<sub>t&minus;1</sub>)/LRGDP1<sub>t&minus;1</sub>&times;100, minus the previous period's nowcast (RGDP2<sub>t&minus;1</sub>).</p>
+  <p class="footnote visible">&dagger;10Y forecasts are only collected in Q1. Revisions compare this year's Q1 response to last year's Q1 response.</p>
 </div>
 
 <script>
 let allData = [];
 
 const ALL_RCOLS = ['RRGDP0','RRGDP2','RRGDP3','RRGDP4','RRGDP5','RRGDPB','RRGDPC','RRGDPD','RRGDP10'];
-const ALL_XLABELS = ['h=\u22121*','h=0<br>(nowcast)','h=1<br>1Q','h=2<br>2Q','h=3<br>3Q','B<br>next yr','C<br>yr after','D<br>3yr out','10Y'];
+const ALL_XLABELS = ['h=\u22121*','h=0<br>(nowcast)','h=1<br>1Q','h=2<br>2Q','h=3<br>3Q','B<br>next yr','C<br>yr after','D<br>3yr out','10Y\u2020'];
 
 function percentile(arr, p) {
   const s = arr.slice().sort((a, b) => a - b);
