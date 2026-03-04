@@ -68,7 +68,7 @@
 
   <div id="plot"></div>
   <p class="legend-note">Black dot = median  &middot;  Bars = 5th&ndash;95th percentile</p>
-  <p class="footnote" id="footnote">*h=&minus;1 is the real-time forecast error: the realized growth rate from consecutive LRGDP1 levels, (LRGDP1<sub>t</sub>&minus;LRGDP1<sub>t&minus;1</sub>)/LRGDP1<sub>t&minus;1</sub>&times;100, minus the previous period's nowcast (RGDP2<sub>t&minus;1</sub>).</p>
+  <p class="footnote" id="footnote">*h=&minus;1 is the forecast error implied by consecutive GDP levels reported in the survey: the annualized growth rate from LRGDP1<sub>t&minus;1</sub> to LRGDP1<sub>t</sub>, minus the previous nowcast (RGDP2<sub>t&minus;1</sub>). Because these levels come from whatever vintage was available at each survey&mdash;not a single consistent release&mdash;the implied growth rate can be distorted by base-year changes and annual revisions between surveys. <b>Alt. median (using BEA advance): <span id="alt-median"></span></b>. The alternative uses the BEA&rsquo;s initial (advance) estimate of quarterly growth in place of the cross-level rate; this is what is substituted in for h=&minus;1 at base-year-change quarters.</p>
   <p class="footnote visible">&dagger;10Y forecasts are only collected in Q1. Revisions compare this year's Q1 response to last year's Q1 response.</p>
 </div>
 
@@ -91,6 +91,15 @@ function updatePlot() {
   const showLagged = document.getElementById('lagged-check').checked;
 
   document.getElementById('footnote').classList.toggle('visible', showLagged);
+
+  if (showLagged) {
+    const [yr, qr] = sel.split('Q');
+    const qRows = allData.filter(r => String(r.YEAR) === yr && String(r.QUARTER) === qr);
+    let altVals = qRows.map(r => parseFloat(r['RRGDP0_ALT'])).filter(v => !isNaN(v));
+    if (nonzeroOnly) altVals = altVals.filter(v => v !== 0);
+    const altMedEl = document.getElementById('alt-median');
+    altMedEl.textContent = altVals.length >= 2 ? percentile(altVals, 50).toFixed(2) + ' pp' : 'n/a';
+  }
 
   const startIdx = showLagged ? 0 : 1;
   const RCOLS = ALL_RCOLS.slice(startIdx);
