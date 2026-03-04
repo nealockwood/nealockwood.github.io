@@ -68,8 +68,8 @@
 
   <div id="plot"></div>
   <p class="legend-note">Black dot = median  &middot;  Bars = 5th&ndash;95th percentile</p>
-  <p class="footnote" id="footnote">*h=&minus;1 is the forecast error implied by consecutive GDP levels reported in the survey: the annualized growth rate from LRGDP1<sub>t&minus;1</sub> to LRGDP1<sub>t</sub>, minus the previous nowcast (RGDP2<sub>t&minus;1</sub>). Because these levels come from whatever vintage was available at each survey&mdash;not a single consistent release&mdash;the implied growth rate can be distorted by base-year changes and annual revisions between surveys. <b>Alt. median (using BEA advance): <span id="alt-median"></span></b>. The alternative uses the BEA&rsquo;s initial (advance) estimate of quarterly growth in place of the cross-level rate; this is what is substituted in for h=&minus;1 at base-year-change quarters.</p>
   <p class="footnote visible">&dagger;10Y forecasts are only collected in Q1. Revisions compare this year's Q1 response to last year's Q1 response.</p>
+  <p class="footnote" id="footnote">*h=&minus;1 is a particular forecast error of the lagged nowcast. It computes the RGDP growth rate of <sub>t&minus;1</sub> using the realized level of last period's RGDP and the level of RGDP at <sub>t&minus;2</sub> available when they made this forecast (i.e., uses the <sub>t&minus;1</sub> RGDP growth rate using only first vintages). This is different from the BEA's advance estimate of RGDP growth since that estimate uses a newer vintage of <sub>t&minus;2</sub> RGDP. For this specific quarter, <b>Alt. median (using BEA advance): <span id="alt-median"></span></b>. This alternative is also used whenever there was a base year change to RGDP.</p>
 </div>
 
 <script>
@@ -96,7 +96,7 @@ function updatePlot() {
     const [yr, qr] = sel.split('Q');
     const qRows = allData.filter(r => String(r.YEAR) === yr && String(r.QUARTER) === qr);
     let altVals = qRows.map(r => parseFloat(r['RRGDP0_ALT'])).filter(v => !isNaN(v));
-    if (nonzeroOnly) altVals = altVals.filter(v => v !== 0);
+    if (nonzeroOnly) altVals = altVals.filter(v => Math.abs(v) > 0.05);
     const altMedEl = document.getElementById('alt-median');
     altMedEl.textContent = altVals.length >= 2 ? percentile(altVals, 50).toFixed(2) + ' pp' : 'n/a';
   }
@@ -113,10 +113,10 @@ function updatePlot() {
   for (const col of RCOLS) {
     let allVals = rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
     const total = allVals.length;
-    const nNonzero = allVals.filter(v => v !== 0).length;
-    const pct = total > 0 ? Math.round(100 * nNonzero / total) : null;
+    const nUpdated = allVals.filter(v => Math.abs(v) > 0.05).length;
+    const pct = total > 0 ? Math.round(100 * nUpdated / total) : null;
 
-    let vals = nonzeroOnly ? allVals.filter(v => v !== 0) : allVals;
+    let vals = nonzeroOnly ? allVals.filter(v => Math.abs(v) > 0.05) : allVals;
     if (vals.length >= 2) {
       medians.push(percentile(vals, 50));
       p5s.push(percentile(vals, 5));
