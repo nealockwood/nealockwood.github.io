@@ -92,6 +92,7 @@ RAW_SHOCK_COLUMNS = [
 ]
 
 EVENT_SCALE_COLUMNS = ["ust2y"]
+TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 
 OUTCOMES = {
     "unrate": {"label": "Unemployment", "source": "UNRATE", "transform": "diff"},
@@ -150,7 +151,27 @@ def read_macro() -> pd.DataFrame:
     mondat, _ = pyreadstat.read_dta(SOURCE_ROOT / "test" / "mondat.dta")
     mondat["daten"] = pd.to_datetime(mondat["daten"])
     mondat["month"] = mondat["daten"].dt.strftime("%Y-%m")
+    mondat = add_target_ffr_change(mondat)
     return mondat
+
+
+def add_target_ffr_change(macro: pd.DataFrame) -> pd.DataFrame:
+    macro = macro.copy()
+    if "tffr" not in macro.columns:
+        target_path = SOURCE_ROOT / "codex" / "dff_fedfunds_tffr_monthly.csv"
+        if target_path.exists():
+            target = pd.read_csv(target_path)
+            target["month"] = pd.to_datetime(target["DATE"]).dt.strftime("%Y-%m")
+            target["tffr"] = pd.to_numeric(target["TFFR"], errors="coerce")
+            macro = macro.merge(target[["month", "tffr"]], on="month", how="left")
+    if "tffr" in macro.columns:
+        macro["tffr"] = pd.to_numeric(macro["tffr"], errors="coerce")
+        if "dtffr" not in macro.columns:
+            macro = macro.sort_values("daten")
+            macro["dtffr"] = macro["tffr"].diff()
+    if "dtffr" in macro.columns:
+        macro["dtffr"] = pd.to_numeric(macro["dtffr"], errors="coerce")
+    return macro
 
 
 def read_external_shocks() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -241,9 +262,19 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
     return sorted(by_date.values(), key=lambda x: x["date"])
 
 
-def macro_rows(macro: pd.DataFrame) -> list[dict]:
+def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
     cols = ["month", "daten", "zlb"] + [spec["source"] for spec in OUTCOMES.values()]
-    cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS
+    cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS + TARGET_FFR_COLUMNS + EVENT_SCALE_COLUMNS
+    monthly_event_values: dict[str, dict[str, float]] = {}
+    for row in events:
+        month = row.get("month")
+        if not month:
+            continue
+        dest = monthly_event_values.setdefault(month, {})
+        for col in EVENT_SCALE_COLUMNS:
+            val = row.get(col)
+            if isinstance(val, (int, float)) and math.isfinite(float(val)):
+                dest[col] = dest.get(col, 0.0) + float(val)
     rows = []
     for _, row in macro.sort_values("daten").iterrows():
         rec = {"month": row["month"], "date": date_key(row["daten"])}
@@ -252,6 +283,9 @@ def macro_rows(macro: pd.DataFrame) -> list[dict]:
                 continue
             if col in row:
                 rec[col] = value(row[col])
+        if row["month"] in monthly_event_values:
+            for col, val in monthly_event_values[row["month"]].items():
+                rec[col] = value(val)
         rows.append(rec)
     return rows
 
@@ -268,10 +302,12 @@ def main() -> None:
             "sources": [
                 "prep.csv",
                 "test/mondat.dta",
+                "codex/dff_fedfunds_tffr_monthly.csv",
                 "BJMW-BRW-shocks-updated-1.xlsx",
                 "BJMW-2025-monetary-policy-shocks-series.xlsx",
             ],
             "defaults": {
+                "series": "mp1",
                 "shock": "mp1",
                 "horizon": 24,
                 "shock_lags": 12,
@@ -291,7 +327,7 @@ def main() -> None:
                 "ci": 0.9,
             },
         },
-        "shocks": {
+        "series": {
             "mp1": {"label": "MP1", "source": "prep.csv"},
             "ff4": {"label": "FF4", "source": "prep.csv"},
             "ed4": {"label": "ED4", "source": "prep.csv"},
@@ -299,6 +335,11 @@ def main() -> None:
             "bs": {"label": "BS", "source": "MPS with mandatory Bauer-Swanson controls"},
             "ns": {"label": "NS", "source": "BJMW NSmethod_Nsdata"},
             "brw": {"label": "BRW", "source": "BJMW latest BRW file"},
+            "dtffr": {
+                "label": "Target FFR Change",
+                "source": "Fredup target FFR monthly change",
+                "frequency": "monthly",
+            },
         },
         "outcomes": OUTCOMES,
         "controls": {
@@ -307,9 +348,10 @@ def main() -> None:
             "fred_macro": FRED_MACRO_CONTROLS,
             "bs_mandatory": MARKET_CONTROLS,
         },
-        "macro": macro_rows(macro),
+        "macro": macro_rows(macro, events),
         "events": events,
     }
+    payload["shocks"] = payload["series"]
     OUTPUT_PATH.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False), encoding="utf-8")
     print(f"Wrote {OUTPUT_PATH} ({len(events)} events, {len(payload['macro'])} monthly rows)")
 

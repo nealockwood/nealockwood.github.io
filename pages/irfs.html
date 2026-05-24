@@ -358,7 +358,7 @@
     <div class="section" style="border-top: 0; padding-top: 0; margin-top: 0;">
       <div class="section-title">Specification</div>
       <div>
-        <label for="shock">Shock</label>
+        <label for="shock">Series</label>
         <select id="shock"></select>
       </div>
       <div style="margin-top: 10px;">
@@ -382,15 +382,15 @@
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
         <label class="check-row"><input id="exclude-unscheduled" type="checkbox"><span>Exclude unscheduled meetings</span></label>
-        <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute no-shock months with zeros</span></label>
+        <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute missing months with zeros</span></label>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title">Shock, Outcome, Scaling</div>
+      <div class="section-title">Series, Outcome, Scaling</div>
       <div class="grid-2">
         <div>
-          <label for="shock-lags">Shock lags</label>
+          <label for="shock-lags">Series lags</label>
           <input id="shock-lags" type="number" min="0" max="60" step="1" value="12">
         </div>
         <div>
@@ -399,7 +399,7 @@
         </div>
       </div>
       <div style="margin-top: 9px;">
-        <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten shock residual</span></label>
+        <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
       </div>
       <div id="whitening-lag-wrap" class="hidden" style="margin-top: 10px;">
         <label for="whitening-lags">Whitening lags</label>
@@ -421,7 +421,7 @@
         <select id="scale-mode">
           <option value="ust2y-impact">UST2Y impact</option>
           <option value="ffr-h0">FFR h=0</option>
-          <option value="shock-rmse">Shock residual SD</option>
+          <option value="shock-rmse">Series residual SD</option>
           <option value="none">None</option>
         </select>
       </div>
@@ -482,7 +482,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=whitening-20260524";
+const DATA_URL = "irfs-data.json?v=target-ffr-series-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -584,11 +584,28 @@ function sumFiniteRows(rows, key) {
   return found ? total : null;
 }
 
+function allSeries() {
+  return DATA?.series || DATA?.shocks || {};
+}
+
+function seriesSpec(key) {
+  return allSeries()[key] || {};
+}
+
+function isMonthlySeries(key) {
+  return seriesSpec(key).frequency === "monthly";
+}
+
 function sourceValue(row, key) {
   if (row && finite(row[key])) return row[key];
   const m = macroByMonth.get(row?.month);
   if (m && finite(m[key])) return m[key];
   return null;
+}
+
+function seriesValue(row, key) {
+  if (isMonthlySeries(key)) return sourceValue(row, key);
+  return finite(row?.[key]) ? row[key] : null;
 }
 
 function monthValue(month, source) {
@@ -669,7 +686,7 @@ function scaleTargetConfig(mode) {
   }
   if (mode === "shock-rmse") {
     return {
-      label: "Shock size",
+      label: "Series size",
       unit: "residual standard deviations",
       value: DATA.meta.defaults.scale_to_shock_sd ?? 1,
       min: 0.01,
@@ -843,10 +860,11 @@ function filteredEventRows(settings, shockKey) {
 }
 
 function trimmedSupportRows(filteredRows, settings, shockKey) {
-  return filteredRows.filter(row => finite(row[shockKey]));
+  return filteredRows.filter(row => finite(seriesValue(row, shockKey)));
 }
 
 function countUnscheduledSupportRows(settings, shockKey) {
+  if (isMonthlySeries(shockKey)) return 0;
   const rowsWithUnscheduled = filteredEventRows({...settings, excludeUnscheduled: false}, shockKey);
   return trimmedSupportRows(rowsWithUnscheduled, settings, shockKey)
     .filter(row => rowPassesYearFilter(row, settings))
@@ -854,7 +872,38 @@ function countUnscheduledSupportRows(settings, shockKey) {
     .length;
 }
 
+function sortAnalysisRows(rows) {
+  return rows.sort((a, b) => {
+    const am = a.month || a.date.slice(0, 7);
+    const bm = b.month || b.date.slice(0, 7);
+    return am === bm ? a.date.localeCompare(b.date) : am.localeCompare(bm);
+  });
+}
+
+function attachSeriesHistory(rows, settings, shockKey) {
+  const history = [];
+  for (const row of rows) {
+    const value = seriesValue(row, shockKey);
+    row._x = finite(value) ? value : 0;
+    row._shockLags = [];
+    for (let i = 1; i <= settings.shockLags; i++) {
+      row._shockLags.push(history.length >= i ? history[history.length - i] : null);
+    }
+    history.push(row._x);
+  }
+  return rows;
+}
+
+function buildMonthlySeriesRows(settings, shockKey) {
+  const rows = DATA.macro
+    .filter(row => finite(seriesValue(row, shockKey)))
+    .map(row => ({...row, source: "monthly-series"}));
+  attachSeriesHistory(sortAnalysisRows(rows), settings, shockKey);
+  return rows.filter(row => rowPassesYearFilter(row, settings));
+}
+
 function buildAnalysisRows(settings, shockKey) {
+  if (isMonthlySeries(shockKey)) return buildMonthlySeriesRows(settings, shockKey);
   const filtered = filteredEventRows(settings, shockKey);
   const supportRows = trimmedSupportRows(filtered, settings, shockKey);
   let rows;
@@ -901,21 +950,7 @@ function buildAnalysisRows(settings, shockKey) {
     rows = supportRows;
   }
 
-  rows = rows.sort((a, b) => {
-    const am = a.month || a.date.slice(0, 7);
-    const bm = b.month || b.date.slice(0, 7);
-    return am === bm ? a.date.localeCompare(b.date) : am.localeCompare(bm);
-  });
-
-  const history = [];
-  for (const row of rows) {
-    row._x = finite(row[shockKey]) ? row[shockKey] : 0;
-    row._shockLags = [];
-    for (let i = 1; i <= settings.shockLags; i++) {
-      row._shockLags.push(history.length >= i ? history[history.length - i] : null);
-    }
-    history.push(row._x);
-  }
+  attachSeriesHistory(sortAnalysisRows(rows), settings, shockKey);
   return rows.filter(row => rowPassesYearFilter(row, settings));
 }
 
@@ -1323,7 +1358,7 @@ function runSpec() {
   const rows = buildAnalysisRows(settings, settings.shock);
   const unscheduledSupportRows = countUnscheduledSupportRows(settings, settings.shock);
   if (rows.length < 12) {
-    showError("The selected sample has too few usable shock observations.");
+    showError("The selected sample has too few usable series observations.");
     return;
   }
 
@@ -1346,11 +1381,11 @@ function runSpec() {
         return;
       }
       if (fit.beta < 0) {
-        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the shock coefficient is negative (${fmt(fit.beta, 4)}). Choose a different scaling method.`);
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the series coefficient is negative (${fmt(fit.beta, 4)}). Choose a different scaling method.`);
         return;
       }
       if (Math.abs(fit.beta) < EPS) {
-        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the shock coefficient is effectively zero. Choose a different scaling method.`);
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the series coefficient is effectively zero. Choose a different scaling method.`);
         return;
       }
       scaleByOutcome[outcome] = target / fit.beta;
@@ -1379,7 +1414,7 @@ function runSpec() {
         ? whitenedShockResidualRmse(scaleData.x, scaleData.controls, settings.whiteningLags)
         : shockResidualRmse(scaleData.x, scaleData.controls);
       if (!fit || !finite(fit.rmse)) {
-        showError(`Shock residual SD scaling failed for ${outcomeLabel(outcome)}.`);
+        showError(`Series residual SD scaling failed for ${outcomeLabel(outcome)}.`);
         return;
       }
       scaleByOutcome[outcome] = settings.scaleTarget * fit.rmse;
@@ -1424,7 +1459,7 @@ function axisLayoutName(i, axis) {
 
 function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows) {
   document.getElementById("error").classList.add("hidden");
-  const shockLabel = DATA.shocks[settings.shock].label;
+  const shockLabel = seriesSpec(settings.shock).label;
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = "90% HC1 robust confidence band";
 
@@ -1544,17 +1579,18 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   const validH = allResults.filter(r => r.n > 0);
   const h0n = Math.min(...OUTCOME_ORDER.map(outcome => resultsByOutcome[outcome][0]?.n || 0));
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
+  const monthlySeries = isMonthlySeries(settings.shock);
   const shockControlCount = settings.useWhitening ? settings.whiteningLags : settings.shockLags;
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
-  const imputeText = settings.imputeZeros ? "zero-imputed" : "event rows";
+  const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
   const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
-  const unscheduledText = settings.excludeUnscheduled
+  const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
     ? `unscheduled excluded (${unscheduledSupportRows})`
-    : `unscheduled included (${unscheduledSupportRows})`;
+    : `unscheduled included (${unscheduledSupportRows})`);
 
   document.getElementById("status-pills").innerHTML = [
-    `<span class="pill">${settings.aggregation}</span>`,
+    `<span class="pill">${monthlySeries ? "monthly series" : settings.aggregation}</span>`,
     `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
     `<span class="pill">${estimatorText}</span>`,
     `<span class="pill">${zlbText}</span>`,
@@ -1564,8 +1600,8 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   ].join("");
 
   document.getElementById("diagnostics").innerHTML = [
-    metric("Event rows", rows.length),
-    metric("Unscheduled rows", settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`),
+    metric("Rows", rows.length),
+    metric("Unscheduled rows", monthlySeries ? "n/a" : (settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`)),
     metric("Years", settings.includedYearsDisplay),
     metric("Date range", `${minDate} to ${maxDate}`),
     metric("h=0 n", h0n),
@@ -1573,7 +1609,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
     metric("Controls", controlsCount),
     metric("Scale", scaleDisplay),
     metric("FFR h=0 raw", fmt(ffrH0, 4)),
-    metric("Shock lags", settings.useWhitening ? "replaced" : settings.shockLags),
+    metric("Series lags", settings.useWhitening ? "replaced" : settings.shockLags),
     metric("Whitening", settings.useWhitening ? settings.whiteningLags : "off"),
     metric("Outcome lags", settings.depLags),
     metric("Macro lags", settings.macroLags),
@@ -1596,11 +1632,11 @@ function showError(message) {
 
 function renderOptions() {
   const shockSel = document.getElementById("shock");
-  shockSel.innerHTML = Object.entries(DATA.shocks)
+  shockSel.innerHTML = Object.entries(allSeries())
     .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
     .join("");
 
-  document.getElementById("shock").value = DATA.meta.defaults.shock;
+  document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
   document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
   document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
