@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Projection IRF Explorer</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f3;
+    --panel: #ffffff;
+    --ink: #17201b;
+    --muted: #66736c;
+    --line: #d9dfd8;
+    --teal: #167c80;
+    --teal-soft: rgba(22, 124, 128, 0.14);
+    --amber: #b66d12;
+    --rose: #9a4055;
+    --shadow: 0 16px 40px rgba(22, 32, 27, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px;
+    min-height: 100vh;
+  }
+
+  aside, main {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  aside {
+    border-radius: 8px;
+    padding: 16px;
+    overflow: auto;
+    max-height: calc(100vh - 36px);
+  }
+
+  main {
+    border-radius: 8px;
+    display: grid;
+    grid-template-rows: auto minmax(430px, 1fr) auto;
+    min-width: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  .stamp {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
+  .section {
+    border-top: 1px solid var(--line);
+    padding-top: 13px;
+    margin-top: 13px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #34443a;
+    margin-bottom: 5px;
+  }
+
+  select, input[type="number"], input[type="date"] {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fbfcfb;
+    color: var(--ink);
+    font-size: 13px;
+    padding: 6px 9px;
+    outline: none;
+  }
+
+  select:focus, input:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px var(--teal-soft);
+  }
+
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    color: #26352d;
+    font-size: 13px;
+  }
+
+  .check-row input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--teal);
+    flex: 0 0 auto;
+  }
+
+  .check-row span {
+    overflow-wrap: anywhere;
+  }
+
+  .control-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+
+  details {
+    border-top: 1px solid #edf0ed;
+    padding-top: 9px;
+    margin-top: 9px;
+  }
+
+  summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 800;
+    color: #26352d;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "+";
+    color: var(--muted);
+    font-weight: 800;
+  }
+  details[open] summary::after { content: "-"; }
+
+  button {
+    border: 0;
+    border-radius: 6px;
+    min-height: 38px;
+    padding: 9px 12px;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+
+  button svg { width: 16px; height: 16px; }
+
+  .primary {
+    width: 100%;
+    background: var(--teal);
+    color: white;
+  }
+
+  .secondary {
+    width: 100%;
+    background: #eef2ef;
+    color: #26352d;
+  }
+
+  .topbar {
+    padding: 16px 18px 10px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .chart-title {
+    font-size: 18px;
+    font-weight: 850;
+    margin-bottom: 4px;
+  }
+
+  .chart-subtitle {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .status {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pill {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 12px;
+    color: #34443a;
+    background: #fbfcfb;
+    white-space: nowrap;
+  }
+
+  .pill.warn {
+    color: var(--rose);
+    border-color: rgba(154, 64, 85, 0.32);
+    background: rgba(154, 64, 85, 0.07);
+  }
+
+  #plot {
+    width: 100%;
+    min-height: 430px;
+  }
+
+  .diagnostics {
+    border-top: 1px solid var(--line);
+    padding: 12px 18px 16px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .metric {
+    background: #f8faf8;
+    border: 1px solid #e8ede8;
+    border-radius: 8px;
+    padding: 9px 10px;
+  }
+
+  .metric .name {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .metric .value {
+    font-size: 15px;
+    font-weight: 850;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .error {
+    margin: 18px;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(154, 64, 85, 0.35);
+    background: rgba(154, 64, 85, 0.08);
+    color: #7e2f43;
+    font-weight: 700;
+  }
+
+  .hidden { display: none; }
+
+  @media (max-width: 940px) {
+    .app {
+      grid-template-columns: 1fr;
+      padding: 10px;
+    }
+    aside {
+      max-height: none;
+    }
+    main {
+      min-height: 620px;
+    }
+    .topbar {
+      display: block;
+    }
+    .status {
+      justify-content: flex-start;
+      margin-top: 10px;
+    }
+    .diagnostics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div>
+        <h1>Local Projection IRF Explorer</h1>
+        <div class="stamp" id="data-stamp">Loading data...</div>
+      </div>
+    </div>
+
+    <div class="section" style="border-top: 0; padding-top: 0; margin-top: 0;">
+      <div class="section-title">Specification</div>
+      <div class="grid-2">
+        <div>
+          <label for="shock">Shock</label>
+          <select id="shock"></select>
+        </div>
+        <div>
+          <label for="outcome">Outcome</label>
+          <select id="outcome"></select>
+        </div>
+      </div>
+      <div style="margin-top: 10px;">
+        <label for="aggregation">Aggregation</label>
+        <select id="aggregation">
+          <option value="main">main == 1</option>
+          <option value="all">All event rows</option>
+          <option value="month-sum">Monthly sum</option>
+          <option value="month-last">Monthly last</option>
+          <option value="month-first">Monthly first</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Sample</div>
+      <div class="grid-2">
+        <div>
+          <label for="start-date">Start</label>
+          <input id="start-date" type="date">
+        </div>
+        <div>
+          <label for="end-date">End</label>
+          <input id="end-date" type="date">
+        </div>
+      </div>
+      <div style="margin-top: 9px;">
+        <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
+        <label class="check-row"><input id="include-unscheduled" type="checkbox"><span>Include unscheduled meetings</span></label>
+        <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute no-shock months with zeros</span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Lags And Scaling</div>
+      <div class="grid-2">
+        <div>
+          <label for="shock-lags">Shock lags</label>
+          <input id="shock-lags" type="number" min="0" max="60" step="1" value="12">
+        </div>
+        <div>
+          <label for="dep-lags">Outcome lags</label>
+          <input id="dep-lags" type="number" min="0" max="60" step="1" value="12">
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top: 10px;">
+        <div>
+          <label for="horizon">Horizon</label>
+          <input id="horizon" type="number" min="1" max="120" step="1" value="24">
+        </div>
+        <div>
+          <label for="scale-bp">FFR h=1 bp</label>
+          <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
+        </div>
+      </div>
+      <div style="margin-top: 9px;">
+        <label class="check-row"><input id="scale-irf" type="checkbox" checked><span>Scale IRF to FFR h=1</span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Controls</div>
+      <details open>
+        <summary>Market / BS Controls</summary>
+        <div class="control-list" id="controls-market"></div>
+      </details>
+      <details>
+        <summary>Greenbook Controls</summary>
+        <div class="control-list" id="controls-greenbook"></div>
+      </details>
+      <details>
+        <summary>Event Controls</summary>
+        <div class="control-list" id="controls-event"></div>
+      </details>
+    </div>
+
+    <div class="section">
+      <div class="grid-2">
+        <button class="secondary" id="reset-btn" type="button"><i data-lucide="rotate-ccw"></i>Reset</button>
+        <button class="primary" id="run-btn" type="button"><i data-lucide="play"></i>Run</button>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div>
+        <div class="chart-title" id="chart-title">IRF</div>
+        <div class="chart-subtitle" id="chart-subtitle">90% HC1 robust confidence band</div>
+      </div>
+      <div class="status" id="status-pills"></div>
+    </div>
+    <div id="error" class="error hidden"></div>
+    <div id="plot"></div>
+    <div class="diagnostics" id="diagnostics"></div>
+  </main>
+</div>
+
+<script>
+const DATA_URL = "irfs-data.json";
+const Z90 = 1.6448536269514722;
+const EPS = 1e-10;
+
+let DATA = null;
+let macroByMonth = new Map();
+let monthIndex = new Map();
+let months = [];
+
+const CONTROL_LABELS = {
+  nfp_surp: "NFP surprise",
+  nfp_12m: "NFP 12m",
+  sp500_3m: "S&P 3m",
+  slope_3m: "Slope 3m",
+  bcom_3m: "BCOM 3m",
+  tr_skew: "TR skew",
+  gRGDPB1: "RGDP B1",
+  gRGDPF0: "RGDP F0",
+  gRGDPF1: "RGDP F1",
+  gRGDPF2: "RGDP F2",
+  gRGDPF3: "RGDP F3",
+  DgRGDPB1: "D RGDP B1",
+  DgRGDPF0: "D RGDP F0",
+  DgRGDPF1: "D RGDP F1",
+  DgRGDPF2: "D RGDP F2",
+  gPGDPB1: "PGDP B1",
+  gPGDPF0: "PGDP F0",
+  gPGDPF1: "PGDP F1",
+  gPGDPF2: "PGDP F2",
+  gPGDPF3: "PGDP F3",
+  DgPGDPB1: "D PGDP B1",
+  DgPGDPF0: "D PGDP F0",
+  DgPGDPF1: "D PGDP F1",
+  DgPGDPF2: "D PGDP F2",
+  UNEMPF0: "UNEMP F0",
+  dffr: "D FFR",
+  eurusd: "EUR/USD",
+  usdjpy: "USD/JPY"
+};
+
+function finite(v) {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+function asNumber(v) {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : null;
+}
+
+function fmt(x, digits = 3) {
+  return finite(x) ? x.toFixed(digits) : "NA";
+}
+
+function truthyFlag(v) {
+  return v === 1 || v === true || v === "1";
+}
+
+function monthToDate(month) {
+  return month + "-01";
+}
+
+function sourceValue(row, key) {
+  if (row && finite(row[key])) return row[key];
+  const m = macroByMonth.get(row?.month);
+  if (m && finite(m[key])) return m[key];
+  return null;
+}
+
+function outcomeBase(outcomeKey) {
+  return DATA.outcomes[outcomeKey].source;
+}
+
+function monthValue(month, source) {
+  const row = macroByMonth.get(month);
+  if (!row || !finite(row[source])) return null;
+  return row[source];
+}
+
+function isZlbMonth(month) {
+  const row = macroByMonth.get(month);
+  return row ? truthyFlag(row.zlb) : false;
+}
+
+function responseValue(outcomeKey, baseMonth, h, includeZlb) {
+  const spec = DATA.outcomes[outcomeKey];
+  const baseIdx = monthIndex.get(baseMonth);
+  if (baseIdx === undefined) return null;
+  const leadIdx = baseIdx + h;
+  const prevIdx = baseIdx - 1;
+  if (leadIdx < 0 || leadIdx >= months.length || prevIdx < 0) return null;
+  const leadMonth = months[leadIdx];
+  const prevMonth = months[prevIdx];
+  if (!includeZlb && isZlbMonth(leadMonth)) return null;
+  const lead = monthValue(leadMonth, spec.source);
+  const prev = monthValue(prevMonth, spec.source);
+  if (!finite(lead) || !finite(prev)) return null;
+  if (spec.transform === "logdiff100") {
+    if (lead <= 0 || prev <= 0) return null;
+    return 100 * (Math.log(lead) - Math.log(prev));
+  }
+  return lead - prev;
+}
+
+function dependentDelta(outcomeKey, baseMonth, lag) {
+  const spec = DATA.outcomes[outcomeKey];
+  const baseIdx = monthIndex.get(baseMonth);
+  if (baseIdx === undefined) return null;
+  const curIdx = baseIdx - lag;
+  const prevIdx = baseIdx - lag - 1;
+  if (curIdx < 0 || prevIdx < 0) return null;
+  const cur = monthValue(months[curIdx], spec.source);
+  const prev = monthValue(months[prevIdx], spec.source);
+  if (!finite(cur) || !finite(prev)) return null;
+  if (spec.transform === "logdiff100") {
+    if (cur <= 0 || prev <= 0) return null;
+    return 100 * (Math.log(cur) - Math.log(prev));
+  }
+  return cur - prev;
+}
+
+function getSettings() {
+  const selectedControls = Array.from(document.querySelectorAll(".control-check:checked"))
+    .map(el => el.value);
+  const shock = document.getElementById("shock").value;
+  const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
+  return {
+    shock,
+    outcome: document.getElementById("outcome").value,
+    aggregation: document.getElementById("aggregation").value,
+    startDate: document.getElementById("start-date").value,
+    endDate: document.getElementById("end-date").value,
+    includeZlb: document.getElementById("include-zlb").checked,
+    includeUnscheduled: document.getElementById("include-unscheduled").checked,
+    imputeZeros: document.getElementById("impute-zeros").checked,
+    shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
+    depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
+    horizon: Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)),
+    scaleBp: Math.max(1, Number.parseFloat(document.getElementById("scale-bp").value || "50")),
+    scaleIrf: document.getElementById("scale-irf").checked,
+    controls: Array.from(new Set([...selectedControls, ...forced]))
+  };
+}
+
+function eventPassesBaseFilters(row, settings) {
+  if (settings.startDate && row.date < settings.startDate) return false;
+  if (settings.endDate && row.date > settings.endDate) return false;
+  if (!settings.includeUnscheduled && truthyFlag(row.unscheduled)) return false;
+  if (!settings.includeUnscheduled && row.scheduled === 0) return false;
+  if (settings.aggregation === "main") {
+    return truthyFlag(row.main) || (row.main == null && row.scheduled === 1);
+  }
+  return true;
+}
+
+function aggregateMonth(items, mode, shockKey) {
+  const sorted = items.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const base = mode === "month-first" ? sorted[0] : sorted[sorted.length - 1];
+  const rec = {...base};
+  rec.source = "aggregated";
+  rec.date = base.date;
+  rec.month = base.month;
+  if (mode === "month-sum") {
+    let total = 0;
+    let found = false;
+    for (const row of sorted) {
+      if (finite(row[shockKey])) {
+        total += row[shockKey];
+        found = true;
+      }
+    }
+    rec[shockKey] = found ? total : null;
+  } else {
+    rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
+  }
+  const allControls = [...DATA.controls.market, ...DATA.controls.greenbook, ...DATA.controls.event];
+  for (const key of allControls) {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (finite(sorted[i][key])) {
+        rec[key] = sorted[i][key];
+        break;
+      }
+    }
+  }
+  rec.unscheduled = sorted.some(r => truthyFlag(r.unscheduled)) ? 1 : 0;
+  rec.main = sorted.some(r => truthyFlag(r.main)) ? 1 : 0;
+  return rec;
+}
+
+function filteredEventRows(settings, shockKey) {
+  let rows = DATA.events.filter(row => eventPassesBaseFilters(row, settings));
+  if (settings.aggregation.startsWith("month-")) {
+    const groups = new Map();
+    for (const row of rows) {
+      if (!groups.has(row.month)) groups.set(row.month, []);
+      groups.get(row.month).push(row);
+    }
+    rows = Array.from(groups.values()).map(items => aggregateMonth(items, settings.aggregation, shockKey));
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function buildAnalysisRows(settings, shockKey) {
+  const filtered = filteredEventRows(settings, shockKey);
+  let rows;
+  if (settings.imputeZeros) {
+    const grouped = new Map();
+    for (const row of filtered) {
+      if (!grouped.has(row.month)) grouped.set(row.month, []);
+      grouped.get(row.month).push(row);
+    }
+    rows = DATA.macro
+      .filter(m => (!settings.startDate || monthToDate(m.month) >= settings.startDate) &&
+                   (!settings.endDate || monthToDate(m.month) <= settings.endDate))
+      .map(m => {
+        const items = grouped.get(m.month) || [];
+        const rec = {date: m.date, month: m.month, source: items.length ? "event-month" : "imputed"};
+        let total = 0;
+        let found = false;
+        for (const item of items) {
+          if (finite(item[shockKey])) {
+            total += item[shockKey];
+            found = true;
+          }
+        }
+        rec[shockKey] = found ? total : 0;
+        const allControls = [...DATA.controls.market, ...DATA.controls.greenbook, ...DATA.controls.event];
+        for (const key of allControls) {
+          for (let i = items.length - 1; i >= 0; i--) {
+            if (finite(items[i][key])) {
+              rec[key] = items[i][key];
+              break;
+            }
+          }
+          if (!finite(rec[key]) && finite(m[key])) rec[key] = m[key];
+        }
+        rec.unscheduled = items.some(r => truthyFlag(r.unscheduled)) ? 1 : 0;
+        rec.main = items.some(r => truthyFlag(r.main)) ? 1 : 0;
+        return rec;
+      });
+  } else {
+    rows = filtered.filter(row => finite(row[shockKey]));
+  }
+
+  rows = rows.sort((a, b) => {
+    const am = a.month || a.date.slice(0, 7);
+    const bm = b.month || b.date.slice(0, 7);
+    return am === bm ? a.date.localeCompare(b.date) : am.localeCompare(bm);
+  });
+
+  const history = [];
+  for (const row of rows) {
+    row._x = finite(row[shockKey]) ? row[shockKey] : 0;
+    row._shockLags = [];
+    for (let i = 1; i <= settings.shockLags; i++) {
+      row._shockLags.push(history.length >= i ? history[history.length - i] : null);
+    }
+    history.push(row._x);
+  }
+  return rows;
+}
+
+function buildRegressionData(settings, rows, outcomeKey, h) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  const rowDates = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const yi = responseValue(outcomeKey, row.month, h, settings.includeZlb);
+    if (!finite(yi) || !finite(row._x)) continue;
+
+    const zi = [];
+    let ok = true;
+    for (let i = 0; i < settings.shockLags; i++) {
+      const v = row._shockLags[i];
+      if (!finite(v)) { ok = false; break; }
+      zi.push(v);
+    }
+    if (!ok) continue;
+
+    for (let i = 1; i <= settings.depLags; i++) {
+      const v = dependentDelta(outcomeKey, row.month, i);
+      if (!finite(v)) { ok = false; break; }
+      zi.push(v);
+    }
+    if (!ok) continue;
+
+    for (const c of settings.controls) {
+      const v = sourceValue(row, c);
+      if (!finite(v)) { ok = false; break; }
+      zi.push(v);
+    }
+    if (!ok) continue;
+    y.push(yi);
+    x.push(row._x);
+    controls.push(zi);
+    rowDates.push(row.date);
+  }
+  return {y, x, controls, rowDates};
+}
+
+function solveLinear(a, b) {
+  const n = b.length;
+  const m = a.map((row, i) => row.slice().concat([b[i]]));
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(m[r][col]) > Math.abs(m[pivot][col])) pivot = r;
+    }
+    if (Math.abs(m[pivot][col]) < EPS) return null;
+    if (pivot !== col) [m[pivot], m[col]] = [m[col], m[pivot]];
+    const div = m[col][col];
+    for (let c = col; c <= n; c++) m[col][c] /= div;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const factor = m[r][col];
+      for (let c = col; c <= n; c++) m[r][c] -= factor * m[col][c];
+    }
+  }
+  return m.map(row => row[n]);
+}
+
+function residualize(v, z) {
+  const n = v.length;
+  if (!z.length || !z[0].length) {
+    const mean = v.reduce((a, b) => a + b, 0) / n;
+    return v.map(x => x - mean);
+  }
+  const k = z[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      xty[a] += z[i][a] * v[i];
+      for (let b = 0; b < k; b++) xtx[a][b] += z[i][a] * z[i][b];
+    }
+  }
+  const beta = solveLinear(xtx, xty);
+  if (!beta) return null;
+  return v.map((val, i) => {
+    let fit = 0;
+    for (let j = 0; j < k; j++) fit += z[i][j] * beta[j];
+    return val - fit;
+  });
+}
+
+function cleanZ(controls) {
+  if (!controls.length) return {z: [], k: 1};
+  const n = controls.length;
+  const rawK = controls[0].length;
+  const keep = [];
+  for (let j = 0; j < rawK; j++) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < n; i++) {
+      min = Math.min(min, controls[i][j]);
+      max = Math.max(max, controls[i][j]);
+    }
+    if (max - min > EPS) keep.push(j);
+  }
+  const z = controls.map(row => [1, ...keep.map(j => row[j])]);
+  return {z, k: 1 + keep.length};
+}
+
+function partialOls(y, x, controls) {
+  const n = y.length;
+  if (n < 8) return null;
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualize(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const denom = rx.reduce((acc, v) => acc + v * v, 0);
+  if (denom < EPS) return null;
+  const beta = rx.reduce((acc, v, i) => acc + v * ry[i], 0) / denom;
+  const resid = ry.map((v, i) => v - beta * rx[i]);
+  const p = k + 1;
+  if (n <= p) return null;
+  let meat = 0;
+  for (let i = 0; i < n; i++) meat += rx[i] * rx[i] * resid[i] * resid[i];
+  const variance = (n / (n - p)) * meat / (denom * denom);
+  return {
+    beta,
+    se: Math.sqrt(Math.max(0, variance)),
+    n,
+    p,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
+  };
+}
+
+function runOutcome(settings, rows, outcomeKey, maxH) {
+  const results = [];
+  for (let h = 0; h <= maxH; h++) {
+    const reg = buildRegressionData(settings, rows, outcomeKey, h);
+    const fit = partialOls(reg.y, reg.x, reg.controls);
+    results.push({
+      h,
+      beta: fit ? fit.beta : null,
+      se: fit ? fit.se : null,
+      n: fit ? fit.n : 0,
+      p: fit ? fit.p : 0,
+      dates: reg.rowDates
+    });
+  }
+  return results;
+}
+
+function runSpec() {
+  const settings = getSettings();
+  syncBsControls();
+  const rows = buildAnalysisRows(settings, settings.shock);
+  if (rows.length < 12) {
+    showError("The selected sample has too few usable shock observations.");
+    return;
+  }
+
+  const maxH = Math.max(settings.horizon, 1);
+  const raw = runOutcome(settings, rows, settings.outcome, maxH);
+  let scale = 1;
+  let ffrH1 = null;
+  if (settings.scaleIrf) {
+    const ffr = runOutcome(settings, rows, "ffr", 1);
+    ffrH1 = ffr[1]?.beta;
+    if (!finite(ffrH1) || Math.abs(ffrH1) < EPS) {
+      showError("Scaling failed because the FFR h=1 coefficient is unavailable or effectively zero.");
+      return;
+    }
+    scale = (settings.scaleBp / 100) / ffrH1;
+  }
+
+  const results = raw.slice(0, settings.horizon + 1).map(r => ({
+    ...r,
+    betaScaled: finite(r.beta) ? r.beta * scale : null,
+    lo: finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * scale : null,
+    hi: finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * scale : null
+  }));
+  render(settings, rows, results, scale, ffrH1);
+}
+
+function render(settings, rows, results, scale, ffrH1) {
+  document.getElementById("error").classList.add("hidden");
+  const shockLabel = DATA.shocks[settings.shock].label;
+  const outcomeLabel = DATA.outcomes[settings.outcome].label;
+  document.getElementById("chart-title").textContent = `${outcomeLabel} response to ${shockLabel}`;
+  document.getElementById("chart-subtitle").textContent = "90% HC1 robust confidence band";
+
+  const x = results.map(r => r.h);
+  const y = results.map(r => r.betaScaled);
+  const lo = results.map(r => r.lo);
+  const hi = results.map(r => r.hi);
+  const n = results.map(r => r.n);
+
+  const bandX = x.concat(x.slice().reverse());
+  const bandY = hi.concat(lo.slice().reverse());
+  const hover = results.map(r =>
+    `h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
+  );
+
+  const traces = [
+    {
+      x: bandX,
+      y: bandY,
+      type: "scatter",
+      mode: "lines",
+      fill: "toself",
+      fillcolor: "rgba(22, 124, 128, 0.16)",
+      line: {color: "rgba(22, 124, 128, 0)"},
+      hoverinfo: "skip",
+      showlegend: false
+    },
+    {
+      x,
+      y,
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#167c80", width: 3},
+      marker: {color: "#17201b", size: 6},
+      hovertemplate: hover,
+      name: "IRF"
+    },
+    {
+      x,
+      y: x.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false
+    }
+  ];
+
+  Plotly.react("plot", traces, {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 62, r: 24, t: 16, b: 52},
+    xaxis: {
+      title: "Horizon",
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      dtick: Math.max(1, Math.ceil(settings.horizon / 12))
+    },
+    yaxis: {
+      title: DATA.outcomes[settings.outcome].transform === "logdiff100" ? "Percent" : "Percentage points",
+      zeroline: false,
+      gridcolor: "#eef2ef"
+    },
+    hovermode: "x unified",
+    showlegend: false,
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
+  }, {responsive: true, displayModeBar: false});
+
+  const minDate = rows.length ? rows[0].date : "NA";
+  const maxDate = rows.length ? rows[rows.length - 1].date : "NA";
+  const validH = results.filter(r => r.n > 0);
+  const h0n = results[0]?.n || 0;
+  const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
+  const controlsCount = settings.controls.length + settings.shockLags + settings.depLags;
+  const zlbText = settings.includeZlb ? "ZLB included" : "ZLB excluded";
+  const imputeText = settings.imputeZeros ? "zero-imputed" : "event sample";
+
+  document.getElementById("status-pills").innerHTML = [
+    `<span class="pill">${settings.aggregation}</span>`,
+    `<span class="pill">${zlbText}</span>`,
+    `<span class="pill">${imputeText}</span>`,
+    settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
+  ].join("");
+
+  document.getElementById("diagnostics").innerHTML = [
+    metric("Event rows", rows.length),
+    metric("Date range", `${minDate} to ${maxDate}`),
+    metric("h=0 n", h0n),
+    metric("Min n", minN),
+    metric("Controls", controlsCount),
+    metric("Scale", fmt(scale, 3)),
+    metric("FFR h=1 raw", fmt(ffrH1, 4)),
+    metric("Shock lags", settings.shockLags),
+    metric("Outcome lags", settings.depLags),
+    metric("Max horizon", settings.horizon)
+  ].join("");
+}
+
+function metric(name, value) {
+  return `<div class="metric"><div class="name">${name}</div><div class="value" title="${value}">${value}</div></div>`;
+}
+
+function showError(message) {
+  const el = document.getElementById("error");
+  el.textContent = message;
+  el.classList.remove("hidden");
+  Plotly.purge("plot");
+  document.getElementById("diagnostics").innerHTML = "";
+  document.getElementById("status-pills").innerHTML = `<span class="pill warn">No result</span>`;
+}
+
+function renderOptions() {
+  const shockSel = document.getElementById("shock");
+  shockSel.innerHTML = Object.entries(DATA.shocks)
+    .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
+    .join("");
+  const outcomeSel = document.getElementById("outcome");
+  outcomeSel.innerHTML = Object.entries(DATA.outcomes)
+    .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
+    .join("");
+
+  document.getElementById("shock").value = DATA.meta.defaults.shock;
+  document.getElementById("outcome").value = DATA.meta.defaults.outcome;
+  document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
+  document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
+  document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
+  document.getElementById("horizon").value = DATA.meta.defaults.horizon;
+  document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h1_bp;
+  document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
+  document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
+  document.getElementById("include-unscheduled").checked = DATA.meta.defaults.include_unscheduled;
+
+  const eventDates = DATA.events.map(r => r.date).sort();
+  document.getElementById("start-date").value = eventDates[0];
+  document.getElementById("end-date").value = eventDates[eventDates.length - 1];
+
+  renderControlChecks("controls-market", DATA.controls.market);
+  renderControlChecks("controls-greenbook", DATA.controls.greenbook);
+  renderControlChecks("controls-event", DATA.controls.event);
+  syncBsControls();
+}
+
+function renderControlChecks(containerId, controls) {
+  document.getElementById(containerId).innerHTML = controls.map(c => {
+    const label = CONTROL_LABELS[c] || c;
+    return `<label class="check-row"><input class="control-check" type="checkbox" value="${c}" data-control="${c}"><span>${label}</span></label>`;
+  }).join("");
+}
+
+function syncBsControls() {
+  const shock = document.getElementById("shock").value;
+  const forced = new Set(DATA?.controls?.bs_mandatory || []);
+  for (const el of document.querySelectorAll(".control-check")) {
+    if (forced.has(el.value)) {
+      if (shock === "bs") {
+        el.checked = true;
+        el.disabled = true;
+        el.closest(".check-row").style.color = "#b66d12";
+      } else {
+        el.disabled = false;
+        el.closest(".check-row").style.color = "";
+      }
+    }
+  }
+}
+
+function resetDefaults() {
+  renderOptions();
+  runSpec();
+}
+
+async function init() {
+  DATA = await fetch(DATA_URL).then(r => {
+    if (!r.ok) throw new Error(`Failed to load ${DATA_URL}`);
+    return r.json();
+  });
+  months = DATA.macro.map(row => row.month);
+  macroByMonth = new Map(DATA.macro.map(row => [row.month, row]));
+  monthIndex = new Map(months.map((m, i) => [m, i]));
+  document.getElementById("data-stamp").textContent = `Snapshot ${DATA.meta.built_at.slice(0, 10)} - ${DATA.events.length} events`;
+  renderOptions();
+  document.getElementById("run-btn").addEventListener("click", runSpec);
+  document.getElementById("reset-btn").addEventListener("click", resetDefaults);
+  document.getElementById("shock").addEventListener("change", () => {
+    syncBsControls();
+    runSpec();
+  });
+  for (const id of ["outcome", "aggregation", "include-zlb", "include-unscheduled", "impute-zeros", "scale-irf"]) {
+    document.getElementById(id).addEventListener("change", runSpec);
+  }
+  if (window.lucide) window.lucide.createIcons();
+  runSpec();
+}
+
+init().catch(err => showError(err.message || String(err)));
+</script>
+</body>
+</html>
