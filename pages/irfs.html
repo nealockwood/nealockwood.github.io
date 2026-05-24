@@ -165,6 +165,11 @@
     margin-bottom: 8px;
   }
 
+  .control-group-header .check-row {
+    margin-bottom: 0;
+    min-height: 24px;
+  }
+
   .control-group-title {
     font-size: 13px;
     font-weight: 850;
@@ -216,14 +221,6 @@
     width: 100%;
     background: #eef2ef;
     color: #26352d;
-  }
-
-  .compact-button {
-    width: auto;
-    min-height: 32px;
-    padding: 7px 9px;
-    font-size: 12px;
-    white-space: nowrap;
   }
 
   .topbar {
@@ -420,7 +417,7 @@
       <div class="control-group">
         <div class="control-group-header">
           <div class="control-group-title">Market / BS Controls</div>
-          <button class="secondary compact-button" id="select-market-controls" type="button"><i data-lucide="list-checks"></i>All Market</button>
+          <label class="check-row"><input id="toggle-market-controls" type="checkbox" data-group-toggle="market"><span>All Market</span></label>
         </div>
         <details class="control-picker">
           <summary>Individual market controls</summary>
@@ -430,7 +427,7 @@
       <div class="control-group">
         <div class="control-group-header">
           <div class="control-group-title">Greenbook Controls</div>
-          <button class="secondary compact-button" id="select-greenbook-controls" type="button"><i data-lucide="list-checks"></i>All Greenbook</button>
+          <label class="check-row"><input id="toggle-greenbook-controls" type="checkbox" data-group-toggle="greenbook"><span>All Greenbook</span></label>
         </div>
         <details class="control-picker">
           <summary>Individual Greenbook controls</summary>
@@ -1177,12 +1174,24 @@ function renderControlChecks(containerId, controls, kind, group) {
   }).join("");
 }
 
-function selectControlGroup(group) {
+function setControlGroup(group, checked) {
   for (const el of document.querySelectorAll(`.control-check[data-group='${group}']`)) {
-    el.checked = true;
+    if (!el.disabled) el.checked = checked;
   }
   syncBsControls();
+  updateGroupToggles();
   runSpec();
+}
+
+function updateGroupToggles() {
+  for (const group of ["market", "greenbook"]) {
+    const toggle = document.querySelector(`[data-group-toggle='${group}']`);
+    const controls = Array.from(document.querySelectorAll(`.control-check[data-group='${group}']`));
+    if (!toggle || !controls.length) continue;
+    const checked = controls.filter(el => el.checked).length;
+    toggle.checked = checked === controls.length;
+    toggle.indeterminate = checked > 0 && checked < controls.length;
+  }
 }
 
 function syncBsControls() {
@@ -1200,6 +1209,7 @@ function syncBsControls() {
       }
     }
   }
+  updateGroupToggles();
 }
 
 function resetDefaults() {
@@ -1219,8 +1229,8 @@ async function init() {
   renderOptions();
   document.getElementById("run-btn").addEventListener("click", runSpec);
   document.getElementById("reset-btn").addEventListener("click", resetDefaults);
-  document.getElementById("select-market-controls").addEventListener("click", () => selectControlGroup("market"));
-  document.getElementById("select-greenbook-controls").addEventListener("click", () => selectControlGroup("greenbook"));
+  document.getElementById("toggle-market-controls").addEventListener("change", event => setControlGroup("market", event.target.checked));
+  document.getElementById("toggle-greenbook-controls").addEventListener("change", event => setControlGroup("greenbook", event.target.checked));
   document.getElementById("shock").addEventListener("change", () => {
     syncBsControls();
     runSpec();
