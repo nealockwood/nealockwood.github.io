@@ -151,21 +151,43 @@
     row-gap: 2px;
   }
 
-  .control-actions {
-    margin-bottom: 12px;
-  }
-
   .control-group {
     border-top: 1px solid #edf0ed;
     padding-top: 9px;
     margin-top: 9px;
   }
 
+  .control-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
   .control-group-title {
     font-size: 13px;
     font-weight: 850;
     color: #26352d;
-    margin-bottom: 8px;
+  }
+
+  .control-picker summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    list-style: none;
+    margin-bottom: 7px;
+  }
+
+  .control-picker summary::-webkit-details-marker { display: none; }
+
+  .control-picker summary::after {
+    content: " +";
+  }
+
+  .control-picker[open] summary::after {
+    content: " -";
   }
 
   button {
@@ -194,6 +216,14 @@
     width: 100%;
     background: #eef2ef;
     color: #26352d;
+  }
+
+  .compact-button {
+    width: auto;
+    min-height: 32px;
+    padding: 7px 9px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   .topbar {
@@ -353,7 +383,7 @@
       </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
-        <label class="check-row"><input id="exclude-unscheduled" type="checkbox" checked><span>Exclude unscheduled meetings</span></label>
+        <label class="check-row"><input id="exclude-unscheduled" type="checkbox"><span>Exclude unscheduled meetings</span></label>
         <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute no-shock months with zeros</span></label>
       </div>
     </div>
@@ -376,27 +406,36 @@
           <input id="horizon" type="number" min="1" max="120" step="1" value="24">
         </div>
         <div>
-          <label for="scale-bp">FFR h=1 bp</label>
+          <label for="scale-bp">FFR h=0 bp</label>
           <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
         </div>
       </div>
       <div style="margin-top: 9px;">
-        <label class="check-row"><input id="scale-irf" type="checkbox" checked><span>Scale IRF to FFR h=1</span></label>
+        <label class="check-row"><input id="scale-irf" type="checkbox" checked><span>Scale IRF to FFR h=0</span></label>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Controls</div>
-      <div class="control-actions">
-        <button class="secondary" id="select-regular-controls" type="button"><i data-lucide="list-checks"></i>All Market + Greenbook</button>
+      <div class="control-group">
+        <div class="control-group-header">
+          <div class="control-group-title">Market / BS Controls</div>
+          <button class="secondary compact-button" id="select-market-controls" type="button"><i data-lucide="list-checks"></i>All Market</button>
+        </div>
+        <details class="control-picker">
+          <summary>Individual market controls</summary>
+          <div class="control-list" id="controls-market"></div>
+        </details>
       </div>
       <div class="control-group">
-        <div class="control-group-title">Market / BS Controls</div>
-        <div class="control-list" id="controls-market"></div>
-      </div>
-      <div class="control-group">
-        <div class="control-group-title">Greenbook Controls</div>
-        <div class="control-list" id="controls-greenbook"></div>
+        <div class="control-group-header">
+          <div class="control-group-title">Greenbook Controls</div>
+          <button class="secondary compact-button" id="select-greenbook-controls" type="button"><i data-lucide="list-checks"></i>All Greenbook</button>
+        </div>
+        <details class="control-picker">
+          <summary>Individual Greenbook controls</summary>
+          <div class="control-list" id="controls-greenbook"></div>
+        </details>
       </div>
       <div class="control-group">
         <div class="control-group-title">FRED Macro Controls</div>
@@ -889,18 +928,18 @@ function runSpec() {
 
   const maxH = Math.max(settings.horizon, 1);
   let scale = 1;
-  let ffrH1 = null;
+  let ffrH0 = null;
   const rawByOutcome = {};
   for (const outcome of OUTCOME_ORDER) {
     rawByOutcome[outcome] = runOutcome(settings, rows, outcome, maxH);
   }
   if (settings.scaleIrf) {
-    ffrH1 = rawByOutcome.ffr[1]?.beta;
-    if (!finite(ffrH1) || Math.abs(ffrH1) < EPS) {
-      showError("Scaling failed because the FFR h=1 coefficient is unavailable or effectively zero.");
+    ffrH0 = rawByOutcome.ffr[0]?.beta;
+    if (!finite(ffrH0) || Math.abs(ffrH0) < EPS) {
+      showError("Scaling failed because the FFR h=0 coefficient is unavailable or effectively zero.");
       return;
     }
-    scale = (settings.scaleBp / 100) / ffrH1;
+    scale = (settings.scaleBp / 100) / ffrH0;
   }
 
   const resultsByOutcome = {};
@@ -917,7 +956,7 @@ function runSpec() {
       };
     });
   }
-  render(settings, rows, resultsByOutcome, scale, ffrH1);
+  render(settings, rows, resultsByOutcome, scale, ffrH0);
 }
 
 function axisRef(i, axis) {
@@ -928,7 +967,7 @@ function axisLayoutName(i, axis) {
   return i === 0 ? `${axis}axis` : `${axis}axis${i + 1}`;
 }
 
-function render(settings, rows, resultsByOutcome, scale, ffrH1) {
+function render(settings, rows, resultsByOutcome, scale, ffrH0) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = DATA.shocks[settings.shock].label;
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
@@ -977,7 +1016,7 @@ function render(settings, rows, resultsByOutcome, scale, ffrH1) {
       anchor: xRef,
       title: col === 0 ? {text: "Response", standoff: 8, font: {size: 11}} : "",
       tickfont: {size: 10},
-      tickformat: ".2f",
+      tickformat: "~g",
       zeroline: false,
       gridcolor: "#eef2ef",
       automargin: true
@@ -1069,7 +1108,7 @@ function render(settings, rows, resultsByOutcome, scale, ffrH1) {
     metric("Min n", minN),
     metric("Controls", controlsCount),
     metric("Scale", fmt(scale, 3)),
-    metric("FFR h=1 raw", fmt(ffrH1, 4)),
+    metric("FFR h=0 raw", fmt(ffrH0, 4)),
     metric("Shock lags", settings.shockLags),
     metric("Outcome lags", settings.depLags),
     metric("Macro lags", settings.macroLags),
@@ -1104,27 +1143,27 @@ function renderOptions() {
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
-  document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h1_bp;
+  document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp;
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
 
-  renderControlChecks("controls-market", DATA.controls.market, "regular");
-  renderControlChecks("controls-greenbook", DATA.controls.greenbook, "regular");
-  renderControlChecks("controls-fred-macro", DATA.controls.fred_macro, "macro");
+  renderControlChecks("controls-market", DATA.controls.market, "regular", "market");
+  renderControlChecks("controls-greenbook", DATA.controls.greenbook, "regular", "greenbook");
+  renderControlChecks("controls-fred-macro", DATA.controls.fred_macro, "macro", "fred_macro");
   syncBsControls();
   document.querySelectorAll(".control-check").forEach(el => el.addEventListener("change", runSpec));
 }
 
-function renderControlChecks(containerId, controls, kind) {
+function renderControlChecks(containerId, controls, kind, group) {
   document.getElementById(containerId).innerHTML = controls.map(c => {
     const label = CONTROL_LABELS[c] || c;
-    return `<label class="check-row"><input class="control-check" type="checkbox" value="${c}" data-kind="${kind}" data-control="${c}"><span>${label}</span></label>`;
+    return `<label class="check-row"><input class="control-check" type="checkbox" value="${c}" data-kind="${kind}" data-group="${group}" data-control="${c}"><span>${label}</span></label>`;
   }).join("");
 }
 
-function selectRegularControls() {
-  for (const el of document.querySelectorAll(".control-check[data-kind='regular']")) {
+function selectControlGroup(group) {
+  for (const el of document.querySelectorAll(`.control-check[data-group='${group}']`)) {
     el.checked = true;
   }
   syncBsControls();
@@ -1165,7 +1204,8 @@ async function init() {
   renderOptions();
   document.getElementById("run-btn").addEventListener("click", runSpec);
   document.getElementById("reset-btn").addEventListener("click", resetDefaults);
-  document.getElementById("select-regular-controls").addEventListener("click", selectRegularControls);
+  document.getElementById("select-market-controls").addEventListener("click", () => selectControlGroup("market"));
+  document.getElementById("select-greenbook-controls").addEventListener("click", () => selectControlGroup("greenbook"));
   document.getElementById("shock").addEventListener("change", () => {
     syncBsControls();
     runSpec();
