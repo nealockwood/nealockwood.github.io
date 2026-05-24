@@ -278,6 +278,7 @@ def main() -> None:
                 "dependent_lags": 12,
                 "macro_lags": 12,
                 "aggregation": "main",
+                "included_years": "1993-2025",
                 "include_zlb": False,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,

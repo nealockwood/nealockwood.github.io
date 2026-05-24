@@ -114,7 +114,7 @@
     font-weight: 700;
   }
 
-  select, input[type="number"], input[type="date"] {
+  select, input[type="number"], input[type="date"], input[type="text"] {
     width: 100%;
     min-height: 34px;
     border: 1px solid var(--line);
@@ -374,16 +374,10 @@
     </div>
 
     <div class="section">
-      <div class="section-title">Sample</div>
-      <div class="grid-2">
-        <div>
-          <label for="row-start">First usable obs</label>
-          <input id="row-start" type="number" min="1" step="1" value="1">
-        </div>
-        <div>
-          <label for="row-end">Last usable obs</label>
-          <input id="row-end" type="number" min="1" step="1" placeholder="last">
-        </div>
+      <div class="section-title">Years</div>
+      <div>
+        <label for="included-years">Included years</label>
+        <input id="included-years" type="text" value="1993-2025" placeholder="1993-2007, 2012, 2024+">
       </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
@@ -481,7 +475,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=scale-target-20260524";
+const DATA_URL = "irfs-data.json?v=included-years-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -514,31 +508,31 @@ const CONTROL_LABELS = {
   gRGDPF1: "RGDP F1",
   gRGDPF2: "RGDP F2",
   gRGDPF3: "RGDP F3",
-  DgRGDPB1: "D RGDP B1",
-  DgRGDPF0: "D RGDP F0",
-  DgRGDPF1: "D RGDP F1",
-  DgRGDPF2: "D RGDP F2",
+  DgRGDPB1: "Δ RGDP B1",
+  DgRGDPF0: "Δ RGDP F0",
+  DgRGDPF1: "Δ RGDP F1",
+  DgRGDPF2: "Δ RGDP F2",
   gPGDPB1: "PGDP B1",
   gPGDPF0: "PGDP F0",
   gPGDPF1: "PGDP F1",
   gPGDPF2: "PGDP F2",
   gPGDPF3: "PGDP F3",
-  DgPGDPB1: "D PGDP B1",
-  DgPGDPF0: "D PGDP F0",
-  DgPGDPF1: "D PGDP F1",
-  DgPGDPF2: "D PGDP F2",
+  DgPGDPB1: "Δ PGDP B1",
+  DgPGDPF0: "Δ PGDP F0",
+  DgPGDPF1: "Δ PGDP F1",
+  DgPGDPF2: "Δ PGDP F2",
   UNEMPF0: "UNEMP F0",
   ffr: "FFR",
   ebp: "EBP",
   GS1: "1Y Treasury",
-  dgdp: "D BBK GDP",
-  dunemp: "D Unemp",
-  dlip: "D log IP",
-  dlcpi: "D log CPI",
-  dlpce: "D log PCE",
-  dlsent: "D log sentiment",
-  dlnas: "D log NASDAQ",
-  dlmpu: "D log EPU"
+  dgdp: "Δ BBK GDP",
+  dunemp: "Δ Unemp",
+  dlip: "Δ log IP",
+  dlcpi: "Δ log CPI",
+  dlpce: "Δ log PCE",
+  dlsent: "Δ log sentiment",
+  dlnas: "Δ log NASDAQ",
+  dlmpu: "Δ log EPU"
 };
 
 function finite(v) {
@@ -704,6 +698,57 @@ function readScaleTarget(mode) {
   return Number.isFinite(value) ? Math.max(cfg.min, value) : cfg.value;
 }
 
+function parseIncludedYears(text) {
+  const raw = (text || "").trim();
+  if (!raw) return {rules: [], error: null, display: ""};
+  const rules = [];
+  const labels = [];
+  for (const part of raw.split(",")) {
+    const token = part.trim();
+    if (!token) continue;
+    let match = token.match(/^(\d{4})$/);
+    if (match) {
+      const year = Number.parseInt(match[1], 10);
+      rules.push({start: year, end: year});
+      labels.push(String(year));
+      continue;
+    }
+
+    match = token.match(/^(\d{4})\s*-\s*(\d{4})$/);
+    if (match) {
+      const start = Number.parseInt(match[1], 10);
+      const end = Number.parseInt(match[2], 10);
+      if (end < start) return {rules: [], error: `bad year range ${token}`, display: raw};
+      rules.push({start, end});
+      labels.push(`${start}-${end}`);
+      continue;
+    }
+
+    match = token.match(/^(\d{4})\+$/);
+    if (match) {
+      const start = Number.parseInt(match[1], 10);
+      rules.push({start, end: Infinity});
+      labels.push(`${start}+`);
+      continue;
+    }
+
+    return {rules: [], error: `bad year token ${token}`, display: raw};
+  }
+  return {rules, error: null, display: labels.join(", ")};
+}
+
+function rowYear(row) {
+  const stamp = row?.month || row?.date;
+  if (!stamp || stamp.length < 4) return null;
+  const year = Number.parseInt(stamp.slice(0, 4), 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+function yearIsIncluded(year, rules) {
+  if (!rules.length) return true;
+  return Number.isFinite(year) && rules.some(rule => year >= rule.start && year <= rule.end);
+}
+
 function getSettings() {
   const selectedRegularControls = Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])"))
     .map(el => el.value);
@@ -712,14 +757,16 @@ function getSettings() {
   const shock = document.getElementById("shock").value;
   const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
   const scaleMode = document.getElementById("scale-mode").value;
+  const includedYears = parseIncludedYears(document.getElementById("included-years").value);
   return {
     shock,
     aggregation: document.getElementById("aggregation").value,
     includeZlb: document.getElementById("include-zlb").checked,
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
-    rowStart: Math.max(1, Number.parseInt(document.getElementById("row-start").value || "1", 10)),
-    rowEnd: Number.parseInt(document.getElementById("row-end").value || "", 10),
+    includedYearRules: includedYears.rules,
+    includedYearsDisplay: includedYears.display || "all",
+    includedYearsError: includedYears.error,
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
@@ -738,6 +785,10 @@ function eventPassesBaseFilters(row, settings) {
     return truthyFlag(row.main) || (row.main == null && row.scheduled === 1);
   }
   return true;
+}
+
+function rowPassesYearFilter(row, settings) {
+  return yearIsIncluded(rowYear(row), settings.includedYearRules);
 }
 
 function aggregateMonth(items, mode, shockKey) {
@@ -783,14 +834,13 @@ function filteredEventRows(settings, shockKey) {
 }
 
 function trimmedSupportRows(filteredRows, settings, shockKey) {
-  const supportRowsAll = filteredRows.filter(row => finite(row[shockKey]));
-  const end = Number.isFinite(settings.rowEnd) ? Math.min(settings.rowEnd, supportRowsAll.length) : supportRowsAll.length;
-  return supportRowsAll.slice(settings.rowStart - 1, end);
+  return filteredRows.filter(row => finite(row[shockKey]));
 }
 
 function countUnscheduledSupportRows(settings, shockKey) {
   const rowsWithUnscheduled = filteredEventRows({...settings, excludeUnscheduled: false}, shockKey);
   return trimmedSupportRows(rowsWithUnscheduled, settings, shockKey)
+    .filter(row => rowPassesYearFilter(row, settings))
     .filter(row => truthyFlag(row.unscheduled) || row.scheduled === 0)
     .length;
 }
@@ -857,7 +907,7 @@ function buildAnalysisRows(settings, shockKey) {
     }
     history.push(row._x);
   }
-  return rows;
+  return rows.filter(row => rowPassesYearFilter(row, settings));
 }
 
 function buildUsedControls(settings, row, outcomeKey) {
@@ -1085,6 +1135,10 @@ function runOutcome(settings, rows, outcomeKey, maxH) {
 function runSpec() {
   const settings = getSettings();
   syncBsControls();
+  if (settings.includedYearsError) {
+    showError(`Invalid included years: ${settings.includedYearsError}. Use entries like 1993-2007, 2010, 2024+.`);
+    return;
+  }
   const rows = buildAnalysisRows(settings, settings.shock);
   const unscheduledSupportRows = countUnscheduledSupportRows(settings, settings.shock);
   if (rows.length < 12) {
@@ -1309,13 +1363,14 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + settings.shockLags + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
-  const imputeText = settings.imputeZeros ? "zero-imputed" : "event sample";
+  const imputeText = settings.imputeZeros ? "zero-imputed" : "event rows";
   const unscheduledText = settings.excludeUnscheduled
     ? `unscheduled excluded (${unscheduledSupportRows})`
     : `unscheduled included (${unscheduledSupportRows})`;
 
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">${settings.aggregation}</span>`,
+    `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${unscheduledText}</span>`,
     `<span class="pill">${imputeText}</span>`,
@@ -1325,6 +1380,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   document.getElementById("diagnostics").innerHTML = [
     metric("Event rows", rows.length),
     metric("Unscheduled rows", settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`),
+    metric("Years", settings.includedYearsDisplay),
     metric("Date range", `${minDate} to ${maxDate}`),
     metric("h=0 n", h0n),
     metric("Min n", minN),
@@ -1359,8 +1415,7 @@ function renderOptions() {
 
   document.getElementById("shock").value = DATA.meta.defaults.shock;
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
-  document.getElementById("row-start").value = 1;
-  document.getElementById("row-end").value = "";
+  document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
   document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
@@ -1453,7 +1508,7 @@ async function init() {
     configureScaleTarget(true);
     runSpec();
   });
-  for (const id of ["row-start", "row-end", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
+  for (const id of ["included-years", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   if (window.lucide) window.lucide.createIcons();
