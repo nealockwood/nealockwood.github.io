@@ -191,6 +191,58 @@ def read_external_shocks() -> tuple[pd.DataFrame, pd.DataFrame]:
     return brw[["date", "scheduled", "brw"]], ns
 
 
+def read_greenbook_monthly_controls() -> dict[str, dict[str, float]]:
+    mapping_path = SOURCE_ROOT / "test" / "intermediates" / "GBFOMCmapping.csv"
+    workbook_path = SOURCE_ROOT / "test" / "intermediates" / "gbweb_row_format.xlsx"
+    if not mapping_path.exists() or not workbook_path.exists():
+        return {}
+
+    mapping = pd.read_csv(mapping_path, dtype=str)
+    if not {"FOMCdate", "GBdate"}.issubset(mapping.columns):
+        return {}
+    gb = mapping[["FOMCdate", "GBdate"]].copy()
+    gb["fomc"] = pd.to_datetime(gb["FOMCdate"], format="%Y%m%d", errors="coerce")
+    gb["gbdate"] = pd.to_datetime(gb["GBdate"], format="%Y%m%d", errors="coerce")
+    gb = gb.dropna(subset=["fomc", "gbdate", "GBdate"]).sort_values("fomc")
+
+    for sheet in ["gRGDP", "gPGDP", "UNEMP"]:
+        sheet_df = pd.read_excel(workbook_path, sheet_name=sheet)
+        sheet_df["GBdate"] = sheet_df["GBdate"].astype(str)
+        keep = ["GBdate"] + [col for col in sheet_df.columns if str(col).startswith(sheet)]
+        gb = gb.merge(sheet_df[keep], on="GBdate", how="left")
+
+    gb["gb_yq"] = gb["gbdate"].dt.year * 4 + gb["gbdate"].dt.quarter
+    same_quarter = gb["gb_yq"].eq(gb["gb_yq"].shift(1))
+    next_quarter = gb["gb_yq"].gt(gb["gb_yq"].shift(1))
+
+    for prefix in ["gRGDP", "gPGDP", "UNEMP"]:
+        gb[f"D{prefix}B1"] = np.where(
+            same_quarter,
+            gb[f"{prefix}B1"] - gb[f"{prefix}B1"].shift(1),
+            np.where(next_quarter, gb[f"{prefix}B1"] - gb[f"{prefix}F0"].shift(1), np.nan),
+        )
+        for horizon in range(4):
+            current = f"{prefix}F{horizon}"
+            previous_next = f"{prefix}F{horizon + 1}"
+            gb[f"D{prefix}F{horizon}"] = np.where(
+                same_quarter,
+                gb[current] - gb[current].shift(1),
+                np.where(next_quarter, gb[current] - gb[previous_next].shift(1), np.nan),
+            )
+
+    rows: dict[str, dict[str, float]] = {}
+    for _, row in gb.sort_values("fomc").iterrows():
+        month = month_key(row["fomc"])
+        dest = rows.setdefault(month, {})
+        for col in GREENBOOK_CONTROLS:
+            val = row.get(col)
+            if col not in dest and isinstance(val, (int, float, np.integer, np.floating)):
+                val = float(val)
+                if math.isfinite(val):
+                    dest[col] = val
+    return rows
+
+
 def prep_events(macro: pd.DataFrame) -> list[dict]:
     prep = pd.read_csv(SOURCE_ROOT / "prep.csv")
     prep.columns = [c.strip() for c in prep.columns]
@@ -265,6 +317,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
 def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
     cols = ["month", "daten", "zlb"] + [spec["source"] for spec in OUTCOMES.values()]
     cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS + TARGET_FFR_COLUMNS + EVENT_SCALE_COLUMNS
+    monthly_greenbook_controls = read_greenbook_monthly_controls()
     monthly_event_values: dict[str, dict[str, float]] = {}
     monthly_event_controls: dict[str, dict[str, float]] = {}
     for row in sorted(events, key=lambda x: x["date"]):
@@ -296,6 +349,10 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
             for col, val in monthly_event_controls[row["month"]].items():
                 if not isinstance(rec.get(col), (int, float)):
                     rec[col] = value(val)
+        if row["month"] in monthly_greenbook_controls:
+            for col, val in monthly_greenbook_controls[row["month"]].items():
+                if not isinstance(rec.get(col), (int, float)):
+                    rec[col] = value(val)
         rows.append(rec)
     return rows
 
@@ -313,6 +370,8 @@ def main() -> None:
                 "prep.csv",
                 "test/mondat.dta",
                 "codex/dff_fedfunds_tffr_monthly.csv",
+                "test/intermediates/GBFOMCmapping.csv",
+                "test/intermediates/gbweb_row_format.xlsx",
                 "BJMW-BRW-shocks-updated-1.xlsx",
                 "BJMW-2025-monetary-policy-shocks-series.xlsx",
             ],
