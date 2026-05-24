@@ -689,11 +689,22 @@ function filteredEventRows(settings, shockKey) {
   return rows.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function trimmedSupportRows(filteredRows, settings, shockKey) {
+  const supportRowsAll = filteredRows.filter(row => finite(row[shockKey]));
+  const end = Number.isFinite(settings.rowEnd) ? Math.min(settings.rowEnd, supportRowsAll.length) : supportRowsAll.length;
+  return supportRowsAll.slice(settings.rowStart - 1, end);
+}
+
+function countUnscheduledSupportRows(settings, shockKey) {
+  const rowsWithUnscheduled = filteredEventRows({...settings, excludeUnscheduled: false}, shockKey);
+  return trimmedSupportRows(rowsWithUnscheduled, settings, shockKey)
+    .filter(row => truthyFlag(row.unscheduled) || row.scheduled === 0)
+    .length;
+}
+
 function buildAnalysisRows(settings, shockKey) {
   const filtered = filteredEventRows(settings, shockKey);
-  const supportRowsAll = filtered.filter(row => finite(row[shockKey]));
-  const end = Number.isFinite(settings.rowEnd) ? Math.min(settings.rowEnd, supportRowsAll.length) : supportRowsAll.length;
-  const supportRows = supportRowsAll.slice(settings.rowStart - 1, end);
+  const supportRows = trimmedSupportRows(filtered, settings, shockKey);
   let rows;
   if (settings.imputeZeros) {
     if (!supportRows.length) return [];
@@ -921,6 +932,7 @@ function runSpec() {
   const settings = getSettings();
   syncBsControls();
   const rows = buildAnalysisRows(settings, settings.shock);
+  const unscheduledSupportRows = countUnscheduledSupportRows(settings, settings.shock);
   if (rows.length < 12) {
     showError("The selected sample has too few usable shock observations.");
     return;
@@ -956,7 +968,7 @@ function runSpec() {
       };
     });
   }
-  render(settings, rows, resultsByOutcome, scale, ffrH0);
+  render(settings, rows, resultsByOutcome, scale, ffrH0, unscheduledSupportRows);
 }
 
 function axisRef(i, axis) {
@@ -967,7 +979,7 @@ function axisLayoutName(i, axis) {
   return i === 0 ? `${axis}axis` : `${axis}axis${i + 1}`;
 }
 
-function render(settings, rows, resultsByOutcome, scale, ffrH0) {
+function render(settings, rows, resultsByOutcome, scale, ffrH0, unscheduledSupportRows) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = DATA.shocks[settings.shock].label;
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
@@ -1091,7 +1103,9 @@ function render(settings, rows, resultsByOutcome, scale, ffrH0) {
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + settings.shockLags + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB excluded";
   const imputeText = settings.imputeZeros ? "zero-imputed" : "event sample";
-  const unscheduledText = settings.excludeUnscheduled ? "unscheduled excluded" : "unscheduled included";
+  const unscheduledText = settings.excludeUnscheduled
+    ? `unscheduled excluded (${unscheduledSupportRows})`
+    : `unscheduled included (${unscheduledSupportRows})`;
 
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">${settings.aggregation}</span>`,
@@ -1103,6 +1117,7 @@ function render(settings, rows, resultsByOutcome, scale, ffrH0) {
 
   document.getElementById("diagnostics").innerHTML = [
     metric("Event rows", rows.length),
+    metric("Unscheduled rows", settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`),
     metric("Date range", `${minDate} to ${maxDate}`),
     metric("h=0 n", h0n),
     metric("Min n", minN),
