@@ -53,7 +53,7 @@
   main {
     border-radius: 8px;
     display: grid;
-    grid-template-rows: auto minmax(640px, 1fr) auto;
+    grid-template-rows: auto minmax(760px, 1fr) auto;
     min-width: 0;
   }
 
@@ -151,30 +151,22 @@
     row-gap: 2px;
   }
 
-  details {
+  .control-actions {
+    margin-bottom: 12px;
+  }
+
+  .control-group {
     border-top: 1px solid #edf0ed;
     padding-top: 9px;
     margin-top: 9px;
   }
 
-  summary {
-    cursor: pointer;
+  .control-group-title {
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 850;
     color: #26352d;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    margin-bottom: 8px;
   }
-
-  summary::-webkit-details-marker { display: none; }
-  summary::after {
-    content: "+";
-    color: var(--muted);
-    font-weight: 800;
-  }
-  details[open] summary::after { content: "-"; }
 
   button {
     border: 0;
@@ -249,7 +241,7 @@
 
   #plot {
     width: 100%;
-    min-height: 640px;
+    min-height: 760px;
   }
 
   .diagnostics {
@@ -304,7 +296,7 @@
       max-height: none;
     }
     main {
-      min-height: 620px;
+      min-height: 760px;
     }
     .topbar {
       display: block;
@@ -367,7 +359,7 @@
     </div>
 
     <div class="section">
-      <div class="section-title">Lags And Scaling</div>
+      <div class="section-title">Shock, Outcome, Scaling</div>
       <div class="grid-2">
         <div>
           <label for="shock-lags">Shock lags</label>
@@ -388,10 +380,6 @@
           <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
         </div>
       </div>
-      <div style="margin-top: 10px;">
-        <label for="macro-lags">Lagged macro-control lags</label>
-        <input id="macro-lags" type="number" min="0" max="60" step="1" value="12">
-      </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="scale-irf" type="checkbox" checked><span>Scale IRF to FFR h=1</span></label>
       </div>
@@ -399,18 +387,25 @@
 
     <div class="section">
       <div class="section-title">Controls</div>
-      <details open>
-        <summary>Market / BS Controls</summary>
+      <div class="control-actions">
+        <button class="secondary" id="select-regular-controls" type="button"><i data-lucide="list-checks"></i>All Market + Greenbook</button>
+      </div>
+      <div class="control-group">
+        <div class="control-group-title">Market / BS Controls</div>
         <div class="control-list" id="controls-market"></div>
-      </details>
-      <details>
-        <summary>Greenbook Controls</summary>
+      </div>
+      <div class="control-group">
+        <div class="control-group-title">Greenbook Controls</div>
         <div class="control-list" id="controls-greenbook"></div>
-      </details>
-      <details>
-        <summary>FRED Macro Controls</summary>
+      </div>
+      <div class="control-group">
+        <div class="control-group-title">FRED Macro Controls</div>
+        <div style="margin-bottom: 9px;">
+          <label for="macro-lags">FRED macro-control lags</label>
+          <input id="macro-lags" type="number" min="0" max="60" step="1" value="12">
+        </div>
         <div class="control-list" id="controls-fred-macro"></div>
-      </details>
+      </div>
     </div>
 
     <div class="section">
@@ -444,7 +439,15 @@ let DATA = null;
 let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
-const OUTCOME_ORDER = ["unrate", "cpi", "pce", "ip", "ffr", "ebp"];
+const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
+const PANEL_LABELS = {
+  ffr: "FFR",
+  unrate: "Unemployment",
+  cpi: "CPI",
+  pce: "PCE",
+  ip: "Industrial Production",
+  ebp: "EBP"
+};
 
 const CONTROL_LABELS = {
   nfp_surp: "NFP surprise",
@@ -592,10 +595,10 @@ function getSettings() {
 }
 
 function eventPassesBaseFilters(row, settings) {
-  if (settings.excludeUnscheduled && truthyFlag(row.unscheduled)) return false;
-  if (settings.excludeUnscheduled && row.scheduled === 0) return false;
+  const unscheduled = truthyFlag(row.unscheduled) || row.scheduled === 0;
+  if (settings.excludeUnscheduled && unscheduled) return false;
   if (settings.aggregation === "main") {
-    return truthyFlag(row.main) || (row.main == null && row.scheduled === 1);
+    return truthyFlag(row.main) || (row.main == null && row.scheduled === 1) || (!settings.excludeUnscheduled && unscheduled);
   }
   return true;
 }
@@ -936,39 +939,51 @@ function render(settings, rows, resultsByOutcome, scale, ffrH1) {
   const layout = {
     paper_bgcolor: "#ffffff",
     plot_bgcolor: "#ffffff",
-    margin: {l: 58, r: 20, t: 38, b: 46},
+    margin: {l: 74, r: 24, t: 30, b: 66},
     hovermode: "closest",
     showlegend: false,
     font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
   };
 
-  const xGap = 0.06;
-  const yGap = 0.12;
+  const xGap = 0.085;
+  const yGap = 0.2;
+  const yPadBottom = 0.06;
+  const yPadTop = 0.05;
   const colW = (1 - 2 * xGap) / 3;
-  const rowH = (1 - yGap) / 2;
+  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
   OUTCOME_ORDER.forEach((outcome, i) => {
     const col = i % 3;
     const row = Math.floor(i / 3);
     const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
-    const yDomain = row === 0 ? [rowH + yGap, 1] : [0, rowH];
+    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
     const xName = axisLayoutName(i, "x");
     const yName = axisLayoutName(i, "y");
+    const xRef = axisRef(i, "x");
+    const yRef = axisRef(i, "y");
     layout[xName] = {
       domain: xDomain,
-      title: row === 1 ? "Horizon" : "",
+      anchor: yRef,
+      title: row === 1 && col === 1 ? {text: "Horizon", standoff: 10, font: {size: 11}} : "",
+      showticklabels: row === 1,
+      tickfont: {size: 10},
       zeroline: false,
       gridcolor: "#eef2ef",
       dtick: Math.max(1, Math.ceil(settings.horizon / 12)),
+      automargin: true,
       range: [0, settings.horizon]
     };
     layout[yName] = {
       domain: yDomain,
-      title: col === 0 ? "Response" : "",
+      anchor: xRef,
+      title: col === 0 ? {text: "Response", standoff: 8, font: {size: 11}} : "",
+      tickfont: {size: 10},
+      tickformat: ".2f",
       zeroline: false,
-      gridcolor: "#eef2ef"
+      gridcolor: "#eef2ef",
+      automargin: true
     };
     annotations.push({
-      text: `<b>${DATA.outcomes[outcome].label}</b>`,
+      text: `<b>${PANEL_LABELS[outcome] || DATA.outcomes[outcome].label}</b>`,
       x: (xDomain[0] + xDomain[1]) / 2,
       y: yDomain[1] + 0.035,
       xref: "paper",
@@ -1108,6 +1123,14 @@ function renderControlChecks(containerId, controls, kind) {
   }).join("");
 }
 
+function selectRegularControls() {
+  for (const el of document.querySelectorAll(".control-check[data-kind='regular']")) {
+    el.checked = true;
+  }
+  syncBsControls();
+  runSpec();
+}
+
 function syncBsControls() {
   const shock = document.getElementById("shock").value;
   const forced = new Set(DATA?.controls?.bs_mandatory || []);
@@ -1142,6 +1165,7 @@ async function init() {
   renderOptions();
   document.getElementById("run-btn").addEventListener("click", runSpec);
   document.getElementById("reset-btn").addEventListener("click", resetDefaults);
+  document.getElementById("select-regular-controls").addEventListener("click", selectRegularControls);
   document.getElementById("shock").addEventListener("change", () => {
     syncBsControls();
     runSpec();
