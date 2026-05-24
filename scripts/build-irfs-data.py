@@ -266,7 +266,8 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
     cols = ["month", "daten", "zlb"] + [spec["source"] for spec in OUTCOMES.values()]
     cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS + TARGET_FFR_COLUMNS + EVENT_SCALE_COLUMNS
     monthly_event_values: dict[str, dict[str, float]] = {}
-    for row in events:
+    monthly_event_controls: dict[str, dict[str, float]] = {}
+    for row in sorted(events, key=lambda x: x["date"]):
         month = row.get("month")
         if not month:
             continue
@@ -275,6 +276,11 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
             val = row.get(col)
             if isinstance(val, (int, float)) and math.isfinite(float(val)):
                 dest[col] = dest.get(col, 0.0) + float(val)
+        control_dest = monthly_event_controls.setdefault(month, {})
+        for col in MARKET_CONTROLS + GREENBOOK_CONTROLS:
+            val = row.get(col)
+            if col not in control_dest and isinstance(val, (int, float)) and math.isfinite(float(val)):
+                control_dest[col] = float(val)
     rows = []
     for _, row in macro.sort_values("daten").iterrows():
         rec = {"month": row["month"], "date": date_key(row["daten"])}
@@ -286,6 +292,10 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
         if row["month"] in monthly_event_values:
             for col, val in monthly_event_values[row["month"]].items():
                 rec[col] = value(val)
+        if row["month"] in monthly_event_controls:
+            for col, val in monthly_event_controls[row["month"]].items():
+                if not isinstance(rec.get(col), (int, float)):
+                    rec[col] = value(val)
         rows.append(rec)
     return rows
 
