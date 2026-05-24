@@ -989,19 +989,31 @@ function syncViewControls() {
   document.querySelectorAll(".decomp-control").forEach(el => el.classList.toggle("hidden", !decomp));
 }
 
+function syncExcludeYearControls() {
+  const horizon = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
+  document.querySelectorAll(".exclude-year-check").forEach(el => {
+    const year = Number.parseInt(el.value, 10);
+    const available = year !== 2010 || horizon > 24;
+    el.disabled = !available;
+    el.closest(".check-row").classList.toggle("hidden", !available);
+    if (!available) el.checked = false;
+  });
+}
+
 function getSettings() {
+  syncExcludeYearControls();
+  const horizon = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
   const selectedRegularControls = Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])"))
     .map(el => el.value);
   const selectedMacroControls = Array.from(document.querySelectorAll(".control-check:checked[data-kind='macro']"))
     .map(el => el.value);
-  const selectedExcludeYears = Array.from(document.querySelectorAll(".exclude-year-check:checked"))
+  const selectedExcludeYears = Array.from(document.querySelectorAll(".exclude-year-check:checked:not(:disabled)"))
     .map(el => Number.parseInt(el.value, 10))
     .filter(Number.isFinite);
   const shock = document.getElementById("shock").value;
   const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
   const scaleMode = document.getElementById("scale-mode").value;
   const includedYears = parseIncludedYears(document.getElementById("included-years").value);
-  const horizon = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
   return {
     shock,
     viewMode: currentViewMode(),
@@ -2074,7 +2086,7 @@ function renderOptions() {
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
-  document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "ffr-h0";
+  document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
   configureScaleTarget(true);
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("include-covid").checked = DATA.meta.defaults.include_covid ?? false;
@@ -2082,6 +2094,7 @@ function renderOptions() {
   document.querySelectorAll(".exclude-year-check").forEach(el => {
     el.checked = defaultExcludeYears.has(Number.parseInt(el.value, 10));
   });
+  syncExcludeYearControls();
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
   renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
@@ -2204,6 +2217,7 @@ async function init() {
     runSpec();
   });
   document.getElementById("horizon").addEventListener("change", () => {
+    syncExcludeYearControls();
     renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
     runSpec();
   });

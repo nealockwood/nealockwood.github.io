@@ -390,7 +390,7 @@ def main() -> None:
                 "include_covid": False,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
-                "scale_mode": "ust2y-impact",
+                "scale_mode": "shock-rmse",
                 "scale_to_ffr_h0_bp": 50,
                 "scale_to_ust2y_bp": 10,
                 "scale_to_shock_sd": 1,
