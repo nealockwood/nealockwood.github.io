@@ -58,39 +58,18 @@ GREENBOOK_CONTROLS = [
     "UNEMPF0",
 ]
 
-EVENT_CONTROLS = [
-    "mp2",
-    "ff1",
-    "ff2",
-    "ff3",
-    "ff5",
-    "ff6",
-    "ed1",
-    "ed2",
-    "ed3",
-    "ed5",
-    "ed6",
-    "ed7",
-    "ed8",
-    "ust3m",
-    "ust6m",
-    "ust2y",
-    "ust5y",
-    "ust10y",
-    "ust30y",
-    "sp500",
-    "spfut",
-    "eurusd",
-    "sep",
-    "pc",
-    "ois1y",
-    "ois2y",
-    "tips5y",
-    "tips10y",
-    "tips30y",
-    "dxy",
-    "usdjpy",
-    "dffr",
+FRED_MACRO_CONTROLS = [
+    "ffr",
+    "ebp",
+    "GS1",
+    "dgdp",
+    "dunemp",
+    "dlip",
+    "dlcpi",
+    "dlpce",
+    "dlsent",
+    "dlnas",
+    "dlmpu",
 ]
 
 OUTCOMES = {
@@ -182,7 +161,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
     prep["scheduled"] = prep["scheduled"].fillna(1 - prep.get("unscheduled", 0))
 
     by_date: dict[str, dict] = {}
-    control_cols = sorted(set(MARKET_CONTROLS + GREENBOOK_CONTROLS + EVENT_CONTROLS))
+    control_cols = sorted(set(MARKET_CONTROLS + GREENBOOK_CONTROLS))
     base_cols = [
         "date",
         "month",
@@ -210,7 +189,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
                 rec[col] = value(row[col])
         mrow = macro_controls.loc[row["month"]] if row["month"] in macro_controls.index else None
         if mrow is not None:
-            for col in MARKET_CONTROLS + EVENT_CONTROLS:
+            for col in MARKET_CONTROLS:
                 if rec.get(col) is None and col in mrow:
                     rec[col] = value(mrow[col])
         by_date[rec["date"]] = rec
@@ -242,7 +221,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         mrow = macro_controls.loc[rec["month"]] if rec["month"] in macro_controls.index else None
         if mrow is not None:
             rec["nzlb"] = 0 if value(mrow.get("zlb")) == 1 else 1
-            for col in MARKET_CONTROLS + EVENT_CONTROLS:
+            for col in MARKET_CONTROLS:
                 if col in mrow:
                     rec[col] = value(mrow[col])
         by_date[dkey] = rec
@@ -252,7 +231,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
 
 def macro_rows(macro: pd.DataFrame) -> list[dict]:
     cols = ["month", "daten", "zlb"] + [spec["source"] for spec in OUTCOMES.values()]
-    cols += MARKET_CONTROLS + EVENT_CONTROLS
+    cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS
     rows = []
     for _, row in macro.sort_values("daten").iterrows():
         rec = {"month": row["month"], "date": date_key(row["daten"])}
@@ -282,14 +261,14 @@ def main() -> None:
             ],
             "defaults": {
                 "shock": "mp1",
-                "outcome": "cpi",
                 "horizon": 24,
                 "shock_lags": 12,
                 "dependent_lags": 12,
+                "macro_lags": 12,
                 "aggregation": "main",
                 "include_zlb": False,
                 "impute_zeros": False,
-                "include_unscheduled": False,
+                "exclude_unscheduled": True,
                 "scale_to_ffr_h1_bp": 50,
                 "ci": 0.9,
             },
@@ -307,7 +286,7 @@ def main() -> None:
         "controls": {
             "market": MARKET_CONTROLS,
             "greenbook": GREENBOOK_CONTROLS,
-            "event": EVENT_CONTROLS,
+            "fred_macro": FRED_MACRO_CONTROLS,
             "bs_mandatory": MARKET_CONTROLS,
         },
         "macro": macro_rows(macro),

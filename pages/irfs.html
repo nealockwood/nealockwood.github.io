@@ -53,7 +53,7 @@
   main {
     border-radius: 8px;
     display: grid;
-    grid-template-rows: auto minmax(430px, 1fr) auto;
+    grid-template-rows: auto minmax(640px, 1fr) auto;
     min-width: 0;
   }
 
@@ -249,7 +249,7 @@
 
   #plot {
     width: 100%;
-    min-height: 430px;
+    min-height: 640px;
   }
 
   .diagnostics {
@@ -331,15 +331,9 @@
 
     <div class="section" style="border-top: 0; padding-top: 0; margin-top: 0;">
       <div class="section-title">Specification</div>
-      <div class="grid-2">
-        <div>
-          <label for="shock">Shock</label>
-          <select id="shock"></select>
-        </div>
-        <div>
-          <label for="outcome">Outcome</label>
-          <select id="outcome"></select>
-        </div>
+      <div>
+        <label for="shock">Shock</label>
+        <select id="shock"></select>
       </div>
       <div style="margin-top: 10px;">
         <label for="aggregation">Aggregation</label>
@@ -357,17 +351,17 @@
       <div class="section-title">Sample</div>
       <div class="grid-2">
         <div>
-          <label for="start-date">Start</label>
-          <input id="start-date" type="date">
+          <label for="row-start">First usable obs</label>
+          <input id="row-start" type="number" min="1" step="1" value="1">
         </div>
         <div>
-          <label for="end-date">End</label>
-          <input id="end-date" type="date">
+          <label for="row-end">Last usable obs</label>
+          <input id="row-end" type="number" min="1" step="1" placeholder="last">
         </div>
       </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
-        <label class="check-row"><input id="include-unscheduled" type="checkbox"><span>Include unscheduled meetings</span></label>
+        <label class="check-row"><input id="exclude-unscheduled" type="checkbox" checked><span>Exclude unscheduled meetings</span></label>
         <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute no-shock months with zeros</span></label>
       </div>
     </div>
@@ -394,6 +388,10 @@
           <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
         </div>
       </div>
+      <div style="margin-top: 10px;">
+        <label for="macro-lags">Lagged macro-control lags</label>
+        <input id="macro-lags" type="number" min="0" max="60" step="1" value="12">
+      </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="scale-irf" type="checkbox" checked><span>Scale IRF to FFR h=1</span></label>
       </div>
@@ -410,8 +408,8 @@
         <div class="control-list" id="controls-greenbook"></div>
       </details>
       <details>
-        <summary>Event Controls</summary>
-        <div class="control-list" id="controls-event"></div>
+        <summary>FRED Macro Controls</summary>
+        <div class="control-list" id="controls-fred-macro"></div>
       </details>
     </div>
 
@@ -446,6 +444,7 @@ let DATA = null;
 let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
+const OUTCOME_ORDER = ["unrate", "cpi", "pce", "ip", "ffr", "ebp"];
 
 const CONTROL_LABELS = {
   nfp_surp: "NFP surprise",
@@ -473,9 +472,17 @@ const CONTROL_LABELS = {
   DgPGDPF1: "D PGDP F1",
   DgPGDPF2: "D PGDP F2",
   UNEMPF0: "UNEMP F0",
-  dffr: "D FFR",
-  eurusd: "EUR/USD",
-  usdjpy: "USD/JPY"
+  ffr: "FFR",
+  ebp: "EBP",
+  GS1: "1Y Treasury",
+  dgdp: "D BBK GDP",
+  dunemp: "D Unemp",
+  dlip: "D log IP",
+  dlcpi: "D log CPI",
+  dlpce: "D log PCE",
+  dlsent: "D log sentiment",
+  dlnas: "D log NASDAQ",
+  dlmpu: "D log EPU"
 };
 
 function finite(v) {
@@ -495,19 +502,11 @@ function truthyFlag(v) {
   return v === 1 || v === true || v === "1";
 }
 
-function monthToDate(month) {
-  return month + "-01";
-}
-
 function sourceValue(row, key) {
   if (row && finite(row[key])) return row[key];
   const m = macroByMonth.get(row?.month);
   if (m && finite(m[key])) return m[key];
   return null;
-}
-
-function outcomeBase(outcomeKey) {
-  return DATA.outcomes[outcomeKey].source;
 }
 
 function monthValue(month, source) {
@@ -519,6 +518,14 @@ function monthValue(month, source) {
 function isZlbMonth(month) {
   const row = macroByMonth.get(month);
   return row ? truthyFlag(row.zlb) : false;
+}
+
+function macroLagValue(controlKey, baseMonth, lag) {
+  const baseIdx = monthIndex.get(baseMonth);
+  if (baseIdx === undefined) return null;
+  const idx = baseIdx - lag;
+  if (idx < 0) return null;
+  return monthValue(months[idx], controlKey);
 }
 
 function responseValue(outcomeKey, baseMonth, h, includeZlb) {
@@ -559,33 +566,34 @@ function dependentDelta(outcomeKey, baseMonth, lag) {
 }
 
 function getSettings() {
-  const selectedControls = Array.from(document.querySelectorAll(".control-check:checked"))
+  const selectedRegularControls = Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])"))
+    .map(el => el.value);
+  const selectedMacroControls = Array.from(document.querySelectorAll(".control-check:checked[data-kind='macro']"))
     .map(el => el.value);
   const shock = document.getElementById("shock").value;
   const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
   return {
     shock,
-    outcome: document.getElementById("outcome").value,
     aggregation: document.getElementById("aggregation").value,
-    startDate: document.getElementById("start-date").value,
-    endDate: document.getElementById("end-date").value,
     includeZlb: document.getElementById("include-zlb").checked,
-    includeUnscheduled: document.getElementById("include-unscheduled").checked,
+    excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
+    rowStart: Math.max(1, Number.parseInt(document.getElementById("row-start").value || "1", 10)),
+    rowEnd: Number.parseInt(document.getElementById("row-end").value || "", 10),
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
+    macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     horizon: Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)),
     scaleBp: Math.max(1, Number.parseFloat(document.getElementById("scale-bp").value || "50")),
     scaleIrf: document.getElementById("scale-irf").checked,
-    controls: Array.from(new Set([...selectedControls, ...forced]))
+    controls: Array.from(new Set([...selectedRegularControls, ...forced])),
+    macroControls: Array.from(new Set(selectedMacroControls))
   };
 }
 
 function eventPassesBaseFilters(row, settings) {
-  if (settings.startDate && row.date < settings.startDate) return false;
-  if (settings.endDate && row.date > settings.endDate) return false;
-  if (!settings.includeUnscheduled && truthyFlag(row.unscheduled)) return false;
-  if (!settings.includeUnscheduled && row.scheduled === 0) return false;
+  if (settings.excludeUnscheduled && truthyFlag(row.unscheduled)) return false;
+  if (settings.excludeUnscheduled && row.scheduled === 0) return false;
   if (settings.aggregation === "main") {
     return truthyFlag(row.main) || (row.main == null && row.scheduled === 1);
   }
@@ -612,7 +620,7 @@ function aggregateMonth(items, mode, shockKey) {
   } else {
     rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
   }
-  const allControls = [...DATA.controls.market, ...DATA.controls.greenbook, ...DATA.controls.event];
+  const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
   for (const key of allControls) {
     for (let i = sorted.length - 1; i >= 0; i--) {
       if (finite(sorted[i][key])) {
@@ -641,16 +649,21 @@ function filteredEventRows(settings, shockKey) {
 
 function buildAnalysisRows(settings, shockKey) {
   const filtered = filteredEventRows(settings, shockKey);
+  const supportRowsAll = filtered.filter(row => finite(row[shockKey]));
+  const end = Number.isFinite(settings.rowEnd) ? Math.min(settings.rowEnd, supportRowsAll.length) : supportRowsAll.length;
+  const supportRows = supportRowsAll.slice(settings.rowStart - 1, end);
   let rows;
   if (settings.imputeZeros) {
+    if (!supportRows.length) return [];
+    const startMonth = supportRows[0].month;
+    const endMonth = supportRows[supportRows.length - 1].month;
     const grouped = new Map();
     for (const row of filtered) {
       if (!grouped.has(row.month)) grouped.set(row.month, []);
       grouped.get(row.month).push(row);
     }
     rows = DATA.macro
-      .filter(m => (!settings.startDate || monthToDate(m.month) >= settings.startDate) &&
-                   (!settings.endDate || monthToDate(m.month) <= settings.endDate))
+      .filter(m => m.month >= startMonth && m.month <= endMonth)
       .map(m => {
         const items = grouped.get(m.month) || [];
         const rec = {date: m.date, month: m.month, source: items.length ? "event-month" : "imputed"};
@@ -663,7 +676,7 @@ function buildAnalysisRows(settings, shockKey) {
           }
         }
         rec[shockKey] = found ? total : 0;
-        const allControls = [...DATA.controls.market, ...DATA.controls.greenbook, ...DATA.controls.event];
+        const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
         for (const key of allControls) {
           for (let i = items.length - 1; i >= 0; i--) {
             if (finite(items[i][key])) {
@@ -678,7 +691,7 @@ function buildAnalysisRows(settings, shockKey) {
         return rec;
       });
   } else {
-    rows = filtered.filter(row => finite(row[shockKey]));
+    rows = supportRows;
   }
 
   rows = rows.sort((a, b) => {
@@ -731,6 +744,17 @@ function buildRegressionData(settings, rows, outcomeKey, h) {
       zi.push(v);
     }
     if (!ok) continue;
+
+    for (const c of settings.macroControls) {
+      for (let lag = 1; lag <= settings.macroLags; lag++) {
+        const v = macroLagValue(c, row.month, lag);
+        if (!finite(v)) { ok = false; break; }
+        zi.push(v);
+      }
+      if (!ok) break;
+    }
+    if (!ok) continue;
+
     y.push(yi);
     x.push(row._x);
     controls.push(zi);
@@ -861,12 +885,14 @@ function runSpec() {
   }
 
   const maxH = Math.max(settings.horizon, 1);
-  const raw = runOutcome(settings, rows, settings.outcome, maxH);
   let scale = 1;
   let ffrH1 = null;
+  const rawByOutcome = {};
+  for (const outcome of OUTCOME_ORDER) {
+    rawByOutcome[outcome] = runOutcome(settings, rows, outcome, maxH);
+  }
   if (settings.scaleIrf) {
-    const ffr = runOutcome(settings, rows, "ffr", 1);
-    ffrH1 = ffr[1]?.beta;
+    ffrH1 = rawByOutcome.ffr[1]?.beta;
     if (!finite(ffrH1) || Math.abs(ffrH1) < EPS) {
       showError("Scaling failed because the FFR h=1 coefficient is unavailable or effectively zero.");
       return;
@@ -874,36 +900,103 @@ function runSpec() {
     scale = (settings.scaleBp / 100) / ffrH1;
   }
 
-  const results = raw.slice(0, settings.horizon + 1).map(r => ({
-    ...r,
-    betaScaled: finite(r.beta) ? r.beta * scale : null,
-    lo: finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * scale : null,
-    hi: finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * scale : null
-  }));
-  render(settings, rows, results, scale, ffrH1);
+  const resultsByOutcome = {};
+  for (const outcome of OUTCOME_ORDER) {
+    resultsByOutcome[outcome] = rawByOutcome[outcome].slice(0, settings.horizon + 1).map(r => {
+      const mid = finite(r.beta) ? r.beta * scale : null;
+      const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * scale : null;
+      const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * scale : null;
+      return {
+        ...r,
+        betaScaled: mid,
+        lo: finite(a) && finite(b) ? Math.min(a, b) : null,
+        hi: finite(a) && finite(b) ? Math.max(a, b) : null
+      };
+    });
+  }
+  render(settings, rows, resultsByOutcome, scale, ffrH1);
 }
 
-function render(settings, rows, results, scale, ffrH1) {
+function axisRef(i, axis) {
+  return i === 0 ? axis : `${axis}${i + 1}`;
+}
+
+function axisLayoutName(i, axis) {
+  return i === 0 ? `${axis}axis` : `${axis}axis${i + 1}`;
+}
+
+function render(settings, rows, resultsByOutcome, scale, ffrH1) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = DATA.shocks[settings.shock].label;
-  const outcomeLabel = DATA.outcomes[settings.outcome].label;
-  document.getElementById("chart-title").textContent = `${outcomeLabel} response to ${shockLabel}`;
+  document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = "90% HC1 robust confidence band";
 
-  const x = results.map(r => r.h);
-  const y = results.map(r => r.betaScaled);
-  const lo = results.map(r => r.lo);
-  const hi = results.map(r => r.hi);
-  const n = results.map(r => r.n);
+  const traces = [];
+  const annotations = [];
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 58, r: 20, t: 38, b: 46},
+    hovermode: "closest",
+    showlegend: false,
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
+  };
 
-  const bandX = x.concat(x.slice().reverse());
-  const bandY = hi.concat(lo.slice().reverse());
-  const hover = results.map(r =>
-    `h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
-  );
+  const xGap = 0.06;
+  const yGap = 0.12;
+  const colW = (1 - 2 * xGap) / 3;
+  const rowH = (1 - yGap) / 2;
+  OUTCOME_ORDER.forEach((outcome, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
+    const yDomain = row === 0 ? [rowH + yGap, 1] : [0, rowH];
+    const xName = axisLayoutName(i, "x");
+    const yName = axisLayoutName(i, "y");
+    layout[xName] = {
+      domain: xDomain,
+      title: row === 1 ? "Horizon" : "",
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      dtick: Math.max(1, Math.ceil(settings.horizon / 12)),
+      range: [0, settings.horizon]
+    };
+    layout[yName] = {
+      domain: yDomain,
+      title: col === 0 ? "Response" : "",
+      zeroline: false,
+      gridcolor: "#eef2ef"
+    };
+    annotations.push({
+      text: `<b>${DATA.outcomes[outcome].label}</b>`,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: yDomain[1] + 0.035,
+      xref: "paper",
+      yref: "paper",
+      showarrow: false,
+      font: {size: 13, color: "#17201b"}
+    });
 
-  const traces = [
-    {
+    const results = resultsByOutcome[outcome];
+    const valid = results.filter(r => finite(r.betaScaled) && finite(r.lo) && finite(r.hi));
+    const x = results.map(r => r.h);
+    const zeroTrace = {
+      x,
+      y: x.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: axisRef(i, "x"),
+      yaxis: axisRef(i, "y")
+    };
+    traces.push(zeroTrace);
+    if (!valid.length) return;
+    const vx = valid.map(r => r.h);
+    const bandX = vx.concat(vx.slice().reverse());
+    const bandY = valid.map(r => r.hi).concat(valid.map(r => r.lo).reverse());
+    traces.push({
       x: bandX,
       y: bandY,
       type: "scatter",
@@ -912,61 +1005,44 @@ function render(settings, rows, results, scale, ffrH1) {
       fillcolor: "rgba(22, 124, 128, 0.16)",
       line: {color: "rgba(22, 124, 128, 0)"},
       hoverinfo: "skip",
-      showlegend: false
-    },
-    {
-      x,
-      y,
+      showlegend: false,
+      xaxis: axisRef(i, "x"),
+      yaxis: axisRef(i, "y")
+    });
+    traces.push({
+      x: vx,
+      y: valid.map(r => r.betaScaled),
       type: "scatter",
       mode: "lines+markers",
-      line: {color: "#167c80", width: 3},
-      marker: {color: "#17201b", size: 6},
-      hovertemplate: hover,
-      name: "IRF"
-    },
-    {
-      x,
-      y: x.map(() => 0),
-      type: "scatter",
-      mode: "lines",
-      line: {color: "#9aa49d", width: 1, dash: "dot"},
-      hoverinfo: "skip",
-      showlegend: false
-    }
-  ];
+      line: {color: "#167c80", width: 2.4},
+      marker: {color: "#17201b", size: 4},
+      hovertemplate: valid.map(r =>
+        `${DATA.outcomes[outcome].label}<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
+      ),
+      showlegend: false,
+      xaxis: axisRef(i, "x"),
+      yaxis: axisRef(i, "y")
+    });
+  });
+  layout.annotations = annotations;
 
-  Plotly.react("plot", traces, {
-    paper_bgcolor: "#ffffff",
-    plot_bgcolor: "#ffffff",
-    margin: {l: 62, r: 24, t: 16, b: 52},
-    xaxis: {
-      title: "Horizon",
-      zeroline: false,
-      gridcolor: "#eef2ef",
-      dtick: Math.max(1, Math.ceil(settings.horizon / 12))
-    },
-    yaxis: {
-      title: DATA.outcomes[settings.outcome].transform === "logdiff100" ? "Percent" : "Percentage points",
-      zeroline: false,
-      gridcolor: "#eef2ef"
-    },
-    hovermode: "x unified",
-    showlegend: false,
-    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
-  }, {responsive: true, displayModeBar: false});
+  Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
 
   const minDate = rows.length ? rows[0].date : "NA";
   const maxDate = rows.length ? rows[rows.length - 1].date : "NA";
-  const validH = results.filter(r => r.n > 0);
-  const h0n = results[0]?.n || 0;
+  const allResults = OUTCOME_ORDER.flatMap(outcome => resultsByOutcome[outcome]);
+  const validH = allResults.filter(r => r.n > 0);
+  const h0n = Math.min(...OUTCOME_ORDER.map(outcome => resultsByOutcome[outcome][0]?.n || 0));
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
-  const controlsCount = settings.controls.length + settings.shockLags + settings.depLags;
+  const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + settings.shockLags + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB excluded";
   const imputeText = settings.imputeZeros ? "zero-imputed" : "event sample";
+  const unscheduledText = settings.excludeUnscheduled ? "unscheduled excluded" : "unscheduled included";
 
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">${settings.aggregation}</span>`,
     `<span class="pill">${zlbText}</span>`,
+    `<span class="pill">${unscheduledText}</span>`,
     `<span class="pill">${imputeText}</span>`,
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
   ].join("");
@@ -981,6 +1057,7 @@ function render(settings, rows, results, scale, ffrH1) {
     metric("FFR h=1 raw", fmt(ffrH1, 4)),
     metric("Shock lags", settings.shockLags),
     metric("Outcome lags", settings.depLags),
+    metric("Macro lags", settings.macroLags),
     metric("Max horizon", settings.horizon)
   ].join("");
 }
@@ -1003,36 +1080,31 @@ function renderOptions() {
   shockSel.innerHTML = Object.entries(DATA.shocks)
     .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
     .join("");
-  const outcomeSel = document.getElementById("outcome");
-  outcomeSel.innerHTML = Object.entries(DATA.outcomes)
-    .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
-    .join("");
 
   document.getElementById("shock").value = DATA.meta.defaults.shock;
-  document.getElementById("outcome").value = DATA.meta.defaults.outcome;
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
+  document.getElementById("row-start").value = 1;
+  document.getElementById("row-end").value = "";
   document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
+  document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h1_bp;
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
-  document.getElementById("include-unscheduled").checked = DATA.meta.defaults.include_unscheduled;
+  document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
 
-  const eventDates = DATA.events.map(r => r.date).sort();
-  document.getElementById("start-date").value = eventDates[0];
-  document.getElementById("end-date").value = eventDates[eventDates.length - 1];
-
-  renderControlChecks("controls-market", DATA.controls.market);
-  renderControlChecks("controls-greenbook", DATA.controls.greenbook);
-  renderControlChecks("controls-event", DATA.controls.event);
+  renderControlChecks("controls-market", DATA.controls.market, "regular");
+  renderControlChecks("controls-greenbook", DATA.controls.greenbook, "regular");
+  renderControlChecks("controls-fred-macro", DATA.controls.fred_macro, "macro");
   syncBsControls();
+  document.querySelectorAll(".control-check").forEach(el => el.addEventListener("change", runSpec));
 }
 
-function renderControlChecks(containerId, controls) {
+function renderControlChecks(containerId, controls, kind) {
   document.getElementById(containerId).innerHTML = controls.map(c => {
     const label = CONTROL_LABELS[c] || c;
-    return `<label class="check-row"><input class="control-check" type="checkbox" value="${c}" data-control="${c}"><span>${label}</span></label>`;
+    return `<label class="check-row"><input class="control-check" type="checkbox" value="${c}" data-kind="${kind}" data-control="${c}"><span>${label}</span></label>`;
   }).join("");
 }
 
@@ -1074,7 +1146,10 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["outcome", "aggregation", "include-zlb", "include-unscheduled", "impute-zeros", "scale-irf"]) {
+  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros", "scale-irf"]) {
+    document.getElementById(id).addEventListener("change", runSpec);
+  }
+  for (const id of ["row-start", "row-end", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   if (window.lucide) window.lucide.createIcons();
