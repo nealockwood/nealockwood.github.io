@@ -275,6 +275,8 @@ def main() -> None:
                 "shock": "mp1",
                 "horizon": 24,
                 "shock_lags": 12,
+                "use_whitening": False,
+                "whitening_lags": 8,
                 "dependent_lags": 12,
                 "macro_lags": 12,
                 "aggregation": "main",

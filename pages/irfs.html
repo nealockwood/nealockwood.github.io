@@ -398,6 +398,13 @@
           <input id="dep-lags" type="number" min="0" max="60" step="1" value="12">
         </div>
       </div>
+      <div style="margin-top: 9px;">
+        <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten shock residual</span></label>
+      </div>
+      <div id="whitening-lag-wrap" class="hidden" style="margin-top: 10px;">
+        <label for="whitening-lags">Whitening lags</label>
+        <input id="whitening-lags" type="number" min="0" max="60" step="1" value="8">
+      </div>
       <div class="grid-2" style="margin-top: 10px;">
         <div>
           <label for="horizon">Horizon</label>
@@ -475,7 +482,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=included-years-20260524";
+const DATA_URL = "irfs-data.json?v=whitening-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -770,6 +777,8 @@ function getSettings() {
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
+    useWhitening: document.getElementById("use-whitening").checked,
+    whiteningLags: Math.max(0, Number.parseInt(document.getElementById("whitening-lags").value || "8", 10)),
     horizon: Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)),
     scaleTarget: readScaleTarget(scaleMode),
     scaleMode,
@@ -910,12 +919,15 @@ function buildAnalysisRows(settings, shockKey) {
   return rows.filter(row => rowPassesYearFilter(row, settings));
 }
 
-function buildUsedControls(settings, row, outcomeKey) {
+function buildUsedControls(settings, row, outcomeKey, options = {}) {
+  const includeShockLags = options.includeShockLags !== false;
   const zi = [];
-  for (let i = 0; i < settings.shockLags; i++) {
-    const v = row._shockLags[i];
-    if (!finite(v)) return null;
-    zi.push(v);
+  if (includeShockLags) {
+    for (let i = 0; i < settings.shockLags; i++) {
+      const v = row._shockLags[i];
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
   }
 
   for (let i = 1; i <= settings.depLags; i++) {
@@ -940,7 +952,7 @@ function buildUsedControls(settings, row, outcomeKey) {
   return zi;
 }
 
-function buildRegressionData(settings, rows, outcomeKey, h) {
+function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
   const y = [];
   const x = [];
   const controls = [];
@@ -950,7 +962,7 @@ function buildRegressionData(settings, rows, outcomeKey, h) {
     const yi = responseValue(outcomeKey, row.month, h);
     if (!finite(yi) || !finite(row._x)) continue;
 
-    const zi = buildUsedControls(settings, row, outcomeKey);
+    const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
 
     y.push(yi);
@@ -961,14 +973,14 @@ function buildRegressionData(settings, rows, outcomeKey, h) {
   return {y, x, controls, rowDates};
 }
 
-function buildShockScaleData(settings, rows, outcomeKey) {
+function buildShockScaleData(settings, rows, outcomeKey, options = {}) {
   const x = [];
   const controls = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     if (!finite(row._x)) continue;
 
-    const zi = buildUsedControls(settings, row, outcomeKey);
+    const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
 
     x.push(row._x);
@@ -977,7 +989,7 @@ function buildShockScaleData(settings, rows, outcomeKey) {
   return {x, controls};
 }
 
-function buildImpactScaleData(settings, rows, outcomeKey) {
+function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
   const y = [];
   const x = [];
   const controls = [];
@@ -988,7 +1000,7 @@ function buildImpactScaleData(settings, rows, outcomeKey) {
     const ust2y = sourceValue(row, "ust2y");
     if (!finite(ust2y)) continue;
 
-    const zi = buildUsedControls(settings, row, outcomeKey);
+    const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
 
     y.push(ust2y);
@@ -1043,6 +1055,70 @@ function residualize(v, z) {
   });
 }
 
+function residualizeThrough(v, z) {
+  const n = v.length;
+  if (!z.length || !z[0].length) return v.slice();
+  const k = z[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      xty[a] += z[i][a] * v[i];
+      for (let b = 0; b < k; b++) xtx[a][b] += z[i][a] * z[i][b];
+    }
+  }
+  const beta = solveLinear(xtx, xty);
+  if (!beta) return null;
+  return v.map((val, i) => {
+    let fit = 0;
+    for (let j = 0; j < k; j++) fit += z[i][j] * beta[j];
+    return val - fit;
+  });
+}
+
+function cleanColumns(matrix) {
+  if (!matrix.length || !matrix[0]?.length) return {z: matrix.map(() => []), k: 0};
+  const n = matrix.length;
+  const rawK = matrix[0].length;
+  const keep = [];
+  for (let j = 0; j < rawK; j++) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < n; i++) {
+      min = Math.min(min, matrix[i][j]);
+      max = Math.max(max, matrix[i][j]);
+    }
+    if (max - min > EPS) keep.push(j);
+  }
+  return {z: matrix.map(row => keep.map(j => row[j])), k: keep.length};
+}
+
+function designRowsWithIntercept(z, n) {
+  if (!z.length || !z[0]?.length) return Array.from({length: n}, () => [1]);
+  return z;
+}
+
+function olsResiduals(y, design) {
+  const n = y.length;
+  if (!n || !design.length || !design[0]?.length) return null;
+  const k = design[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      xty[a] += design[i][a] * y[i];
+      for (let b = 0; b < k; b++) xtx[a][b] += design[i][a] * design[i][b];
+    }
+  }
+  const beta = solveLinear(xtx, xty);
+  if (!beta) return null;
+  return y.map((val, i) => {
+    let fit = 0;
+    for (let j = 0; j < k; j++) fit += design[i][j] * beta[j];
+    return val - fit;
+  });
+}
+
 function cleanZ(controls) {
   if (!controls.length) return {z: [], k: 1};
   const n = controls.length;
@@ -1093,6 +1169,96 @@ function partialOls(y, x, controls) {
   };
 }
 
+function buildWhitenedShock(x, controls, lags) {
+  const n = x.length;
+  if (n < 8) return null;
+  let {z, k} = cleanZ(controls);
+  let xTilde = null;
+  while (true) {
+    xTilde = residualize(x, z);
+    if (xTilde) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+
+  const p = Math.max(0, lags);
+  const wRowsAll = designRowsWithIntercept(z, n);
+  const indices = [];
+  const tilde = [];
+  const wRows = [];
+  const lagRows = [];
+  for (let i = p; i < n; i++) {
+    const lagRow = [];
+    let ok = true;
+    for (let lag = 1; lag <= p; lag++) {
+      const v = xTilde[i - lag];
+      if (!finite(v)) { ok = false; break; }
+      lagRow.push(v);
+    }
+    if (!ok) continue;
+    indices.push(i);
+    tilde.push(xTilde[i]);
+    wRows.push(wRowsAll[i]);
+    lagRows.push(lagRow);
+  }
+  if (tilde.length < 8) return null;
+
+  let {z: lRows, k: lK} = cleanColumns(lagRows);
+  let r = null;
+  while (true) {
+    r = residualizeThrough(tilde, lRows);
+    if (r) break;
+    if (!lRows.length || !lRows[0].length) return null;
+    lRows = lRows.map(row => row.slice(0, -1));
+    lK -= 1;
+  }
+
+  const denom = r.reduce((acc, v) => acc + v * v, 0);
+  if (denom < EPS) return null;
+  return {
+    r,
+    indices,
+    wRows,
+    lRows,
+    n: r.length,
+    wK: wRows[0]?.length || 0,
+    lK,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0,
+    droppedWhiteningLags: Math.max(0, p - lK)
+  };
+}
+
+function whitenedOls(y, x, controls, lags) {
+  const model = buildWhitenedShock(x, controls, lags);
+  if (!model) return null;
+  const y2 = model.indices.map(i => y[i]);
+  const x2 = model.indices.map(i => x[i]);
+  const denom = model.r.reduce((acc, v) => acc + v * v, 0);
+  const beta = model.r.reduce((acc, v, i) => acc + v * y2[i], 0) / denom;
+  const fullDesign = y2.map((_, i) => [x2[i], ...model.wRows[i], ...model.lRows[i]]);
+  const fullResid = olsResiduals(y2, fullDesign);
+  const resid = fullResid || y2.map((v, i) => v - beta * model.r[i]);
+  const p = 1 + model.wK + model.lK;
+  if (model.n <= p) return null;
+  let meat = 0;
+  for (let i = 0; i < model.n; i++) meat += model.r[i] * model.r[i] * resid[i] * resid[i];
+  const variance = (model.n / (model.n - p)) * meat / (denom * denom);
+  return {
+    beta,
+    se: Math.sqrt(Math.max(0, variance)),
+    n: model.n,
+    p,
+    droppedControls: model.droppedControls,
+    droppedWhiteningLags: model.droppedWhiteningLags
+  };
+}
+
+function fitShockResponse(y, x, controls, settings) {
+  if (settings.useWhitening) return whitenedOls(y, x, controls, settings.whiteningLags);
+  return partialOls(y, x, controls);
+}
+
 function shockResidualRmse(x, controls) {
   const n = x.length;
   if (n < 8) return null;
@@ -1115,11 +1281,26 @@ function shockResidualRmse(x, controls) {
   };
 }
 
+function whitenedShockResidualRmse(x, controls, lags) {
+  const model = buildWhitenedShock(x, controls, lags);
+  if (!model) return null;
+  const rss = model.r.reduce((acc, v) => acc + v * v, 0);
+  const p = model.wK + model.lK;
+  if (model.n <= p) return null;
+  return {
+    rmse: Math.sqrt(rss / (model.n - p)),
+    n: model.n,
+    p,
+    droppedControls: model.droppedControls,
+    droppedWhiteningLags: model.droppedWhiteningLags
+  };
+}
+
 function runOutcome(settings, rows, outcomeKey, maxH) {
   const results = [];
   for (let h = 0; h <= maxH; h++) {
-    const reg = buildRegressionData(settings, rows, outcomeKey, h);
-    const fit = partialOls(reg.y, reg.x, reg.controls);
+    const reg = buildRegressionData(settings, rows, outcomeKey, h, {includeShockLags: !settings.useWhitening});
+    const fit = fitShockResponse(reg.y, reg.x, reg.controls, settings);
     results.push({
       h,
       beta: fit ? fit.beta : null,
@@ -1158,8 +1339,8 @@ function runSpec() {
     const target = settings.scaleTarget / 100;
     const coefs = [];
     for (const outcome of OUTCOME_ORDER) {
-      const scaleData = buildImpactScaleData(settings, rows, outcome);
-      const fit = partialOls(scaleData.y, scaleData.x, scaleData.controls);
+      const scaleData = buildImpactScaleData(settings, rows, outcome, {includeShockLags: !settings.useWhitening});
+      const fit = fitShockResponse(scaleData.y, scaleData.x, scaleData.controls, settings);
       if (!fit || !finite(fit.beta)) {
         showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the scaling regression could not be estimated. Choose a different scaling method.`);
         return;
@@ -1193,8 +1374,10 @@ function runSpec() {
   } else if (settings.scaleMode === "shock-rmse") {
     const rmseByOutcome = [];
     for (const outcome of OUTCOME_ORDER) {
-      const scaleData = buildShockScaleData(settings, rows, outcome);
-      const fit = shockResidualRmse(scaleData.x, scaleData.controls);
+      const scaleData = buildShockScaleData(settings, rows, outcome, {includeShockLags: !settings.useWhitening});
+      const fit = settings.useWhitening
+        ? whitenedShockResidualRmse(scaleData.x, scaleData.controls, settings.whiteningLags)
+        : shockResidualRmse(scaleData.x, scaleData.controls);
       if (!fit || !finite(fit.rmse)) {
         showError(`Shock residual SD scaling failed for ${outcomeLabel(outcome)}.`);
         return;
@@ -1361,9 +1544,11 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   const validH = allResults.filter(r => r.n > 0);
   const h0n = Math.min(...OUTCOME_ORDER.map(outcome => resultsByOutcome[outcome][0]?.n || 0));
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
-  const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + settings.shockLags + settings.depLags;
+  const shockControlCount = settings.useWhitening ? settings.whiteningLags : settings.shockLags;
+  const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
   const imputeText = settings.imputeZeros ? "zero-imputed" : "event rows";
+  const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
   const unscheduledText = settings.excludeUnscheduled
     ? `unscheduled excluded (${unscheduledSupportRows})`
     : `unscheduled included (${unscheduledSupportRows})`;
@@ -1371,6 +1556,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">${settings.aggregation}</span>`,
     `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
+    `<span class="pill">${estimatorText}</span>`,
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${unscheduledText}</span>`,
     `<span class="pill">${imputeText}</span>`,
@@ -1387,7 +1573,8 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
     metric("Controls", controlsCount),
     metric("Scale", scaleDisplay),
     metric("FFR h=0 raw", fmt(ffrH0, 4)),
-    metric("Shock lags", settings.shockLags),
+    metric("Shock lags", settings.useWhitening ? "replaced" : settings.shockLags),
+    metric("Whitening", settings.useWhitening ? settings.whiteningLags : "off"),
     metric("Outcome lags", settings.depLags),
     metric("Macro lags", settings.macroLags),
     metric("Max horizon", settings.horizon)
@@ -1417,6 +1604,9 @@ function renderOptions() {
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
   document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
   document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
+  document.getElementById("use-whitening").checked = DATA.meta.defaults.use_whitening ?? false;
+  document.getElementById("whitening-lags").value = DATA.meta.defaults.whitening_lags ?? 8;
+  syncWhiteningControls();
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
@@ -1478,6 +1668,15 @@ function syncBsControls() {
   updateGroupToggles();
 }
 
+function syncWhiteningControls() {
+  const enabled = document.getElementById("use-whitening").checked;
+  const wrap = document.getElementById("whitening-lag-wrap");
+  wrap.classList.toggle("hidden", !enabled);
+  if (enabled && !document.getElementById("whitening-lags").value) {
+    document.getElementById("whitening-lags").value = DATA?.meta?.defaults?.whitening_lags ?? 8;
+  }
+}
+
 function resetDefaults() {
   renderOptions();
   runSpec();
@@ -1504,11 +1703,15 @@ async function init() {
   for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
+  document.getElementById("use-whitening").addEventListener("change", () => {
+    syncWhiteningControls();
+    runSpec();
+  });
   document.getElementById("scale-mode").addEventListener("change", () => {
     configureScaleTarget(true);
     runSpec();
   });
-  for (const id of ["included-years", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
+  for (const id of ["included-years", "shock-lags", "whitening-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   if (window.lucide) window.lucide.createIcons();
