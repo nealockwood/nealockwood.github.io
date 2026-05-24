@@ -308,10 +308,6 @@
     color: white;
   }
 
-  .top-select {
-    min-width: 160px;
-  }
-
   .top-dropdown {
     position: relative;
     min-width: 180px;
@@ -582,10 +578,6 @@
         <div class="view-tabs" role="tablist" aria-label="Plot view">
           <button class="view-tab active" type="button" data-view="irf" role="tab" aria-selected="true">IRF panel</button>
           <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
-        </div>
-        <div class="decomp-control hidden">
-          <label for="decomp-outcome">Outcome</label>
-          <select class="top-select" id="decomp-outcome"></select>
         </div>
         <div class="decomp-control hidden">
           <label>Horizon lines</label>
@@ -975,7 +967,6 @@ function getSettings() {
   return {
     shock,
     viewMode: currentViewMode(),
-    decompOutcome: document.getElementById("decomp-outcome").value || "ffr",
     decompHorizons: selectedDecompHorizons(horizon),
     aggregation: document.getElementById("aggregation").value,
     includeZlb: document.getElementById("include-zlb").checked,
@@ -1717,94 +1708,108 @@ function axisLayoutName(i, axis) {
 }
 
 function renderDecompPlot(settings, rows, scaleByOutcome) {
-  const outcome = settings.decompOutcome || "ffr";
-  const outcomeText = outcomeLabel(outcome);
   const shockLabel = seriesSpec(settings.shock).label;
-  document.getElementById("chart-title").textContent = `LP decomposition: ${outcomeText} response to ${shockLabel}`;
+  document.getElementById("chart-title").textContent = `LP decomposition: responses to ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = "Cumulative FWL contributions by selected horizon";
-
   const horizons = settings.decompHorizons.filter(h => h <= settings.horizon);
-  const scale = scaleByOutcome[outcome] ?? 1;
-  const traces = [{
-    x: rows.map(row => row.date),
-    y: rows.map(() => 0),
-    type: "scatter",
-    mode: "lines",
-    line: {color: "#9aa49d", width: 1, dash: "dot"},
-    hoverinfo: "skip",
-    showlegend: false
-  }];
-  const lines = [];
-  for (const h of horizons) {
-    const line = buildDecompLine(settings, rows, outcome, h, scale);
-    if (line && line.dates.length) lines.push(line);
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const color = DECOMP_COLORS[i % DECOMP_COLORS.length];
-    traces.push({
-      x: line.dates,
-      y: line.values,
-      type: "scatter",
-      mode: "lines",
-      line: {color, width: 2.4},
-      name: `h=${line.h}`,
-      hovertemplate: line.dates.map((date, j) =>
-        `${outcomeText}<br>${date}<br>h=${line.h}<br>contribution=${fmt(line.values[j], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
-      )
-    });
-  }
-
-  if (!lines.length) {
-    traces.push({
-      x: [rows[0]?.date || "1993-01-01"],
-      y: [0],
-      type: "scatter",
-      mode: "markers",
-      marker: {opacity: 0},
-      hoverinfo: "skip",
-      showlegend: false
-    });
-  }
+  const traces = [];
+  const annotations = [];
 
   const layout = {
     paper_bgcolor: "#ffffff",
     plot_bgcolor: "#ffffff",
-    margin: {l: 76, r: 28, t: 30, b: 68},
+    margin: {l: 74, r: 24, t: 30, b: 66},
     hovermode: "closest",
     showlegend: true,
-    legend: {orientation: "h", x: 0, y: 1.08, xanchor: "left", yanchor: "bottom"},
-    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"},
-    xaxis: {
-      title: {text: "Estimation date", standoff: 10, font: {size: 11}},
-      type: "date",
-      gridcolor: "#eef2ef",
-      zeroline: false,
-      automargin: true
-    },
-    yaxis: {
-      title: {text: "Cumulative contribution", standoff: 8, font: {size: 11}},
-      tickformat: ".4~f",
-      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
-      gridcolor: "#eef2ef",
-      zeroline: false,
-      automargin: true
-    },
-    annotations: lines.length <= 8 ? lines.map((line, i) => ({
-      text: `h=${line.h}: ${fmt(line.betaScaled, 4)}`,
-      x: line.dates[line.dates.length - 1],
-      y: line.values[line.values.length - 1],
-      xref: "x",
-      yref: "y",
-      showarrow: false,
-      xanchor: "left",
-      yanchor: "middle",
-      xshift: 6,
-      font: {size: 11, color: DECOMP_COLORS[i % DECOMP_COLORS.length]}
-    })) : []
+    legend: {orientation: "h", x: 0, y: 1.09, xanchor: "left", yanchor: "bottom"},
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
   };
 
+  const xGap = 0.085;
+  const yGap = 0.2;
+  const yPadBottom = 0.06;
+  const yPadTop = 0.05;
+  const colW = (1 - 2 * xGap) / 3;
+  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
+  const legendShown = new Set();
+  OUTCOME_ORDER.forEach((outcome, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
+    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
+    const xName = axisLayoutName(i, "x");
+    const yName = axisLayoutName(i, "y");
+    const xRef = axisRef(i, "x");
+    const yRef = axisRef(i, "y");
+    layout[xName] = {
+      domain: xDomain,
+      anchor: yRef,
+      title: row === 1 && col === 1 ? {text: "Estimation date", standoff: 10, font: {size: 11}} : "",
+      showticklabels: row === 1,
+      type: "date",
+      tickfont: {size: 10},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    layout[yName] = {
+      domain: yDomain,
+      anchor: xRef,
+      title: col === 0 ? {text: "Cumulative contribution", standoff: 8, font: {size: 11}} : "",
+      tickfont: {size: 10},
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    annotations.push({
+      text: `<b>${PANEL_LABELS[outcome] || DATA.outcomes[outcome].label}</b>`,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: yDomain[1] + 0.035,
+      xref: "paper",
+      yref: "paper",
+      showarrow: false,
+      font: {size: 13, color: "#17201b"}
+    });
+
+    traces.push({
+      x: rows.map(row => row.date),
+      y: rows.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+
+    const scale = scaleByOutcome[outcome] ?? 1;
+    horizons.forEach((h, hIndex) => {
+      const line = buildDecompLine(settings, rows, outcome, h, scale);
+      if (!line || !line.dates.length) return;
+      const color = DECOMP_COLORS[hIndex % DECOMP_COLORS.length];
+      const showLegend = !legendShown.has(h);
+      if (showLegend) legendShown.add(h);
+      traces.push({
+        x: line.dates,
+        y: line.values,
+        type: "scatter",
+        mode: "lines",
+        line: {color, width: 2.1},
+        name: `h=${line.h}`,
+        legendgroup: `h${line.h}`,
+        showlegend: showLegend,
+        hovertemplate: line.dates.map((date, j) =>
+          `${DATA.outcomes[outcome].label}<br>${date}<br>h=${line.h}<br>contribution=${fmt(line.values[j], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
+        ),
+        xaxis: xRef,
+        yaxis: yRef
+      });
+    });
+  });
+  layout.annotations = annotations;
   Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
 }
 
@@ -1942,7 +1947,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
   const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
   const viewText = settings.viewMode === "decomp"
-    ? `LP decomp ${outcomeLabel(settings.decompOutcome)} h=${settings.decompHorizons.join(",")}`
+    ? `LP decomp h=${settings.decompHorizons.join(",")}`
     : "IRF panel";
   const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
     ? `unscheduled excluded (${unscheduledSupportRows})`
@@ -1998,10 +2003,6 @@ function renderOptions() {
   shockSel.innerHTML = Object.entries(allSeries())
     .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
     .join("");
-  document.getElementById("decomp-outcome").innerHTML = OUTCOME_ORDER
-    .map(key => `<option value="${key}">${PANEL_LABELS[key] || DATA.outcomes[key].label}</option>`)
-    .join("");
-  document.getElementById("decomp-outcome").value = "ffr";
 
   document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
@@ -2113,7 +2114,6 @@ async function init() {
       runSpec();
     });
   });
-  document.getElementById("decomp-outcome").addEventListener("change", runSpec);
   document.getElementById("decomp-default-horizons").addEventListener("click", () => {
     setDecompHorizons(defaultDecompHorizons(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10))));
     runSpec();
