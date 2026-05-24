@@ -479,6 +479,7 @@
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
         <label class="check-row"><input id="include-covid" type="checkbox"><span>Include COVID</span></label>
+        <label class="check-row"><input id="exclude-2009-2010" type="checkbox"><span>Exclude 2009-2010</span></label>
         <label class="check-row"><input id="exclude-unscheduled" type="checkbox"><span>Exclude unscheduled meetings</span></label>
         <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute missing months with zeros</span></label>
       </div>
@@ -744,6 +745,15 @@ function isCovidLeadMonth(month) {
   return month >= "2020-03" && month <= "2021-03";
 }
 
+function isExcluded2009LeadMonth(month) {
+  return month >= "2009-01" && month <= "2010-12";
+}
+
+function isSuppressedLeadMonth(month, settings) {
+  return (!settings.includeCovid && isCovidLeadMonth(month)) ||
+    (settings.exclude2009_2010 && isExcluded2009LeadMonth(month));
+}
+
 function macroLagValue(controlKey, baseMonth, lag) {
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
@@ -760,7 +770,7 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}) {
   const prevIdx = baseIdx - 1;
   if (leadIdx < 0 || leadIdx >= months.length || prevIdx < 0) return null;
   const leadMonth = months[leadIdx];
-  if (!settings.includeCovid && isCovidLeadMonth(leadMonth)) return null;
+  if (isSuppressedLeadMonth(leadMonth, settings)) return null;
   const prevMonth = months[prevIdx];
   const lead = monthValue(leadMonth, spec.source);
   const prev = monthValue(prevMonth, spec.source);
@@ -971,6 +981,7 @@ function getSettings() {
     aggregation: document.getElementById("aggregation").value,
     includeZlb: document.getElementById("include-zlb").checked,
     includeCovid: document.getElementById("include-covid").checked,
+    exclude2009_2010: document.getElementById("exclude-2009-2010").checked,
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
     includedYearRules: includedYears.rules,
@@ -1544,14 +1555,13 @@ function buildDecompLine(settings, rows, outcomeKey, h, scale) {
   };
 }
 
-function covidLeadGapRow(rows, prevDate, nextDate, settings, h) {
-  if (settings.includeCovid) return null;
+function suppressedLeadGapRow(rows, prevDate, nextDate, settings, h) {
   for (const row of rows) {
     if (row.date <= prevDate || row.date >= nextDate) continue;
     const baseIdx = monthIndex.get(row.month);
     if (baseIdx === undefined) continue;
     const leadMonth = months[baseIdx + h];
-    if (isCovidLeadMonth(leadMonth)) return row;
+    if (isSuppressedLeadMonth(leadMonth, settings)) return row;
   }
   return null;
 }
@@ -1562,7 +1572,7 @@ function decompPlotLine(line, rows, settings, outcomeKey) {
   const hover = [];
   for (let i = 0; i < line.dates.length; i++) {
     if (i > 0) {
-      const gapRow = covidLeadGapRow(rows, line.dates[i - 1], line.dates[i], settings, line.h);
+      const gapRow = suppressedLeadGapRow(rows, line.dates[i - 1], line.dates[i], settings, line.h);
       if (gapRow) {
         dates.push(gapRow.date);
         values.push(null);
@@ -1760,8 +1770,8 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
   };
 
   const xGap = 0.085;
-  const yGap = 0.2;
-  const yPadBottom = 0.06;
+  const yGap = 0.26;
+  const yPadBottom = 0.075;
   const yPadTop = 0.05;
   const colW = (1 - 2 * xGap) / 3;
   const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
@@ -1778,10 +1788,12 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
     layout[xName] = {
       domain: xDomain,
       anchor: yRef,
-      title: row === 1 && col === 1 ? {text: "Estimation date", standoff: 10, font: {size: 11}} : "",
-      showticklabels: row === 1,
+      title: col === 1 ? {text: "Estimation date", standoff: 8, font: {size: 11}} : "",
+      showticklabels: true,
       type: "date",
       tickfont: {size: 10},
+      tickformat: "%Y",
+      dtick: "M48",
       zeroline: false,
       gridcolor: "#eef2ef",
       automargin: true
@@ -1868,8 +1880,8 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   };
 
   const xGap = 0.085;
-  const yGap = 0.2;
-  const yPadBottom = 0.06;
+  const yGap = 0.26;
+  const yPadBottom = 0.075;
   const yPadTop = 0.05;
   const colW = (1 - 2 * xGap) / 3;
   const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
@@ -1885,8 +1897,8 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     layout[xName] = {
       domain: xDomain,
       anchor: yRef,
-      title: row === 1 && col === 1 ? {text: "Horizon", standoff: 10, font: {size: 11}} : "",
-      showticklabels: row === 1,
+      title: col === 1 ? {text: "Horizon", standoff: 8, font: {size: 11}} : "",
+      showticklabels: true,
       tickfont: {size: 10},
       zeroline: false,
       gridcolor: "#eef2ef",
@@ -1978,6 +1990,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
   const covidText = settings.includeCovid ? "COVID included" : "COVID leads excluded";
+  const exclude2009Text = settings.exclude2009_2010 ? "2009-2010 leads excluded" : "2009-2010 included";
   const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
   const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
   const viewText = settings.viewMode === "decomp"
@@ -1994,6 +2007,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     `<span class="pill">${estimatorText}</span>`,
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${covidText}</span>`,
+    `<span class="pill">${exclude2009Text}</span>`,
     `<span class="pill">${unscheduledText}</span>`,
     `<span class="pill">${imputeText}</span>`,
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
@@ -2006,6 +2020,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     metric("Years", settings.includedYearsDisplay),
     metric("Date range", `${minDate} to ${maxDate}`),
     metric("COVID", settings.includeCovid ? "included" : "leads excluded"),
+    metric("2009-2010", settings.exclude2009_2010 ? "leads excluded" : "included"),
     metric("h=0 n", h0n),
     metric("Min n", minN),
     metric("Controls", controlsCount),
@@ -2052,6 +2067,7 @@ function renderOptions() {
   configureScaleTarget(true);
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("include-covid").checked = DATA.meta.defaults.include_covid ?? false;
+  document.getElementById("exclude-2009-2010").checked = DATA.meta.defaults.exclude_2009_2010 ?? false;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
   renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
@@ -2161,7 +2177,7 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros"]) {
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-2009-2010", "exclude-unscheduled", "impute-zeros"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   document.getElementById("use-whitening").addEventListener("change", () => {
