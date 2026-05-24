@@ -1544,6 +1544,40 @@ function buildDecompLine(settings, rows, outcomeKey, h, scale) {
   };
 }
 
+function covidLeadGapRow(rows, prevDate, nextDate, settings, h) {
+  if (settings.includeCovid) return null;
+  for (const row of rows) {
+    if (row.date <= prevDate || row.date >= nextDate) continue;
+    const baseIdx = monthIndex.get(row.month);
+    if (baseIdx === undefined) continue;
+    const leadMonth = months[baseIdx + h];
+    if (isCovidLeadMonth(leadMonth)) return row;
+  }
+  return null;
+}
+
+function decompPlotLine(line, rows, settings, outcomeKey) {
+  const dates = [];
+  const values = [];
+  const hover = [];
+  for (let i = 0; i < line.dates.length; i++) {
+    if (i > 0) {
+      const gapRow = covidLeadGapRow(rows, line.dates[i - 1], line.dates[i], settings, line.h);
+      if (gapRow) {
+        dates.push(gapRow.date);
+        values.push(null);
+        hover.push("");
+      }
+    }
+    dates.push(line.dates[i]);
+    values.push(line.values[i]);
+    hover.push(
+      `${DATA.outcomes[outcomeKey].label}<br>${line.dates[i]}<br>h=${line.h}<br>contribution=${fmt(line.values[i], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
+    );
+  }
+  return {dates, values, hover};
+}
+
 function shockResidualRmse(x, controls) {
   const n = x.length;
   if (n < 8) return null;
@@ -1789,21 +1823,21 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
     horizons.forEach((h, hIndex) => {
       const line = buildDecompLine(settings, rows, outcome, h, scale);
       if (!line || !line.dates.length) return;
+      const plotLine = decompPlotLine(line, rows, settings, outcome);
       const color = DECOMP_COLORS[hIndex % DECOMP_COLORS.length];
       const showLegend = !legendShown.has(h);
       if (showLegend) legendShown.add(h);
       traces.push({
-        x: line.dates,
-        y: line.values,
+        x: plotLine.dates,
+        y: plotLine.values,
         type: "scatter",
         mode: "lines",
         line: {color, width: 2.1},
         name: `h=${line.h}`,
         legendgroup: `h${line.h}`,
         showlegend: showLegend,
-        hovertemplate: line.dates.map((date, j) =>
-          `${DATA.outcomes[outcome].label}<br>${date}<br>h=${line.h}<br>contribution=${fmt(line.values[j], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
-        ),
+        connectgaps: false,
+        hovertemplate: plotLine.hover,
         xaxis: xRef,
         yaxis: yRef
       });
