@@ -107,6 +107,13 @@
     margin-bottom: 5px;
   }
 
+  .unit-note {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
   select, input[type="number"], input[type="date"] {
     width: 100%;
     min-height: 34px;
@@ -403,8 +410,9 @@
           <input id="horizon" type="number" min="1" max="120" step="1" value="24">
         </div>
         <div>
-          <label for="scale-bp">FFR target bp</label>
-          <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
+          <label id="scale-target-label" for="scale-bp">UST2Y target</label>
+          <input id="scale-bp" type="number" min="0.01" max="300" step="1" value="10">
+          <div class="unit-note" id="scale-target-unit">basis points</div>
         </div>
       </div>
       <div style="margin-top: 10px;">
@@ -473,9 +481,10 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=ust2y-impact-20260524";
+const DATA_URL = "irfs-data.json?v=scale-target-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
+const DISPLAY_ZERO_TOL = 1e-10;
 
 let DATA = null;
 let macroByMonth = new Map();
@@ -541,8 +550,17 @@ function asNumber(v) {
   return Number.isFinite(x) ? x : null;
 }
 
+function cleanZero(v) {
+  return finite(v) && Math.abs(v) < DISPLAY_ZERO_TOL ? 0 : v;
+}
+
 function fmt(x, digits = 3) {
-  return finite(x) ? x.toFixed(digits) : "NA";
+  return finite(x) ? cleanZero(x).toFixed(digits) : "NA";
+}
+
+function fmtTarget(x) {
+  if (!finite(x)) return "NA";
+  return Number.parseFloat(cleanZero(x).toFixed(4)).toString();
 }
 
 function outcomeLabel(key) {
@@ -627,6 +645,65 @@ function dependentDelta(outcomeKey, baseMonth, lag) {
   return cur - prev;
 }
 
+function scaleTargetConfig(mode) {
+  if (mode === "ust2y-impact") {
+    return {
+      label: "UST2Y target",
+      unit: "basis points",
+      value: DATA.meta.defaults.scale_to_ust2y_bp ?? DEFAULT_UST2Y_TARGET_BP,
+      min: 0.01,
+      max: 300,
+      step: 1
+    };
+  }
+  if (mode === "ffr-h0") {
+    return {
+      label: "FFR h=0 target",
+      unit: "basis points",
+      value: DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp ?? 50,
+      min: 0.01,
+      max: 300,
+      step: 1
+    };
+  }
+  if (mode === "shock-rmse") {
+    return {
+      label: "Shock size",
+      unit: "residual standard deviations",
+      value: DATA.meta.defaults.scale_to_shock_sd ?? 1,
+      min: 0.01,
+      max: 20,
+      step: 0.25
+    };
+  }
+  return {
+    label: "Raw multiplier",
+    unit: "multiplier",
+    value: 1,
+    min: 0,
+    max: 20,
+    step: 0.25
+  };
+}
+
+function configureScaleTarget(resetValue = false) {
+  const mode = document.getElementById("scale-mode").value;
+  const cfg = scaleTargetConfig(mode);
+  const input = document.getElementById("scale-bp");
+  document.getElementById("scale-target-label").textContent = cfg.label;
+  document.getElementById("scale-target-unit").textContent = cfg.unit;
+  input.min = cfg.min;
+  input.max = cfg.max;
+  input.step = cfg.step;
+  if (resetValue || !input.value) input.value = cfg.value;
+}
+
+function readScaleTarget(mode) {
+  const cfg = scaleTargetConfig(mode);
+  const value = Number.parseFloat(document.getElementById("scale-bp").value);
+  return Number.isFinite(value) ? Math.max(cfg.min, value) : cfg.value;
+}
+
 function getSettings() {
   const selectedRegularControls = Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])"))
     .map(el => el.value);
@@ -634,6 +711,7 @@ function getSettings() {
     .map(el => el.value);
   const shock = document.getElementById("shock").value;
   const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
+  const scaleMode = document.getElementById("scale-mode").value;
   return {
     shock,
     aggregation: document.getElementById("aggregation").value,
@@ -646,8 +724,8 @@ function getSettings() {
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     horizon: Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)),
-    scaleBp: Math.max(1, Number.parseFloat(document.getElementById("scale-bp").value || "50")),
-    scaleMode: document.getElementById("scale-mode").value,
+    scaleTarget: readScaleTarget(scaleMode),
+    scaleMode,
     controls: Array.from(new Set([...selectedRegularControls, ...forced])),
     macroControls: Array.from(new Set(selectedMacroControls))
   };
@@ -1023,7 +1101,7 @@ function runSpec() {
   }
   const scaleByOutcome = Object.fromEntries(OUTCOME_ORDER.map(outcome => [outcome, 1]));
   if (settings.scaleMode === "ust2y-impact") {
-    const target = (DATA.meta.defaults.scale_to_ust2y_bp ?? DEFAULT_UST2Y_TARGET_BP) / 100;
+    const target = settings.scaleTarget / 100;
     const coefs = [];
     for (const outcome of OUTCOME_ORDER) {
       const scaleData = buildImpactScaleData(settings, rows, outcome);
@@ -1048,16 +1126,16 @@ function runSpec() {
     const coefDisplay = Math.abs(maxCoef - minCoef) < 1e-8
       ? fmt(minCoef, 4)
       : `${fmt(minCoef, 4)}-${fmt(maxCoef, 4)}`;
-    scaleDisplay = `${DATA.meta.defaults.scale_to_ust2y_bp ?? DEFAULT_UST2Y_TARGET_BP}bp UST2Y; coef ${coefDisplay}`;
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)}bp UST2Y; coef ${coefDisplay}`;
   } else if (settings.scaleMode === "ffr-h0") {
     ffrH0 = rawByOutcome.ffr[0]?.beta;
     if (!finite(ffrH0) || Math.abs(ffrH0) < EPS) {
       showError("Scaling failed because the FFR h=0 coefficient is unavailable or effectively zero.");
       return;
     }
-    const scale = (settings.scaleBp / 100) / ffrH0;
+    const scale = (settings.scaleTarget / 100) / ffrH0;
     for (const outcome of OUTCOME_ORDER) scaleByOutcome[outcome] = scale;
-    scaleDisplay = fmt(scale, 3);
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)}bp FFR; scale ${fmt(scale, 3)}`;
   } else if (settings.scaleMode === "shock-rmse") {
     const rmseByOutcome = [];
     for (const outcome of OUTCOME_ORDER) {
@@ -1067,14 +1145,18 @@ function runSpec() {
         showError(`Shock residual SD scaling failed for ${outcomeLabel(outcome)}.`);
         return;
       }
-      scaleByOutcome[outcome] = fit.rmse;
+      scaleByOutcome[outcome] = settings.scaleTarget * fit.rmse;
       rmseByOutcome.push(fit.rmse);
     }
     const minScale = Math.min(...rmseByOutcome);
     const maxScale = Math.max(...rmseByOutcome);
-    scaleDisplay = Math.abs(maxScale - minScale) < 1e-8
+    const rmseDisplay = Math.abs(maxScale - minScale) < 1e-8
       ? fmt(minScale, 3)
       : `${fmt(minScale, 3)}-${fmt(maxScale, 3)}`;
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)} SD; rmse ${rmseDisplay}`;
+  } else if (settings.scaleMode === "none") {
+    for (const outcome of OUTCOME_ORDER) scaleByOutcome[outcome] = settings.scaleTarget;
+    scaleDisplay = `raw x ${fmtTarget(settings.scaleTarget)}`;
   }
 
   const resultsByOutcome = {};
@@ -1086,9 +1168,9 @@ function runSpec() {
       const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * scale : null;
       return {
         ...r,
-        betaScaled: mid,
-        lo: finite(a) && finite(b) ? Math.min(a, b) : null,
-        hi: finite(a) && finite(b) ? Math.max(a, b) : null
+        betaScaled: finite(mid) ? cleanZero(mid) : null,
+        lo: finite(a) && finite(b) ? cleanZero(Math.min(a, b)) : null,
+        hi: finite(a) && finite(b) ? cleanZero(Math.max(a, b)) : null
       };
     });
   }
@@ -1152,7 +1234,8 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
       anchor: xRef,
       title: col === 0 ? {text: "Response", standoff: 8, font: {size: 11}} : "",
       tickfont: {size: 10},
-      tickformat: "~g",
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
       zeroline: false,
       gridcolor: "#eef2ef",
       automargin: true
@@ -1282,8 +1365,8 @@ function renderOptions() {
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
-  document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "ffr-h0";
+  configureScaleTarget(true);
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
@@ -1363,9 +1446,13 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros", "scale-mode"]) {
+  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
+  document.getElementById("scale-mode").addEventListener("change", () => {
+    configureScaleTarget(true);
+    runSpec();
+  });
   for (const id of ["row-start", "row-end", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }

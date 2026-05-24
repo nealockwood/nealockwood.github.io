@@ -284,6 +284,7 @@ def main() -> None:
                 "scale_mode": "ust2y-impact",
                 "scale_to_ffr_h0_bp": 50,
                 "scale_to_ust2y_bp": 10,
+                "scale_to_shock_sd": 1,
                 "ci": 0.9,
             },
         },
