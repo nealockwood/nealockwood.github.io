@@ -26,6 +26,10 @@ import pyreadstat
 SITE_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = Path(os.environ.get("MPS_REP_DIR", SITE_ROOT.parent / "mps_rep")).resolve()
 OUTPUT_PATH = SITE_ROOT / "pages" / "irfs-data.json"
+RAW_EVENT_URL = os.environ.get(
+    "JK_SOURCE_URL",
+    "https://raw.githubusercontent.com/paulbousquet/GBMPSurprise/main/jk_source_old.csv",
+)
 
 MARKET_CONTROLS = [
     "nfp_surp",
@@ -72,6 +76,25 @@ FRED_MACRO_CONTROLS = [
     "dlmpu",
 ]
 
+RAW_SHOCK_COLUMNS = [
+    "mp1",
+    "mp2",
+    "ff1",
+    "ff2",
+    "ff3",
+    "ff4",
+    "ff5",
+    "ff6",
+    "ed1",
+    "ed2",
+    "ed3",
+    "ed4",
+    "ed5",
+    "ed6",
+    "ed7",
+    "ed8",
+]
+
 OUTCOMES = {
     "unrate": {"label": "Unemployment", "source": "UNRATE", "transform": "diff"},
     "cpi": {"label": "CPI", "source": "CPIAUCSL", "transform": "logdiff100"},
@@ -106,12 +129,18 @@ def date_key(ts) -> str:
 
 def compute_mps_from_pca(prep: pd.DataFrame) -> pd.Series:
     cols = ["ed1", "ed2", "ed3", "ed4"]
-    valid = prep[cols].notna().all(axis=1)
-    x = prep.loc[valid, cols].astype(float).to_numpy()
-    x_std = (x - x.mean(axis=0)) / x.std(axis=0, ddof=0)
+    clean = prep[cols].apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
+    valid = clean.notna().all(axis=1)
+    x = clean.loc[valid, cols].astype(float).to_numpy()
+    if len(x) < 4:
+        return pd.Series(np.nan, index=prep.index, dtype=float)
+    std = x.std(axis=0, ddof=0)
+    if np.any(std < 1e-12):
+        return pd.Series(np.nan, index=prep.index, dtype=float)
+    x_std = (x - x.mean(axis=0)) / std
     _, _, vt = np.linalg.svd(x_std, full_matrices=False)
-    pc1 = x_std @ vt[0]
-    y = prep.loc[valid, "ed4"].astype(float).to_numpy()
+    pc1 = np.dot(x_std, vt[0])
+    y = clean.loc[valid, "ed4"].astype(float).to_numpy()
     design = np.column_stack([np.ones(len(pc1)), pc1])
     coef = np.linalg.lstsq(design, y, rcond=None)[0][1]
     out = pd.Series(np.nan, index=prep.index, dtype=float)
@@ -143,22 +172,61 @@ def read_external_shocks() -> tuple[pd.DataFrame, pd.DataFrame]:
     return brw[["date", "scheduled", "brw"]], ns
 
 
+def read_raw_events() -> pd.DataFrame:
+    source = SOURCE_ROOT / "jk_source_old.csv"
+    if not source.exists():
+        source = RAW_EVENT_URL
+    raw = pd.read_csv(source)
+    raw.columns = [c.strip().lower() for c in raw.columns]
+    raw["date"] = pd.to_datetime(raw["date"], errors="coerce").dt.normalize()
+    raw = raw[raw["date"].notna()].copy()
+    raw["month"] = raw["date"].dt.strftime("%Y-%m")
+    if "fomc_latest" in raw:
+        raw["fomc_latest_date"] = pd.to_datetime(raw["fomc_latest"], errors="coerce").dt.normalize()
+    else:
+        raw["fomc_latest_date"] = pd.NaT
+
+    numeric_cols = sorted(
+        set(RAW_SHOCK_COLUMNS + MARKET_CONTROLS + ["unscheduled", "main", "ff4_mr"])
+    )
+    for col in numeric_cols:
+        if col in raw:
+            raw[col] = pd.to_numeric(raw[col], errors="coerce")
+
+    # The monthly shock file used by fredup keeps 9/17/2001 as a possible
+    # event month for controls, but blanks out the high-frequency shock series.
+    raw.loc[raw["date"] == pd.Timestamp("2001-09-17"), RAW_SHOCK_COLUMNS] = np.nan
+
+    raw["scheduled"] = 1 - raw.get("unscheduled", 0).fillna(0)
+    raw["possible"] = 1
+    raw["mps"] = compute_mps_from_pca(raw)
+    raw["bs"] = raw["mps"]
+    return raw
+
+
 def prep_events(macro: pd.DataFrame) -> list[dict]:
     prep = pd.read_csv(SOURCE_ROOT / "prep.csv")
     prep.columns = [c.strip() for c in prep.columns]
     prep["date"] = pd.to_datetime(prep["date"]).dt.normalize()
     prep["month"] = prep["date"].dt.strftime("%Y-%m")
-    prep["mps"] = compute_mps_from_pca(prep)
-    prep["bs"] = prep["mps"]
+    if "fomc_latest" in prep:
+        prep["fomc_latest_date"] = pd.to_datetime(prep["fomc_latest"], errors="coerce").dt.normalize()
+
+    events = read_raw_events()
 
     brw, ns = read_external_shocks()
-    prep = prep.merge(brw, on="date", how="left", suffixes=("", "_brw"))
-    prep = prep.merge(ns, on="date", how="left", suffixes=("", "_ns"))
-    if "scheduled" in prep:
-        prep["scheduled"] = prep["scheduled"].combine_first(prep.get("scheduled_ns"))
-    else:
-        prep["scheduled"] = prep.get("scheduled_ns")
-    prep["scheduled"] = prep["scheduled"].fillna(1 - prep.get("unscheduled", 0))
+    events = events.merge(brw, on="date", how="left", suffixes=("", "_brw"))
+    events = events.merge(ns, on="date", how="left", suffixes=("", "_ns"))
+    if "scheduled" in events:
+        events["scheduled"] = pd.to_numeric(events["scheduled"], errors="coerce")
+    if "scheduled_ns" in events:
+        events["scheduled_ns"] = pd.to_numeric(events["scheduled_ns"], errors="coerce")
+    if "scheduled" in events and "scheduled_ns" in events:
+        missing_scheduled = events["scheduled"].isna()
+        events.loc[missing_scheduled, "scheduled"] = events.loc[missing_scheduled, "scheduled_ns"]
+    elif "scheduled_ns" in events:
+        events["scheduled"] = events["scheduled_ns"]
+    events["scheduled"] = events["scheduled"].fillna(1 - events.get("unscheduled", 0))
 
     by_date: dict[str, dict] = {}
     control_cols = sorted(set(MARKET_CONTROLS + GREENBOOK_CONTROLS))
@@ -170,9 +238,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         "nzlb",
         "possible",
         "scheduled",
-        "mp1",
-        "ff4",
-        "ed4",
+        *RAW_SHOCK_COLUMNS,
         "mps",
         "bs",
         "ns",
@@ -180,15 +246,34 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
     ]
 
     macro_controls = macro.set_index("month", drop=False)
-    for _, row in prep.iterrows():
-        rec = {"source": "prep"}
+    prep_by_date = {date_key(row["date"]): row for _, row in prep.iterrows()}
+    prep_by_fomc = {}
+    if "fomc_latest_date" in prep:
+        prep_by_fomc = {
+            date_key(row["fomc_latest_date"]): row
+            for _, row in prep.iterrows()
+            if pd.notna(row.get("fomc_latest_date"))
+        }
+
+    for _, row in events.iterrows():
+        rec = {"source": "jk_source_old"}
         for col in base_cols + control_cols:
             if col == "date":
                 rec[col] = date_key(row[col])
             elif col in row:
                 rec[col] = value(row[col])
+
+        control_row = prep_by_date.get(rec["date"])
+        if control_row is None and pd.notna(row.get("fomc_latest_date")):
+            control_row = prep_by_fomc.get(date_key(row["fomc_latest_date"]))
+        if control_row is not None:
+            for col in control_cols:
+                if rec.get(col) is None and col in control_row:
+                    rec[col] = value(control_row[col])
+
         mrow = macro_controls.loc[row["month"]] if row["month"] in macro_controls.index else None
         if mrow is not None:
+            rec["nzlb"] = 0 if value(mrow.get("zlb")) == 1 else 1
             for col in MARKET_CONTROLS:
                 if rec.get(col) is None and col in mrow:
                     rec[col] = value(mrow[col])
@@ -254,6 +339,7 @@ def main() -> None:
         "meta": {
             "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "sources": [
+                "jk_source_old.csv",
                 "prep.csv",
                 "test/mondat.dta",
                 "BJMW-BRW-shocks-updated-1.xlsx",
@@ -267,6 +353,7 @@ def main() -> None:
                 "macro_lags": 12,
                 "aggregation": "main",
                 "include_zlb": False,
+                "exclude_future_zlb_leads": True,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
                 "scale_to_ffr_h0_bp": 50,
@@ -274,9 +361,9 @@ def main() -> None:
             },
         },
         "shocks": {
-            "mp1": {"label": "MP1", "source": "prep.csv"},
-            "ff4": {"label": "FF4", "source": "prep.csv"},
-            "ed4": {"label": "ED4", "source": "prep.csv"},
+            "mp1": {"label": "MP1", "source": "jk_source_old.csv event rows"},
+            "ff4": {"label": "FF4", "source": "jk_source_old.csv event rows"},
+            "ed4": {"label": "ED4", "source": "jk_source_old.csv event rows"},
             "mps": {"label": "MPS", "source": "PCA(ed1, ed2, ed3, ed4), normalized by ED4"},
             "bs": {"label": "BS", "source": "MPS with mandatory Bauer-Swanson controls"},
             "ns": {"label": "NS", "source": "BJMW NSmethod_Nsdata"},
