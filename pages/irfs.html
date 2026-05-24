@@ -473,7 +473,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json";
+const DATA_URL = "irfs-data.json?v=ust2y-impact-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 
@@ -1346,7 +1346,7 @@ function resetDefaults() {
 }
 
 async function init() {
-  DATA = await fetch(DATA_URL).then(r => {
+  DATA = await fetch(DATA_URL, {cache: "no-store"}).then(r => {
     if (!r.ok) throw new Error(`Failed to load ${DATA_URL}`);
     return r.json();
   });
