@@ -233,6 +233,9 @@
   .topbar {
     padding: 16px 18px 10px;
     border-bottom: 1px solid var(--line);
+  }
+
+  .topbar-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -271,6 +274,101 @@
     color: var(--rose);
     border-color: rgba(154, 64, 85, 0.32);
     background: rgba(154, 64, 85, 0.07);
+  }
+
+  .plot-controls {
+    margin-top: 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .view-tabs {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    overflow: hidden;
+    background: #fbfcfb;
+  }
+
+  .view-tab {
+    min-height: 34px;
+    border-radius: 0;
+    padding: 7px 11px;
+    background: transparent;
+    color: #34443a;
+    border-right: 1px solid var(--line);
+  }
+
+  .view-tab:last-child { border-right: 0; }
+
+  .view-tab.active {
+    background: var(--teal);
+    color: white;
+  }
+
+  .top-select {
+    min-width: 160px;
+  }
+
+  .top-dropdown {
+    position: relative;
+    min-width: 180px;
+  }
+
+  .top-dropdown summary {
+    min-height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fbfcfb;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 750;
+    padding: 7px 10px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .top-dropdown summary::-webkit-details-marker { display: none; }
+
+  .top-dropdown summary::after {
+    content: " ▾";
+    color: var(--muted);
+  }
+
+  .dropdown-panel {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 6px);
+    right: 0;
+    width: min(520px, calc(100vw - 52px));
+    max-height: 320px;
+    overflow: auto;
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 10px;
+  }
+
+  .dropdown-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .mini-action {
+    min-height: 30px;
+    padding: 6px 10px;
+    background: #eef2ef;
+    color: #26352d;
+  }
+
+  .horizon-list {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(48px, 1fr));
+    gap: 2px 8px;
   }
 
   #plot {
@@ -333,6 +431,9 @@
       min-height: 760px;
     }
     .topbar {
+      display: block;
+    }
+    .topbar-head {
       display: block;
     }
     .status {
@@ -470,11 +571,36 @@
 
   <main>
     <div class="topbar">
-      <div>
-        <div class="chart-title" id="chart-title">IRF</div>
-        <div class="chart-subtitle" id="chart-subtitle">90% HC1 robust confidence band</div>
+      <div class="topbar-head">
+        <div>
+          <div class="chart-title" id="chart-title">IRF</div>
+          <div class="chart-subtitle" id="chart-subtitle">90% HC1 robust confidence band</div>
+        </div>
+        <div class="status" id="status-pills"></div>
       </div>
-      <div class="status" id="status-pills"></div>
+      <div class="plot-controls">
+        <div class="view-tabs" role="tablist" aria-label="Plot view">
+          <button class="view-tab active" type="button" data-view="irf" role="tab" aria-selected="true">IRF panel</button>
+          <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
+        </div>
+        <div class="decomp-control hidden">
+          <label for="decomp-outcome">Outcome</label>
+          <select class="top-select" id="decomp-outcome"></select>
+        </div>
+        <div class="decomp-control hidden">
+          <label>Horizon lines</label>
+          <details class="top-dropdown" id="decomp-horizon-dropdown">
+            <summary id="decomp-horizon-summary">h=3, 6, 9</summary>
+            <div class="dropdown-panel">
+              <div class="dropdown-actions">
+                <button class="mini-action" id="decomp-default-horizons" type="button">3, 6, 9</button>
+                <button class="mini-action" id="decomp-all-horizons" type="button">All</button>
+              </div>
+              <div class="horizon-list" id="decomp-horizons"></div>
+            </div>
+          </details>
+        </div>
+      </div>
     </div>
     <div id="error" class="error hidden"></div>
     <div id="plot"></div>
@@ -483,7 +609,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=include-covid-filter-20260524";
+const DATA_URL = "irfs-data.json?v=lpdecomp-view-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -493,6 +619,8 @@ let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
 const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
+const DEFAULT_DECOMP_HORIZONS = [3, 6, 9];
+const DECOMP_COLORS = ["#167c80", "#9a4055", "#b66d12", "#4d6fb3", "#6c5b7b", "#2f6f4e", "#8a5a2b", "#52616b"];
 const PANEL_LABELS = {
   ffr: "FFR",
   unrate: "Unemployment",
@@ -779,6 +907,61 @@ function yearIsIncluded(year, rules) {
   return Number.isFinite(year) && rules.some(rule => year >= rule.start && year <= rule.end);
 }
 
+function currentViewMode() {
+  return document.querySelector(".view-tab.active")?.dataset.view || "irf";
+}
+
+function defaultDecompHorizons(maxH) {
+  const defaults = DEFAULT_DECOMP_HORIZONS.filter(h => h <= maxH);
+  return defaults.length ? defaults : [Math.max(0, maxH)];
+}
+
+function selectedDecompHorizons(maxH) {
+  const selected = Array.from(document.querySelectorAll(".decomp-horizon-check:checked"))
+    .map(el => Number.parseInt(el.value, 10))
+    .filter(h => Number.isInteger(h) && h >= 0 && h <= maxH);
+  const horizons = selected.length ? selected : defaultDecompHorizons(maxH);
+  return Array.from(new Set(horizons)).sort((a, b) => a - b);
+}
+
+function setDecompHorizons(horizons) {
+  const keep = new Set(horizons);
+  document.querySelectorAll(".decomp-horizon-check").forEach(el => {
+    el.checked = keep.has(Number.parseInt(el.value, 10));
+  });
+  updateDecompHorizonSummary();
+}
+
+function updateDecompHorizonSummary() {
+  const maxH = Math.max(0, Number.parseInt(document.getElementById("horizon").value || "0", 10));
+  const horizons = selectedDecompHorizons(maxH);
+  const text = horizons.length > 8
+    ? `${horizons.length} horizons`
+    : `h=${horizons.join(", ")}`;
+  document.getElementById("decomp-horizon-summary").textContent = text;
+}
+
+function renderDecompHorizonOptions(maxH) {
+  const previous = selectedDecompHorizons(maxH);
+  const selected = new Set(previous.length ? previous : defaultDecompHorizons(maxH));
+  const html = Array.from({length: maxH + 1}, (_, h) => (
+    `<label class="check-row"><input class="decomp-horizon-check" type="checkbox" value="${h}" ${selected.has(h) ? "checked" : ""}><span>h=${h}</span></label>`
+  )).join("");
+  document.getElementById("decomp-horizons").innerHTML = html;
+  document.querySelectorAll(".decomp-horizon-check").forEach(el => {
+    el.addEventListener("change", () => {
+      updateDecompHorizonSummary();
+      runSpec();
+    });
+  });
+  updateDecompHorizonSummary();
+}
+
+function syncViewControls() {
+  const decomp = currentViewMode() === "decomp";
+  document.querySelectorAll(".decomp-control").forEach(el => el.classList.toggle("hidden", !decomp));
+}
+
 function getSettings() {
   const selectedRegularControls = Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])"))
     .map(el => el.value);
@@ -788,8 +971,12 @@ function getSettings() {
   const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
   const scaleMode = document.getElementById("scale-mode").value;
   const includedYears = parseIncludedYears(document.getElementById("included-years").value);
+  const horizon = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
   return {
     shock,
+    viewMode: currentViewMode(),
+    decompOutcome: document.getElementById("decomp-outcome").value || "ffr",
+    decompHorizons: selectedDecompHorizons(horizon),
     aggregation: document.getElementById("aggregation").value,
     includeZlb: document.getElementById("include-zlb").checked,
     includeCovid: document.getElementById("include-covid").checked,
@@ -803,7 +990,7 @@ function getSettings() {
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     useWhitening: document.getElementById("use-whitening").checked,
     whiteningLags: Math.max(0, Number.parseInt(document.getElementById("whitening-lags").value || "8", 10)),
-    horizon: Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)),
+    horizon,
     scaleTarget: readScaleTarget(scaleMode),
     scaleMode,
     controls: Array.from(new Set([...selectedRegularControls, ...forced])),
@@ -1301,6 +1488,71 @@ function fitShockResponse(y, x, controls, settings) {
   return partialOls(y, x, controls);
 }
 
+function standardDecompParts(y, x, controls) {
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualize(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const denom = rx.reduce((acc, v) => acc + v * v, 0);
+  if (denom < EPS) return null;
+  const beta = rx.reduce((acc, v, i) => acc + v * ry[i], 0) / denom;
+  return {rx, yResidual: ry, denom, beta, n: y.length, p: k + 1};
+}
+
+function buildDecompLine(settings, rows, outcomeKey, h, scale) {
+  const reg = buildRegressionData(settings, rows, outcomeKey, h, {includeShockLags: !settings.useWhitening});
+  if (reg.y.length < 8) return null;
+  let dates = reg.rowDates;
+  let weights = null;
+  let yForContribution = reg.y;
+  let beta = null;
+  let n = reg.y.length;
+  let p = 0;
+
+  if (settings.useWhitening) {
+    const model = buildWhitenedShock(reg.x, reg.controls, settings.whiteningLags);
+    if (!model) return null;
+    const denom = model.r.reduce((acc, v) => acc + v * v, 0);
+    if (denom < EPS) return null;
+    dates = model.indices.map(i => reg.rowDates[i]);
+    yForContribution = model.indices.map(i => reg.y[i]);
+    weights = model.r.map(v => v / denom);
+    beta = model.r.reduce((acc, v, i) => acc + v * yForContribution[i], 0) / denom;
+    n = model.n;
+    p = 1 + model.wK + model.lK;
+  } else {
+    const parts = standardDecompParts(reg.y, reg.x, reg.controls);
+    if (!parts) return null;
+    weights = parts.rx.map(v => v / parts.denom);
+    yForContribution = parts.yResidual;
+    beta = parts.beta;
+    n = parts.n;
+    p = parts.p;
+  }
+
+  let cumulative = 0;
+  const values = [];
+  for (let i = 0; i < yForContribution.length; i++) {
+    cumulative += weights[i] * yForContribution[i] * scale;
+    values.push(cleanZero(cumulative));
+  }
+  return {
+    h,
+    dates,
+    values,
+    betaScaled: cleanZero(beta * scale),
+    n,
+    p
+  };
+}
+
 function shockResidualRmse(x, controls) {
   const n = x.length;
   if (n < 8) return null;
@@ -1453,7 +1705,7 @@ function runSpec() {
       };
     });
   }
-  render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows);
+  render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows);
 }
 
 function axisRef(i, axis) {
@@ -1464,12 +1716,107 @@ function axisLayoutName(i, axis) {
   return i === 0 ? `${axis}axis` : `${axis}axis${i + 1}`;
 }
 
-function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows) {
+function renderDecompPlot(settings, rows, scaleByOutcome) {
+  const outcome = settings.decompOutcome || "ffr";
+  const outcomeText = outcomeLabel(outcome);
+  const shockLabel = seriesSpec(settings.shock).label;
+  document.getElementById("chart-title").textContent = `LP decomposition: ${outcomeText} response to ${shockLabel}`;
+  document.getElementById("chart-subtitle").textContent = "Cumulative FWL contributions by selected horizon";
+
+  const horizons = settings.decompHorizons.filter(h => h <= settings.horizon);
+  const scale = scaleByOutcome[outcome] ?? 1;
+  const traces = [{
+    x: rows.map(row => row.date),
+    y: rows.map(() => 0),
+    type: "scatter",
+    mode: "lines",
+    line: {color: "#9aa49d", width: 1, dash: "dot"},
+    hoverinfo: "skip",
+    showlegend: false
+  }];
+  const lines = [];
+  for (const h of horizons) {
+    const line = buildDecompLine(settings, rows, outcome, h, scale);
+    if (line && line.dates.length) lines.push(line);
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const color = DECOMP_COLORS[i % DECOMP_COLORS.length];
+    traces.push({
+      x: line.dates,
+      y: line.values,
+      type: "scatter",
+      mode: "lines",
+      line: {color, width: 2.4},
+      name: `h=${line.h}`,
+      hovertemplate: line.dates.map((date, j) =>
+        `${outcomeText}<br>${date}<br>h=${line.h}<br>contribution=${fmt(line.values[j], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
+      )
+    });
+  }
+
+  if (!lines.length) {
+    traces.push({
+      x: [rows[0]?.date || "1993-01-01"],
+      y: [0],
+      type: "scatter",
+      mode: "markers",
+      marker: {opacity: 0},
+      hoverinfo: "skip",
+      showlegend: false
+    });
+  }
+
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 76, r: 28, t: 30, b: 68},
+    hovermode: "closest",
+    showlegend: true,
+    legend: {orientation: "h", x: 0, y: 1.08, xanchor: "left", yanchor: "bottom"},
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"},
+    xaxis: {
+      title: {text: "Estimation date", standoff: 10, font: {size: 11}},
+      type: "date",
+      gridcolor: "#eef2ef",
+      zeroline: false,
+      automargin: true
+    },
+    yaxis: {
+      title: {text: "Cumulative contribution", standoff: 8, font: {size: 11}},
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
+      gridcolor: "#eef2ef",
+      zeroline: false,
+      automargin: true
+    },
+    annotations: lines.length <= 8 ? lines.map((line, i) => ({
+      text: `h=${line.h}: ${fmt(line.betaScaled, 4)}`,
+      x: line.dates[line.dates.length - 1],
+      y: line.values[line.values.length - 1],
+      xref: "x",
+      yref: "y",
+      showarrow: false,
+      xanchor: "left",
+      yanchor: "middle",
+      xshift: 6,
+      font: {size: 11, color: DECOMP_COLORS[i % DECOMP_COLORS.length]}
+    })) : []
+  };
+
+  Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+}
+
+function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = seriesSpec(settings.shock).label;
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = "90% HC1 robust confidence band";
 
+  if (settings.viewMode === "decomp") {
+    renderDecompPlot(settings, rows, scaleByOutcome);
+  } else {
   const traces = [];
   const annotations = [];
   const layout = {
@@ -1579,6 +1926,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   layout.annotations = annotations;
 
   Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+  }
 
   const minDate = rows.length ? rows[0].date : "NA";
   const maxDate = rows.length ? rows[rows.length - 1].date : "NA";
@@ -1593,6 +1941,9 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   const covidText = settings.includeCovid ? "COVID included" : "COVID leads excluded";
   const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
   const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
+  const viewText = settings.viewMode === "decomp"
+    ? `LP decomp ${outcomeLabel(settings.decompOutcome)} h=${settings.decompHorizons.join(",")}`
+    : "IRF panel";
   const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
     ? `unscheduled excluded (${unscheduledSupportRows})`
     : `unscheduled included (${unscheduledSupportRows})`);
@@ -1600,6 +1951,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">${monthlySeries ? "monthly series" : settings.aggregation}</span>`,
     `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
+    `<span class="pill">${viewText}</span>`,
     `<span class="pill">${estimatorText}</span>`,
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${covidText}</span>`,
@@ -1610,6 +1962,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
 
   document.getElementById("diagnostics").innerHTML = [
     metric("Rows", rows.length),
+    metric("View", settings.viewMode === "decomp" ? "LP decomp" : "IRF panel"),
     metric("Unscheduled rows", monthlySeries ? "n/a" : (settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`)),
     metric("Years", settings.includedYearsDisplay),
     metric("Date range", `${minDate} to ${maxDate}`),
@@ -1645,6 +1998,10 @@ function renderOptions() {
   shockSel.innerHTML = Object.entries(allSeries())
     .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
     .join("");
+  document.getElementById("decomp-outcome").innerHTML = OUTCOME_ORDER
+    .map(key => `<option value="${key}">${PANEL_LABELS[key] || DATA.outcomes[key].label}</option>`)
+    .join("");
+  document.getElementById("decomp-outcome").value = "ffr";
 
   document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
@@ -1662,6 +2019,8 @@ function renderOptions() {
   document.getElementById("include-covid").checked = DATA.meta.defaults.include_covid ?? false;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
+  renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
+  syncViewControls();
 
   renderControlChecks("controls-market", DATA.controls.market, "regular", "market");
   renderControlChecks("controls-greenbook", DATA.controls.greenbook, "regular", "greenbook");
@@ -1743,6 +2102,27 @@ async function init() {
   document.getElementById("reset-btn").addEventListener("click", resetDefaults);
   document.getElementById("toggle-market-controls").addEventListener("change", event => setControlGroup("market", event.target.checked));
   document.getElementById("toggle-greenbook-controls").addEventListener("change", event => setControlGroup("greenbook", event.target.checked));
+  document.querySelectorAll(".view-tab").forEach(button => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".view-tab").forEach(el => {
+        const active = el === button;
+        el.classList.toggle("active", active);
+        el.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      syncViewControls();
+      runSpec();
+    });
+  });
+  document.getElementById("decomp-outcome").addEventListener("change", runSpec);
+  document.getElementById("decomp-default-horizons").addEventListener("click", () => {
+    setDecompHorizons(defaultDecompHorizons(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10))));
+    runSpec();
+  });
+  document.getElementById("decomp-all-horizons").addEventListener("click", () => {
+    const maxH = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
+    setDecompHorizons(Array.from({length: maxH + 1}, (_, h) => h));
+    runSpec();
+  });
   document.getElementById("shock").addEventListener("change", () => {
     syncBsControls();
     runSpec();
@@ -1758,7 +2138,11 @@ async function init() {
     configureScaleTarget(true);
     runSpec();
   });
-  for (const id of ["included-years", "shock-lags", "whitening-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
+  document.getElementById("horizon").addEventListener("change", () => {
+    renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
+    runSpec();
+  });
+  for (const id of ["included-years", "shock-lags", "whitening-lags", "dep-lags", "macro-lags", "scale-bp"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   if (window.lucide) window.lucide.createIcons();
