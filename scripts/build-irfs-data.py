@@ -277,6 +277,7 @@ def main() -> None:
                 "include_zlb": False,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
+                "scale_mode": "ffr-h0",
                 "scale_to_ffr_h0_bp": 50,
                 "ci": 0.9,
             },

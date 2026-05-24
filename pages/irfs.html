@@ -407,8 +407,13 @@
           <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
         </div>
       </div>
-      <div style="margin-top: 9px;">
-        <label class="check-row"><input id="scale-irf" type="checkbox" checked><span>Scale IRF to FFR h=0</span></label>
+      <div style="margin-top: 10px;">
+        <label for="scale-mode">Scale mode</label>
+        <select id="scale-mode">
+          <option value="ffr-h0">FFR h=0</option>
+          <option value="shock-rmse">Shock residual SD</option>
+          <option value="none">None</option>
+        </select>
       </div>
     </div>
 
@@ -623,7 +628,7 @@ function getSettings() {
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     horizon: Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)),
     scaleBp: Math.max(1, Number.parseFloat(document.getElementById("scale-bp").value || "50")),
-    scaleIrf: document.getElementById("scale-irf").checked,
+    scaleMode: document.getElementById("scale-mode").value,
     controls: Array.from(new Set([...selectedRegularControls, ...forced])),
     macroControls: Array.from(new Set(selectedMacroControls))
   };
@@ -812,6 +817,52 @@ function buildRegressionData(settings, rows, outcomeKey, h) {
   return {y, x, controls, rowDates};
 }
 
+function buildShockScaleData(settings, rows, outcomeKey) {
+  const x = [];
+  const controls = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if (!finite(row._x)) continue;
+
+    const zi = [];
+    let ok = true;
+    for (let i = 0; i < settings.shockLags; i++) {
+      const v = row._shockLags[i];
+      if (!finite(v)) { ok = false; break; }
+      zi.push(v);
+    }
+    if (!ok) continue;
+
+    for (let i = 1; i <= settings.depLags; i++) {
+      const v = dependentDelta(outcomeKey, row.month, i);
+      if (!finite(v)) { ok = false; break; }
+      zi.push(v);
+    }
+    if (!ok) continue;
+
+    for (const c of settings.controls) {
+      const v = sourceValue(row, c);
+      if (!finite(v)) { ok = false; break; }
+      zi.push(v);
+    }
+    if (!ok) continue;
+
+    for (const c of settings.macroControls) {
+      for (let lag = 1; lag <= settings.macroLags; lag++) {
+        const v = macroLagValue(c, row.month, lag);
+        if (!finite(v)) { ok = false; break; }
+        zi.push(v);
+      }
+      if (!ok) break;
+    }
+    if (!ok) continue;
+
+    x.push(row._x);
+    controls.push(zi);
+  }
+  return {x, controls};
+}
+
 function solveLinear(a, b) {
   const n = b.length;
   const m = a.map((row, i) => row.slice().concat([b[i]]));
@@ -907,6 +958,28 @@ function partialOls(y, x, controls) {
   };
 }
 
+function shockResidualRmse(x, controls) {
+  const n = x.length;
+  if (n < 8) return null;
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  while (true) {
+    rx = residualize(x, z);
+    if (rx) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const rss = rx.reduce((acc, v) => acc + v * v, 0);
+  if (n <= k) return null;
+  return {
+    rmse: Math.sqrt(rss / (n - k)),
+    n,
+    p: k,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
+  };
+}
+
 function runOutcome(settings, rows, outcomeKey, maxH) {
   const results = [];
   for (let h = 0; h <= maxH; h++) {
@@ -935,23 +1008,44 @@ function runSpec() {
   }
 
   const maxH = Math.max(settings.horizon, 1);
-  let scale = 1;
+  let scaleDisplay = "1.000";
   let ffrH0 = null;
   const rawByOutcome = {};
   for (const outcome of OUTCOME_ORDER) {
     rawByOutcome[outcome] = runOutcome(settings, rows, outcome, maxH);
   }
-  if (settings.scaleIrf) {
+  const scaleByOutcome = Object.fromEntries(OUTCOME_ORDER.map(outcome => [outcome, 1]));
+  if (settings.scaleMode === "ffr-h0") {
     ffrH0 = rawByOutcome.ffr[0]?.beta;
     if (!finite(ffrH0) || Math.abs(ffrH0) < EPS) {
       showError("Scaling failed because the FFR h=0 coefficient is unavailable or effectively zero.");
       return;
     }
-    scale = (settings.scaleBp / 100) / ffrH0;
+    const scale = (settings.scaleBp / 100) / ffrH0;
+    for (const outcome of OUTCOME_ORDER) scaleByOutcome[outcome] = scale;
+    scaleDisplay = fmt(scale, 3);
+  } else if (settings.scaleMode === "shock-rmse") {
+    const rmseByOutcome = [];
+    for (const outcome of OUTCOME_ORDER) {
+      const scaleData = buildShockScaleData(settings, rows, outcome);
+      const fit = shockResidualRmse(scaleData.x, scaleData.controls);
+      if (!fit || !finite(fit.rmse)) {
+        showError(`Shock residual SD scaling failed for ${OUTCOME_LABELS[outcome]}.`);
+        return;
+      }
+      scaleByOutcome[outcome] = fit.rmse;
+      rmseByOutcome.push(fit.rmse);
+    }
+    const minScale = Math.min(...rmseByOutcome);
+    const maxScale = Math.max(...rmseByOutcome);
+    scaleDisplay = Math.abs(maxScale - minScale) < 1e-8
+      ? fmt(minScale, 3)
+      : `${fmt(minScale, 3)}-${fmt(maxScale, 3)}`;
   }
 
   const resultsByOutcome = {};
   for (const outcome of OUTCOME_ORDER) {
+    const scale = scaleByOutcome[outcome];
     resultsByOutcome[outcome] = rawByOutcome[outcome].slice(0, settings.horizon + 1).map(r => {
       const mid = finite(r.beta) ? r.beta * scale : null;
       const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * scale : null;
@@ -964,7 +1058,7 @@ function runSpec() {
       };
     });
   }
-  render(settings, rows, resultsByOutcome, scale, ffrH0, unscheduledSupportRows);
+  render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows);
 }
 
 function axisRef(i, axis) {
@@ -975,7 +1069,7 @@ function axisLayoutName(i, axis) {
   return i === 0 ? `${axis}axis` : `${axis}axis${i + 1}`;
 }
 
-function render(settings, rows, resultsByOutcome, scale, ffrH0, unscheduledSupportRows) {
+function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = DATA.shocks[settings.shock].label;
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
@@ -1118,7 +1212,7 @@ function render(settings, rows, resultsByOutcome, scale, ffrH0, unscheduledSuppo
     metric("h=0 n", h0n),
     metric("Min n", minN),
     metric("Controls", controlsCount),
-    metric("Scale", fmt(scale, 3)),
+    metric("Scale", scaleDisplay),
     metric("FFR h=0 raw", fmt(ffrH0, 4)),
     metric("Shock lags", settings.shockLags),
     metric("Outcome lags", settings.depLags),
@@ -1155,6 +1249,7 @@ function renderOptions() {
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp;
+  document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "ffr-h0";
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
@@ -1234,7 +1329,7 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros", "scale-irf"]) {
+  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros", "scale-mode"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   for (const id of ["row-start", "row-end", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {
