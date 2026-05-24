@@ -275,7 +275,6 @@ def main() -> None:
                 "macro_lags": 12,
                 "aggregation": "main",
                 "include_zlb": False,
-                "exclude_future_zlb_leads": True,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
                 "scale_to_ffr_h0_bp": 50,
