@@ -403,13 +403,14 @@
           <input id="horizon" type="number" min="1" max="120" step="1" value="24">
         </div>
         <div>
-          <label for="scale-bp">FFR h=0 bp</label>
+          <label for="scale-bp">FFR target bp</label>
           <input id="scale-bp" type="number" min="1" max="300" step="1" value="50">
         </div>
       </div>
       <div style="margin-top: 10px;">
         <label for="scale-mode">Scale mode</label>
         <select id="scale-mode">
+          <option value="ust2y-impact">UST2Y impact (10 bp)</option>
           <option value="ffr-h0">FFR h=0</option>
           <option value="shock-rmse">Shock residual SD</option>
           <option value="none">None</option>
@@ -489,6 +490,8 @@ const PANEL_LABELS = {
   ip: "Industrial Production",
   ebp: "EBP"
 };
+const MONTH_SUM_SCALE_COLUMNS = ["ust2y"];
+const DEFAULT_UST2Y_TARGET_BP = 10;
 
 const CONTROL_LABELS = {
   nfp_surp: "NFP surprise",
@@ -542,8 +545,24 @@ function fmt(x, digits = 3) {
   return finite(x) ? x.toFixed(digits) : "NA";
 }
 
+function outcomeLabel(key) {
+  return PANEL_LABELS[key] || DATA?.outcomes?.[key]?.label || key;
+}
+
 function truthyFlag(v) {
   return v === 1 || v === true || v === "1";
+}
+
+function sumFiniteRows(rows, key) {
+  let total = 0;
+  let found = false;
+  for (const row of rows) {
+    if (finite(row[key])) {
+      total += row[key];
+      found = true;
+    }
+  }
+  return found ? total : null;
 }
 
 function sourceValue(row, key) {
@@ -651,15 +670,10 @@ function aggregateMonth(items, mode, shockKey) {
   rec.date = base.date;
   rec.month = base.month;
   if (mode === "month-sum") {
-    let total = 0;
-    let found = false;
-    for (const row of sorted) {
-      if (finite(row[shockKey])) {
-        total += row[shockKey];
-        found = true;
-      }
+    rec[shockKey] = sumFiniteRows(sorted, shockKey);
+    for (const key of MONTH_SUM_SCALE_COLUMNS) {
+      rec[key] = sumFiniteRows(sorted, key);
     }
-    rec[shockKey] = found ? total : null;
   } else {
     rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
   }
@@ -730,6 +744,8 @@ function buildAnalysisRows(settings, shockKey) {
           }
         }
         rec[shockKey] = found ? total : 0;
+        const ust2ySum = sumFiniteRows(items, "ust2y");
+        rec.ust2y = finite(ust2ySum) ? ust2ySum : (items.length ? null : 0);
         const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
         for (const key of allControls) {
           for (let i = items.length - 1; i >= 0; i--) {
@@ -766,6 +782,36 @@ function buildAnalysisRows(settings, shockKey) {
   return rows;
 }
 
+function buildUsedControls(settings, row, outcomeKey) {
+  const zi = [];
+  for (let i = 0; i < settings.shockLags; i++) {
+    const v = row._shockLags[i];
+    if (!finite(v)) return null;
+    zi.push(v);
+  }
+
+  for (let i = 1; i <= settings.depLags; i++) {
+    const v = dependentDelta(outcomeKey, row.month, i);
+    if (!finite(v)) return null;
+    zi.push(v);
+  }
+
+  for (const c of settings.controls) {
+    const v = sourceValue(row, c);
+    if (!finite(v)) return null;
+    zi.push(v);
+  }
+
+  for (const c of settings.macroControls) {
+    for (let lag = 1; lag <= settings.macroLags; lag++) {
+      const v = macroLagValue(c, row.month, lag);
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+  return zi;
+}
+
 function buildRegressionData(settings, rows, outcomeKey, h) {
   const y = [];
   const x = [];
@@ -776,38 +822,8 @@ function buildRegressionData(settings, rows, outcomeKey, h) {
     const yi = responseValue(outcomeKey, row.month, h);
     if (!finite(yi) || !finite(row._x)) continue;
 
-    const zi = [];
-    let ok = true;
-    for (let i = 0; i < settings.shockLags; i++) {
-      const v = row._shockLags[i];
-      if (!finite(v)) { ok = false; break; }
-      zi.push(v);
-    }
-    if (!ok) continue;
-
-    for (let i = 1; i <= settings.depLags; i++) {
-      const v = dependentDelta(outcomeKey, row.month, i);
-      if (!finite(v)) { ok = false; break; }
-      zi.push(v);
-    }
-    if (!ok) continue;
-
-    for (const c of settings.controls) {
-      const v = sourceValue(row, c);
-      if (!finite(v)) { ok = false; break; }
-      zi.push(v);
-    }
-    if (!ok) continue;
-
-    for (const c of settings.macroControls) {
-      for (let lag = 1; lag <= settings.macroLags; lag++) {
-        const v = macroLagValue(c, row.month, lag);
-        if (!finite(v)) { ok = false; break; }
-        zi.push(v);
-      }
-      if (!ok) break;
-    }
-    if (!ok) continue;
+    const zi = buildUsedControls(settings, row, outcomeKey);
+    if (!zi) continue;
 
     y.push(yi);
     x.push(row._x);
@@ -824,43 +840,34 @@ function buildShockScaleData(settings, rows, outcomeKey) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     if (!finite(row._x)) continue;
 
-    const zi = [];
-    let ok = true;
-    for (let i = 0; i < settings.shockLags; i++) {
-      const v = row._shockLags[i];
-      if (!finite(v)) { ok = false; break; }
-      zi.push(v);
-    }
-    if (!ok) continue;
-
-    for (let i = 1; i <= settings.depLags; i++) {
-      const v = dependentDelta(outcomeKey, row.month, i);
-      if (!finite(v)) { ok = false; break; }
-      zi.push(v);
-    }
-    if (!ok) continue;
-
-    for (const c of settings.controls) {
-      const v = sourceValue(row, c);
-      if (!finite(v)) { ok = false; break; }
-      zi.push(v);
-    }
-    if (!ok) continue;
-
-    for (const c of settings.macroControls) {
-      for (let lag = 1; lag <= settings.macroLags; lag++) {
-        const v = macroLagValue(c, row.month, lag);
-        if (!finite(v)) { ok = false; break; }
-        zi.push(v);
-      }
-      if (!ok) break;
-    }
-    if (!ok) continue;
+    const zi = buildUsedControls(settings, row, outcomeKey);
+    if (!zi) continue;
 
     x.push(row._x);
     controls.push(zi);
   }
   return {x, controls};
+}
+
+function buildImpactScaleData(settings, rows, outcomeKey) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if (!finite(row._x)) continue;
+    if (!finite(responseValue(outcomeKey, row.month, 0))) continue;
+    const ust2y = sourceValue(row, "ust2y");
+    if (!finite(ust2y)) continue;
+
+    const zi = buildUsedControls(settings, row, outcomeKey);
+    if (!zi) continue;
+
+    y.push(ust2y);
+    x.push(row._x);
+    controls.push(zi);
+  }
+  return {y, x, controls};
 }
 
 function solveLinear(a, b) {
@@ -1015,7 +1022,34 @@ function runSpec() {
     rawByOutcome[outcome] = runOutcome(settings, rows, outcome, maxH);
   }
   const scaleByOutcome = Object.fromEntries(OUTCOME_ORDER.map(outcome => [outcome, 1]));
-  if (settings.scaleMode === "ffr-h0") {
+  if (settings.scaleMode === "ust2y-impact") {
+    const target = (DATA.meta.defaults.scale_to_ust2y_bp ?? DEFAULT_UST2Y_TARGET_BP) / 100;
+    const coefs = [];
+    for (const outcome of OUTCOME_ORDER) {
+      const scaleData = buildImpactScaleData(settings, rows, outcome);
+      const fit = partialOls(scaleData.y, scaleData.x, scaleData.controls);
+      if (!fit || !finite(fit.beta)) {
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the scaling regression could not be estimated. Choose a different scaling method.`);
+        return;
+      }
+      if (fit.beta < 0) {
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the shock coefficient is negative (${fmt(fit.beta, 4)}). Choose a different scaling method.`);
+        return;
+      }
+      if (Math.abs(fit.beta) < EPS) {
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the shock coefficient is effectively zero. Choose a different scaling method.`);
+        return;
+      }
+      scaleByOutcome[outcome] = target / fit.beta;
+      coefs.push(fit.beta);
+    }
+    const minCoef = Math.min(...coefs);
+    const maxCoef = Math.max(...coefs);
+    const coefDisplay = Math.abs(maxCoef - minCoef) < 1e-8
+      ? fmt(minCoef, 4)
+      : `${fmt(minCoef, 4)}-${fmt(maxCoef, 4)}`;
+    scaleDisplay = `${DATA.meta.defaults.scale_to_ust2y_bp ?? DEFAULT_UST2Y_TARGET_BP}bp UST2Y; coef ${coefDisplay}`;
+  } else if (settings.scaleMode === "ffr-h0") {
     ffrH0 = rawByOutcome.ffr[0]?.beta;
     if (!finite(ffrH0) || Math.abs(ffrH0) < EPS) {
       showError("Scaling failed because the FFR h=0 coefficient is unavailable or effectively zero.");
@@ -1030,7 +1064,7 @@ function runSpec() {
       const scaleData = buildShockScaleData(settings, rows, outcome);
       const fit = shockResidualRmse(scaleData.x, scaleData.controls);
       if (!fit || !finite(fit.rmse)) {
-        showError(`Shock residual SD scaling failed for ${OUTCOME_LABELS[outcome]}.`);
+        showError(`Shock residual SD scaling failed for ${outcomeLabel(outcome)}.`);
         return;
       }
       scaleByOutcome[outcome] = fit.rmse;

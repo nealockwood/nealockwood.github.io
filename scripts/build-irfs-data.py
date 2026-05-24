@@ -91,6 +91,8 @@ RAW_SHOCK_COLUMNS = [
     "ed8",
 ]
 
+EVENT_SCALE_COLUMNS = ["ust2y"]
+
 OUTCOMES = {
     "unrate": {"label": "Unemployment", "source": "UNRATE", "transform": "diff"},
     "cpi": {"label": "CPI", "source": "CPIAUCSL", "transform": "logdiff100"},
@@ -182,6 +184,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
     numeric_cols = sorted(
         set(
             RAW_SHOCK_COLUMNS
+            + EVENT_SCALE_COLUMNS
             + MARKET_CONTROLS
             + GREENBOOK_CONTROLS
             + ["unscheduled", "main", "nzlb", "possible", "scheduled", "ff4_mr", "brw", "ns"]
@@ -217,6 +220,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         "nzlb",
         "possible",
         "scheduled",
+        *EVENT_SCALE_COLUMNS,
         *RAW_SHOCK_COLUMNS,
         "mps",
         "bs",
@@ -277,8 +281,9 @@ def main() -> None:
                 "include_zlb": False,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
-                "scale_mode": "ffr-h0",
+                "scale_mode": "ust2y-impact",
                 "scale_to_ffr_h0_bp": 50,
+                "scale_to_ust2y_bp": 10,
                 "ci": 0.9,
             },
         },
