@@ -808,7 +808,7 @@ function aggregateMonth(items, mode, shockKey) {
   }
   const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
   for (const key of allControls) {
-    for (let i = sorted.length - 1; i >= 0; i--) {
+    for (let i = 0; i < sorted.length; i++) {
       if (finite(sorted[i][key])) {
         rec[key] = sorted[i][key];
         break;
@@ -876,7 +876,7 @@ function buildAnalysisRows(settings, shockKey) {
         rec.ust2y = finite(ust2ySum) ? ust2ySum : (items.length ? null : 0);
         const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
         for (const key of allControls) {
-          for (let i = items.length - 1; i >= 0; i--) {
+          for (let i = 0; i < items.length; i++) {
             if (finite(items[i][key])) {
               rec[key] = items[i][key];
               break;
