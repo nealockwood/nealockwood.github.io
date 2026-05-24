@@ -328,6 +328,7 @@ def main() -> None:
                 "aggregation": "main",
                 "included_years": "1993-2025",
                 "include_zlb": False,
+                "include_covid": False,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
                 "scale_mode": "ust2y-impact",

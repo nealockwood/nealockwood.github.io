@@ -381,6 +381,7 @@
       </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
+        <label class="check-row"><input id="include-covid" type="checkbox"><span>Include COVID</span></label>
         <label class="check-row"><input id="exclude-unscheduled" type="checkbox"><span>Exclude unscheduled meetings</span></label>
         <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute missing months with zeros</span></label>
       </div>
@@ -482,7 +483,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=target-ffr-series-2-20260524";
+const DATA_URL = "irfs-data.json?v=include-covid-filter-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -619,6 +620,10 @@ function isZlbMonth(month) {
   return row ? truthyFlag(row.zlb) : false;
 }
 
+function isCovidLeadMonth(month) {
+  return month >= "2020-03" && month <= "2021-03";
+}
+
 function macroLagValue(controlKey, baseMonth, lag) {
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
@@ -627,7 +632,7 @@ function macroLagValue(controlKey, baseMonth, lag) {
   return monthValue(months[idx], controlKey);
 }
 
-function responseValue(outcomeKey, baseMonth, h) {
+function responseValue(outcomeKey, baseMonth, h, settings = {}) {
   const spec = DATA.outcomes[outcomeKey];
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
@@ -635,6 +640,7 @@ function responseValue(outcomeKey, baseMonth, h) {
   const prevIdx = baseIdx - 1;
   if (leadIdx < 0 || leadIdx >= months.length || prevIdx < 0) return null;
   const leadMonth = months[leadIdx];
+  if (!settings.includeCovid && isCovidLeadMonth(leadMonth)) return null;
   const prevMonth = months[prevIdx];
   const lead = monthValue(leadMonth, spec.source);
   const prev = monthValue(prevMonth, spec.source);
@@ -786,6 +792,7 @@ function getSettings() {
     shock,
     aggregation: document.getElementById("aggregation").value,
     includeZlb: document.getElementById("include-zlb").checked,
+    includeCovid: document.getElementById("include-covid").checked,
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
     includedYearRules: includedYears.rules,
@@ -994,7 +1001,7 @@ function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
   const rowDates = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
-    const yi = responseValue(outcomeKey, row.month, h);
+    const yi = responseValue(outcomeKey, row.month, h, settings);
     if (!finite(yi) || !finite(row._x)) continue;
 
     const zi = buildUsedControls(settings, row, outcomeKey, options);
@@ -1031,7 +1038,7 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     if (!finite(row._x)) continue;
-    if (!finite(responseValue(outcomeKey, row.month, 0))) continue;
+    if (!finite(responseValue(outcomeKey, row.month, 0, settings))) continue;
     const ust2y = sourceValue(row, "ust2y");
     if (!finite(ust2y)) continue;
 
@@ -1583,6 +1590,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
   const shockControlCount = settings.useWhitening ? settings.whiteningLags : settings.shockLags;
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
+  const covidText = settings.includeCovid ? "COVID included" : "COVID leads excluded";
   const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
   const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
   const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
@@ -1594,6 +1602,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
     `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
     `<span class="pill">${estimatorText}</span>`,
     `<span class="pill">${zlbText}</span>`,
+    `<span class="pill">${covidText}</span>`,
     `<span class="pill">${unscheduledText}</span>`,
     `<span class="pill">${imputeText}</span>`,
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
@@ -1604,6 +1613,7 @@ function render(settings, rows, resultsByOutcome, scaleDisplay, ffrH0, unschedul
     metric("Unscheduled rows", monthlySeries ? "n/a" : (settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`)),
     metric("Years", settings.includedYearsDisplay),
     metric("Date range", `${minDate} to ${maxDate}`),
+    metric("COVID", settings.includeCovid ? "included" : "leads excluded"),
     metric("h=0 n", h0n),
     metric("Min n", minN),
     metric("Controls", controlsCount),
@@ -1649,6 +1659,7 @@ function renderOptions() {
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "ffr-h0";
   configureScaleTarget(true);
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
+  document.getElementById("include-covid").checked = DATA.meta.defaults.include_covid ?? false;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
 
@@ -1736,7 +1747,7 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros"]) {
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   document.getElementById("use-whitening").addEventListener("change", () => {
