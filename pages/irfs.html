@@ -380,7 +380,6 @@
       </div>
       <div style="margin-top: 9px;">
         <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
-        <label class="check-row"><input id="exclude-future-zlb" type="checkbox" checked><span>Exclude future ZLB outcome leads</span></label>
         <label class="check-row"><input id="exclude-unscheduled" type="checkbox"><span>Exclude unscheduled meetings</span></label>
         <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute no-shock months with zeros</span></label>
       </div>
@@ -477,7 +476,6 @@ let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
 const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
-const MONTHLY_SHOCKS = new Set(["mp1", "ff4", "ed4", "mps", "bs"]);
 const PANEL_LABELS = {
   ffr: "FFR",
   unrate: "Unemployment",
@@ -569,7 +567,7 @@ function macroLagValue(controlKey, baseMonth, lag) {
   return monthValue(months[idx], controlKey);
 }
 
-function responseValue(outcomeKey, baseMonth, h, settings) {
+function responseValue(outcomeKey, baseMonth, h, includeZlb) {
   const spec = DATA.outcomes[outcomeKey];
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
@@ -578,7 +576,7 @@ function responseValue(outcomeKey, baseMonth, h, settings) {
   if (leadIdx < 0 || leadIdx >= months.length || prevIdx < 0) return null;
   const leadMonth = months[leadIdx];
   const prevMonth = months[prevIdx];
-  if (!settings.includeZlb && settings.excludeFutureZlb && isZlbMonth(leadMonth)) return null;
+  if (!includeZlb && isZlbMonth(leadMonth)) return null;
   const lead = monthValue(leadMonth, spec.source);
   const prev = monthValue(prevMonth, spec.source);
   if (!finite(lead) || !finite(prev)) return null;
@@ -617,7 +615,6 @@ function getSettings() {
     shock,
     aggregation: document.getElementById("aggregation").value,
     includeZlb: document.getElementById("include-zlb").checked,
-    excludeFutureZlb: document.getElementById("exclude-future-zlb").checked,
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
     rowStart: Math.max(1, Number.parseInt(document.getElementById("row-start").value || "1", 10)),
@@ -676,28 +673,7 @@ function aggregateMonth(items, mode, shockKey) {
   return rec;
 }
 
-function useMondatMonthly(settings, shockKey) {
-  return settings.aggregation === "month-sum" && MONTHLY_SHOCKS.has(shockKey);
-}
-
-function monthlyShockRows(settings, shockKey) {
-  return DATA.macro
-    .filter(row => finite(row[shockKey]) && truthyFlag(row.possible))
-    .map(row => ({
-      ...row,
-      source: "mondat-monthly",
-      main: truthyFlag(row.possible) ? 1 : 0,
-      scheduled: 1,
-      unscheduled: 0,
-      nzlb: truthyFlag(row.zlb) ? 0 : 1
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
 function filteredEventRows(settings, shockKey) {
-  if (useMondatMonthly(settings, shockKey)) {
-    return monthlyShockRows(settings, shockKey);
-  }
   let rows = DATA.events.filter(row => eventPassesBaseFilters(row, settings));
   if (settings.aggregation.startsWith("month-")) {
     const groups = new Map();
@@ -793,7 +769,7 @@ function buildRegressionData(settings, rows, outcomeKey, h) {
   const rowDates = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
-    const yi = responseValue(outcomeKey, row.month, h, settings);
+    const yi = responseValue(outcomeKey, row.month, h, settings.includeZlb);
     if (!finite(yi) || !finite(row._x)) continue;
 
     const zi = [];
@@ -1122,9 +1098,7 @@ function render(settings, rows, resultsByOutcome, scale, ffrH0, unscheduledSuppo
   const h0n = Math.min(...OUTCOME_ORDER.map(outcome => resultsByOutcome[outcome][0]?.n || 0));
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + settings.shockLags + settings.depLags;
-  const zlbText = settings.includeZlb
-    ? "ZLB included"
-    : (settings.excludeFutureZlb ? "ZLB current+leads excluded" : "ZLB current excluded");
+  const zlbText = settings.includeZlb ? "ZLB included" : "ZLB excluded";
   const imputeText = settings.imputeZeros ? "zero-imputed" : "event sample";
   const unscheduledText = settings.excludeUnscheduled
     ? `unscheduled excluded (${unscheduledSupportRows})`
@@ -1183,7 +1157,6 @@ function renderOptions() {
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-bp").value = DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp;
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
-  document.getElementById("exclude-future-zlb").checked = DATA.meta.defaults.exclude_future_zlb_leads;
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
 
@@ -1262,7 +1235,7 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "exclude-future-zlb", "exclude-unscheduled", "impute-zeros", "scale-irf"]) {
+  for (const id of ["aggregation", "include-zlb", "exclude-unscheduled", "impute-zeros", "scale-irf"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   for (const id of ["row-start", "row-end", "shock-lags", "dep-lags", "macro-lags", "horizon", "scale-bp"]) {

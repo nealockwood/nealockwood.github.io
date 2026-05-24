@@ -72,8 +72,6 @@ FRED_MACRO_CONTROLS = [
     "dlmpu",
 ]
 
-MONTHLY_SHOCKS = ["mp1", "ff4", "ed4", "mps", "bs"]
-
 OUTCOMES = {
     "unrate": {"label": "Unemployment", "source": "UNRATE", "transform": "diff"},
     "cpi": {"label": "CPI", "source": "CPIAUCSL", "transform": "logdiff100"},
@@ -108,13 +106,11 @@ def date_key(ts) -> str:
 
 def compute_mps_from_pca(prep: pd.DataFrame) -> pd.Series:
     cols = ["ed1", "ed2", "ed3", "ed4"]
-    vals = prep[cols].apply(pd.to_numeric, errors="coerce")
-    valid = vals.notna().all(axis=1) & np.isfinite(vals).all(axis=1)
-    x = vals.loc[valid, cols].to_numpy(dtype=np.float64, copy=True)
+    valid = prep[cols].notna().all(axis=1)
+    x = prep.loc[valid, cols].astype(float).to_numpy()
     x_std = (x - x.mean(axis=0)) / x.std(axis=0, ddof=0)
     _, _, vt = np.linalg.svd(x_std, full_matrices=False)
-    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
-        pc1 = x_std @ vt[0]
+    pc1 = x_std @ vt[0]
     y = prep.loc[valid, "ed4"].astype(float).to_numpy()
     design = np.column_stack([np.ones(len(pc1)), pc1])
     coef = np.linalg.lstsq(design, y, rcond=None)[0][1]
@@ -127,8 +123,6 @@ def read_macro() -> pd.DataFrame:
     mondat, _ = pyreadstat.read_dta(SOURCE_ROOT / "test" / "mondat.dta")
     mondat["daten"] = pd.to_datetime(mondat["daten"])
     mondat["month"] = mondat["daten"].dt.strftime("%Y-%m")
-    mondat["mps"] = compute_mps_from_pca(mondat)
-    mondat["bs"] = mondat["mps"]
     return mondat
 
 
@@ -236,8 +230,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
 
 
 def macro_rows(macro: pd.DataFrame) -> list[dict]:
-    cols = ["month", "daten", "zlb", "possible", "year"] + MONTHLY_SHOCKS
-    cols += [spec["source"] for spec in OUTCOMES.values()]
+    cols = ["month", "daten", "zlb"] + [spec["source"] for spec in OUTCOMES.values()]
     cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS
     rows = []
     for _, row in macro.sort_values("daten").iterrows():
@@ -274,7 +267,6 @@ def main() -> None:
                 "macro_lags": 12,
                 "aggregation": "main",
                 "include_zlb": False,
-                "exclude_future_zlb_leads": True,
                 "impute_zeros": False,
                 "exclude_unscheduled": False,
                 "scale_to_ffr_h0_bp": 50,
@@ -282,9 +274,9 @@ def main() -> None:
             },
         },
         "shocks": {
-            "mp1": {"label": "MP1", "source": "prep.csv events; mondat monthly for Monthly sum"},
-            "ff4": {"label": "FF4", "source": "prep.csv events; mondat monthly for Monthly sum"},
-            "ed4": {"label": "ED4", "source": "prep.csv events; mondat monthly for Monthly sum"},
+            "mp1": {"label": "MP1", "source": "prep.csv"},
+            "ff4": {"label": "FF4", "source": "prep.csv"},
+            "ed4": {"label": "ED4", "source": "prep.csv"},
             "mps": {"label": "MPS", "source": "PCA(ed1, ed2, ed3, ed4), normalized by ED4"},
             "bs": {"label": "BS", "source": "MPS with mandatory Bauer-Swanson controls"},
             "ns": {"label": "NS", "source": "BJMW NSmethod_Nsdata"},
