@@ -93,6 +93,16 @@ RAW_SHOCK_COLUMNS = [
 
 EVENT_SCALE_COLUMNS = ["ust2y"]
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
+VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
+VAR_CONTROL_MAP = {
+    "NFP_SURP": "varctl_nfp_surp",
+    "NFP_12M": "varctl_nfp_12m",
+    "SP500_3M": "varctl_sp500_3m",
+    "SLOPE_3M": "varctl_slope_3m",
+    "BCOM_3M": "varctl_bcom_3m",
+    "TR_SKEW": "varctl_tr_skew",
+}
+VAR_CONTROL_COLUMNS = list(VAR_CONTROL_MAP.values())
 
 OUTCOMES = {
     "unrate": {"label": "Unemployment", "source": "UNRATE", "transform": "diff"},
@@ -152,6 +162,7 @@ def read_macro() -> pd.DataFrame:
     mondat["daten"] = pd.to_datetime(mondat["daten"])
     mondat["month"] = mondat["daten"].dt.strftime("%Y-%m")
     mondat = add_target_ffr_change(mondat)
+    mondat = add_var_outcomes(mondat)
     return mondat
 
 
@@ -172,6 +183,32 @@ def add_target_ffr_change(macro: pd.DataFrame) -> pd.DataFrame:
     if "dtffr" in macro.columns:
         macro["dtffr"] = pd.to_numeric(macro["dtffr"], errors="coerce")
     return macro
+
+
+def add_var_outcomes(macro: pd.DataFrame) -> pd.DataFrame:
+    var_path = SOURCE_ROOT / "bs" / "gk" / "data" / "var_data2.csv"
+    if not var_path.exists():
+        return macro
+    var_data = pd.read_csv(var_path, encoding="utf-8-sig")
+    if "date" not in var_data.columns:
+        return macro
+    var_data["month"] = pd.to_datetime(var_data["date"], errors="coerce").dt.strftime("%Y-%m")
+    var_data = var_data.rename(
+        columns={
+            "y2": "var_y2",
+            "logcpi": "var_logcpi",
+            "logip": "var_logip",
+            "ebp": "var_ebp",
+            **VAR_CONTROL_MAP,
+        }
+    )
+    keep = ["month"] + [col for col in VAR_OUTCOME_COLUMNS + VAR_CONTROL_COLUMNS if col in var_data.columns]
+    if len(keep) == 1:
+        return macro
+    for col in keep:
+        if col != "month":
+            var_data[col] = pd.to_numeric(var_data[col], errors="coerce")
+    return macro.merge(var_data[keep], on="month", how="left")
 
 
 def read_external_shocks() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -316,7 +353,14 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
 
 def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
     cols = ["month", "daten", "zlb"] + [spec["source"] for spec in OUTCOMES.values()]
-    cols += MARKET_CONTROLS + FRED_MACRO_CONTROLS + TARGET_FFR_COLUMNS + EVENT_SCALE_COLUMNS
+    cols += (
+        MARKET_CONTROLS
+        + FRED_MACRO_CONTROLS
+        + TARGET_FFR_COLUMNS
+        + EVENT_SCALE_COLUMNS
+        + VAR_OUTCOME_COLUMNS
+        + VAR_CONTROL_COLUMNS
+    )
     monthly_greenbook_controls = read_greenbook_monthly_controls()
     monthly_event_values: dict[str, dict[str, float]] = {}
     monthly_event_controls: dict[str, dict[str, float]] = {}
@@ -370,6 +414,7 @@ def main() -> None:
                 "prep.csv",
                 "test/mondat.dta",
                 "codex/dff_fedfunds_tffr_monthly.csv",
+                "bs/gk/data/var_data2.csv",
                 "test/intermediates/GBFOMCmapping.csv",
                 "test/intermediates/gbweb_row_format.xlsx",
                 "BJMW-BRW-shocks-updated-1.xlsx",

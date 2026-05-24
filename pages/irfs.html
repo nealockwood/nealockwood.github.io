@@ -603,6 +603,7 @@
         <div class="view-tabs" role="tablist" aria-label="Plot view">
           <button class="view-tab active" type="button" data-view="irf" role="tab" aria-selected="true">IRF panel</button>
           <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
+          <button class="view-tab" type="button" data-view="var" role="tab" aria-selected="false">VAR</button>
         </div>
         <div class="decomp-control hidden">
           <label>Horizon lines</label>
@@ -626,7 +627,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=lpdecomp-view-20260524";
+const DATA_URL = "irfs-data.json?v=var-view-20260524";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -636,10 +637,27 @@ let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
 const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
+const VAR_OUTCOME_ORDER = ["y2", "cpi", "ip", "ebp"];
+const VAR_OUTCOMES = {
+  y2: {label: "2Y Treasury", source: "var_y2"},
+  cpi: {label: "CPI", source: "var_logcpi"},
+  ip: {label: "IP", source: "var_logip"},
+  ebp: {label: "EBP", source: "var_ebp"}
+};
+const VAR_MARKET_CONTROL_SOURCE = {
+  nfp_surp: "varctl_nfp_surp",
+  nfp_12m: "varctl_nfp_12m",
+  sp500_3m: "varctl_sp500_3m",
+  slope_3m: "varctl_slope_3m",
+  bcom_3m: "varctl_bcom_3m",
+  tr_skew: "varctl_tr_skew"
+};
+const VAR_Y2_TARGET_BP = 25;
 const DEFAULT_DECOMP_HORIZONS = [3, 6, 9];
 const DECOMP_COLORS = ["#167c80", "#9a4055", "#b66d12", "#4d6fb3", "#6c5b7b", "#2f6f4e", "#8a5a2b", "#52616b"];
 const PANEL_LABELS = {
   ffr: "FFR",
+  y2: "2Y Treasury",
   unrate: "Unemployment",
   cpi: "CPI",
   pce: "PCE",
@@ -1281,6 +1299,215 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
   return {y, x, controls};
 }
 
+function varControlValue(row, key) {
+  const varSource = VAR_MARKET_CONTROL_SOURCE[key];
+  if (varSource && finite(row[varSource])) return row[varSource];
+  return sourceValue(row, key);
+}
+
+function buildVarControlRow(settings, row) {
+  const controls = [];
+  for (const c of settings.controls) {
+    const v = varControlValue(row, c);
+    if (!finite(v)) return null;
+    controls.push(v);
+  }
+  for (const c of settings.macroControls) {
+    for (let lag = 1; lag <= settings.macroLags; lag++) {
+      const v = macroLagValue(c, row.month, lag);
+      if (!finite(v)) return null;
+      controls.push(v);
+    }
+  }
+  return controls;
+}
+
+function groupedProxyValue(items, mode, shockKey) {
+  const sorted = items.slice().sort((a, b) => a.date.localeCompare(b.date));
+  if (mode === "month-first") {
+    const row = sorted.find(r => finite(seriesValue(r, shockKey)));
+    return row ? seriesValue(row, shockKey) : null;
+  }
+  if (mode === "month-last") {
+    const row = sorted.slice().reverse().find(r => finite(seriesValue(r, shockKey)));
+    return row ? seriesValue(row, shockKey) : null;
+  }
+  return sumFiniteRows(sorted, shockKey);
+}
+
+function buildVarProxyLookup(settings, shockKey) {
+  if (isMonthlySeries(shockKey)) {
+    return row => sourceValue(row, shockKey);
+  }
+
+  const rows = filteredEventRows(settings, shockKey);
+  const supportRows = trimmedSupportRows(rows, settings, shockKey);
+  if (!supportRows.length) return () => null;
+  const firstMonth = supportRows[0].month;
+  const lastMonth = supportRows[supportRows.length - 1].month;
+  const grouped = new Map();
+  for (const row of rows) {
+    if (!grouped.has(row.month)) grouped.set(row.month, []);
+    grouped.get(row.month).push(row);
+  }
+  const monthlyValues = new Map();
+  for (const [month, items] of grouped.entries()) {
+    monthlyValues.set(month, groupedProxyValue(items, settings.aggregation, shockKey));
+  }
+  return row => {
+    if (row.month < firstMonth || row.month > lastMonth) return null;
+    if (!monthlyValues.has(row.month)) return 0;
+    return monthlyValues.get(row.month);
+  };
+}
+
+function buildVarData(settings, shockKey) {
+  const proxyForRow = buildVarProxyLookup(settings, shockKey);
+  const rows = [];
+  const vars = [];
+  const proxy = [];
+  const exog = [];
+  for (const row of DATA.macro) {
+    if (!rowPassesYearFilter(row, settings)) continue;
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if (isSuppressedLeadMonth(row.month, settings)) continue;
+    const y = VAR_OUTCOME_ORDER.map(key => row[VAR_OUTCOMES[key].source]);
+    if (!y.every(finite)) continue;
+    const x = proxyForRow(row);
+    if (!finite(x)) continue;
+    const controls = buildVarControlRow(settings, row);
+    if (!controls) continue;
+    rows.push(row);
+    vars.push(y);
+    proxy.push(x);
+    exog.push(controls);
+  }
+  return {
+    rows,
+    vars,
+    proxy,
+    exog: exog[0]?.length ? exog : null,
+    controlCount: exog[0]?.length || 0
+  };
+}
+
+function olsMulti(design, yMatrix) {
+  const n = design.length;
+  if (!n || !design[0]?.length || !yMatrix.length) return null;
+  const k = design[0].length;
+  const m = yMatrix[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array.from({length: k}, () => Array(m).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      for (let b = 0; b < k; b++) xtx[a][b] += design[i][a] * design[i][b];
+      for (let j = 0; j < m; j++) xty[a][j] += design[i][a] * yMatrix[i][j];
+    }
+  }
+  const beta = Array.from({length: k}, () => Array(m).fill(0));
+  for (let j = 0; j < m; j++) {
+    const sol = solveLinear(xtx, xty.map(row => row[j]));
+    if (!sol) return null;
+    for (let a = 0; a < k; a++) beta[a][j] = sol[a];
+  }
+  return beta;
+}
+
+function fitVarx(varsData, p, exog) {
+  const total = varsData.length;
+  const n = varsData[0]?.length || 0;
+  if (total <= p + n * p + 2) return null;
+  const design = [];
+  const y = [];
+  for (let t = p; t < total; t++) {
+    const row = [];
+    for (let lag = 1; lag <= p; lag++) row.push(...varsData[t - lag]);
+    if (exog) row.push(...exog[t]);
+    row.push(1);
+    design.push(row);
+    y.push(varsData[t]);
+  }
+  const beta = olsMulti(design, y);
+  if (!beta) return null;
+  const res = y.map((vals, i) => vals.map((val, j) => {
+    let fit = 0;
+    for (let a = 0; a < design[i].length; a++) fit += design[i][a] * beta[a][j];
+    return val - fit;
+  }));
+  return {beta, res, n, p, kExog: exog ? exog[0].length : 0};
+}
+
+function covarianceMatrix(rows, denom) {
+  const n = rows[0].length;
+  const out = Array.from({length: n}, () => Array(n).fill(0));
+  for (const row of rows) {
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) out[i][j] += row[i] * row[j] / denom;
+    }
+  }
+  return out;
+}
+
+function proxyVarxIrfs(varsData, proxy, exog, p, horizon) {
+  const fit = fitVarx(varsData, p, exog);
+  if (!fit) return null;
+  const t = fit.res.length;
+  const n = fit.n;
+  const tM = Math.min(proxy.length, t);
+  const denom = tM - n * p - 1;
+  if (tM < 8 || denom <= 0) return null;
+  const resM = fit.res.slice(t - tM);
+  const proxyTail = proxy.slice(proxy.length - tM);
+  const exogTail = exog ? exog.slice(exog.length - tM) : null;
+  const firstStage = proxyTail.map((v, i) => [1, v, ...(exogTail ? exogTail[i] : [])]);
+  const phib = olsMulti(firstStage, resM);
+  if (!phib) return null;
+  const uhat1 = firstStage.map(row => row.reduce((acc, v, i) => acc + v * phib[i][0], 0));
+  const secondStage = uhat1.map(v => [1, v]);
+  const resRest = resM.map(row => row.slice(1));
+  const b21Fit = olsMulti(secondStage, resRest);
+  if (!b21Fit) return null;
+  const b21 = b21Fit[1].slice();
+  const sigma = covarianceMatrix(resM, denom);
+  const sig11 = sigma[0][0];
+  const sig21 = sigma.slice(1).map(row => row[0]);
+  const sig22 = sigma.slice(1).map(row => row.slice(1));
+  const zzp = sig22.map((row, i) => row.map((val, j) =>
+    val + b21[i] * sig11 * b21[j] - sig21[i] * b21[j] - b21[i] * sig21[j]
+  ));
+  const v = sig21.map((val, i) => val - b21[i] * sig11);
+  const solved = solveLinear(zzp, v);
+  if (!solved) return null;
+  const b12b12p = v.reduce((acc, val, i) => acc + val * solved[i], 0);
+  const b11sq = sig11 - b12b12p;
+  if (!finite(b11sq) || b11sq <= EPS) return null;
+  const b11 = Math.sqrt(b11sq);
+  const impact = [b11, ...b21.map(vv => vv * b11)];
+
+  const irs = Array.from({length: p + horizon + 1}, () => Array(n).fill(0));
+  irs[p] = impact;
+  for (let h = 1; h <= horizon; h++) {
+    const row = [];
+    for (let lag = 1; lag <= p; lag++) row.push(...irs[p + h - lag]);
+    if (fit.kExog) row.push(...Array(fit.kExog).fill(0));
+    const next = Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      for (let a = 0; a < row.length; a++) next[j] += row[a] * fit.beta[a][j];
+    }
+    irs[p + h] = next;
+  }
+
+  return {
+    irfs: irs.slice(p, p + horizon + 1),
+    n: varsData.length,
+    t: t,
+    tM,
+    p,
+    firstStageControls: firstStage[0].length - 2,
+    rawImpact: impact[0]
+  };
+}
+
 function solveLinear(a, b) {
   const n = b.length;
   const m = a.map((row, i) => row.slice().concat([b[i]]));
@@ -1663,11 +1890,38 @@ function runOutcome(settings, rows, outcomeKey, maxH) {
   return results;
 }
 
+function runVarSpec(settings) {
+  const p = Math.max(1, settings.shockLags);
+  const varData = buildVarData(settings, settings.shock);
+  if (varData.rows.length <= p + VAR_OUTCOME_ORDER.length * p + 8) {
+    showError("The selected sample has too few usable monthly VAR observations.");
+    return;
+  }
+  const fit = proxyVarxIrfs(varData.vars, varData.proxy, varData.exog, p, settings.horizon);
+  if (!fit || !fit.irfs.length) {
+    showError("Proxy VARX estimation failed for this series and control set.");
+    return;
+  }
+  const y2Impact = fit.irfs[0][0];
+  if (!finite(y2Impact) || Math.abs(y2Impact) < EPS) {
+    showError("Proxy VARX scaling failed because the 2Y impact response is unavailable or effectively zero.");
+    return;
+  }
+  const target = VAR_Y2_TARGET_BP / 100;
+  const scale = target / y2Impact;
+  const scaledIrfs = fit.irfs.map(row => row.map(v => finite(v) ? cleanZero(v * scale) : null));
+  renderVarPlot(settings, varData, fit, scaledIrfs, scale);
+}
+
 function runSpec() {
   const settings = getSettings();
   syncBsControls();
   if (settings.includedYearsError) {
     showError(`Invalid included years: ${settings.includedYearsError}. Use entries like 1993-2007, 2010, 2024+.`);
+    return;
+  }
+  if (settings.viewMode === "var") {
+    runVarSpec(settings);
     return;
   }
   const rows = buildAnalysisRows(settings, settings.shock);
@@ -1878,6 +2132,138 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
   });
   layout.annotations = annotations;
   Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+}
+
+function renderVarPlot(settings, varData, fit, scaledIrfs, scale) {
+  document.getElementById("error").classList.add("hidden");
+  const shockLabel = seriesSpec(settings.shock).label;
+  document.getElementById("chart-title").textContent = `Proxy VARX: ${shockLabel}`;
+  document.getElementById("chart-subtitle").textContent = `Monthly proxy VAR with controls, normalized to ${VAR_Y2_TARGET_BP}bp 2Y impact`;
+
+  const traces = [];
+  const annotations = [];
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 74, r: 24, t: 30, b: 66},
+    hovermode: "closest",
+    showlegend: false,
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
+  };
+
+  const xGap = 0.11;
+  const yGap = 0.24;
+  const yPadBottom = 0.075;
+  const yPadTop = 0.055;
+  const colW = (1 - xGap) / 2;
+  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
+  const horizons = scaledIrfs.map((_, h) => h);
+
+  VAR_OUTCOME_ORDER.forEach((outcome, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
+    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
+    const xName = axisLayoutName(i, "x");
+    const yName = axisLayoutName(i, "y");
+    const xRef = axisRef(i, "x");
+    const yRef = axisRef(i, "y");
+    layout[xName] = {
+      domain: xDomain,
+      anchor: yRef,
+      title: row === 1 ? {text: "Horizon", standoff: 8, font: {size: 11}} : "",
+      showticklabels: true,
+      tickfont: {size: 10},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      dtick: Math.max(1, Math.ceil(settings.horizon / 12)),
+      automargin: true,
+      range: [0, settings.horizon]
+    };
+    layout[yName] = {
+      domain: yDomain,
+      anchor: xRef,
+      title: col === 0 ? {text: "Response", standoff: 8, font: {size: 11}} : "",
+      tickfont: {size: 10},
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    annotations.push({
+      text: `<b>${VAR_OUTCOMES[outcome].label}</b>`,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: yDomain[1] + 0.035,
+      xref: "paper",
+      yref: "paper",
+      showarrow: false,
+      font: {size: 13, color: "#17201b"}
+    });
+
+    traces.push({
+      x: horizons,
+      y: horizons.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+    traces.push({
+      x: horizons,
+      y: scaledIrfs.map(row => row[i]),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#167c80", width: 2.4},
+      marker: {color: "#17201b", size: 4},
+      hovertemplate: horizons.map((h, idx) =>
+        `${VAR_OUTCOMES[outcome].label}<br>h=${h}<br>response=${fmt(scaledIrfs[idx][i], 4)}<br>n=${fit.n}<extra></extra>`
+      ),
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+  });
+
+  layout.annotations = annotations;
+  Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+
+  const minDate = varData.rows.length ? varData.rows[0].date : "NA";
+  const maxDate = varData.rows.length ? varData.rows[varData.rows.length - 1].date : "NA";
+  const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
+  const covidText = settings.includeCovid ? "COVID included" : "COVID rows excluded";
+  const excludedYearsText = settings.excludeLeadYears.length
+    ? `excluded years ${settings.excludeLeadYears.join(", ")}`
+    : "no extra years excluded";
+
+  document.getElementById("status-pills").innerHTML = [
+    `<span class="pill">VARX proxy</span>`,
+    `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
+    `<span class="pill">p=${fit.p}</span>`,
+    `<span class="pill">${VAR_Y2_TARGET_BP}bp 2Y impact</span>`,
+    `<span class="pill">${zlbText}</span>`,
+    `<span class="pill">${covidText}</span>`,
+    `<span class="pill">${excludedYearsText}</span>`,
+    settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
+  ].join("");
+
+  document.getElementById("diagnostics").innerHTML = [
+    metric("Rows", varData.rows.length),
+    metric("View", "Proxy VARX"),
+    metric("Date range", `${minDate} to ${maxDate}`),
+    metric("VAR lags", fit.p),
+    metric("Outcomes", "2Y, CPI, IP, EBP"),
+    metric("Controls", varData.controlCount),
+    metric("First-stage controls", fit.firstStageControls),
+    metric("Proxy obs", fit.tM),
+    metric("Scale", `${VAR_Y2_TARGET_BP}bp 2Y impact`),
+    metric("Raw 2Y impact", fmt(fit.irfs[0][0], 4)),
+    metric("Scale factor", fmt(scale, 3)),
+    metric("Max horizon", settings.horizon)
+  ].join("");
 }
 
 function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows) {
