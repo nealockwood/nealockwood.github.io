@@ -99,6 +99,12 @@
     gap: 10px;
   }
 
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(94px, 1fr));
+    gap: 10px;
+  }
+
   label {
     display: block;
     font-size: 12px;
@@ -458,6 +464,9 @@
     .diagnostics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    .grid-3 {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 </head>
@@ -521,10 +530,10 @@
           <input id="dep-lags" type="number" min="0" max="60" step="1" value="12">
         </div>
       </div>
-      <div style="margin-top: 9px;">
+      <div class="lp-control" style="margin-top: 9px;">
         <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
       </div>
-      <div id="whitening-lag-wrap" class="hidden" style="margin-top: 10px;">
+      <div id="whitening-lag-wrap" class="lp-control hidden" style="margin-top: 10px;">
         <label for="whitening-lags">Whitening lags</label>
         <input id="whitening-lags" type="number" min="0" max="60" step="1" value="8">
       </div>
@@ -533,13 +542,13 @@
           <label for="horizon">Horizon</label>
           <input id="horizon" type="number" min="1" max="120" step="1" value="24">
         </div>
-        <div>
+        <div class="lp-control">
           <label id="scale-target-label" for="scale-bp">UST2Y target</label>
           <input id="scale-bp" type="number" min="0.01" max="300" step="1" value="10">
           <div class="unit-note" id="scale-target-unit">basis points</div>
         </div>
       </div>
-      <div style="margin-top: 10px;">
+      <div class="lp-control" style="margin-top: 10px;">
         <label for="scale-mode">Scale mode</label>
         <select id="scale-mode">
           <option value="ust2y-impact">UST2Y impact</option>
@@ -618,6 +627,25 @@
             </div>
           </details>
         </div>
+        <div class="var-control hidden">
+          <label>VAR</label>
+          <div class="grid-3">
+            <div>
+              <label for="var-lags">Lag length</label>
+              <input id="var-lags" type="number" min="1" max="24" step="1" value="12">
+            </div>
+            <div>
+              <label for="var-scale-bp">2Y impact</label>
+              <input id="var-scale-bp" type="number" min="0.01" max="300" step="1" value="25">
+              <div class="unit-note">basis points</div>
+            </div>
+            <div>
+              <label for="var-bootstrap-draws">Bootstrap</label>
+              <input id="var-bootstrap-draws" type="number" min="100" max="5000" step="100" value="1000">
+              <div class="unit-note">95% bands</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="error" class="error hidden"></div>
@@ -636,6 +664,8 @@ let DATA = null;
 let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
+let activeViewMode = "irf";
+const VIEW_STATE = {lp: null, var: null};
 const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
 const VAR_OUTCOME_ORDER = ["y2", "cpi", "ip", "ebp"];
 const VAR_OUTCOMES = {
@@ -652,7 +682,12 @@ const VAR_MARKET_CONTROL_SOURCE = {
   bcom_3m: "varctl_bcom_3m",
   tr_skew: "varctl_tr_skew"
 };
+const VAR_PROXY_SOURCE = {
+  mps: "var_mps"
+};
 const VAR_Y2_TARGET_BP = 25;
+const VAR_BOOTSTRAP_DEFAULT = 1000;
+const VAR_BAND_LEVEL = 0.95;
 const DEFAULT_DECOMP_HORIZONS = [3, 6, 9];
 const DECOMP_COLORS = ["#167c80", "#9a4055", "#b66d12", "#4d6fb3", "#6c5b7b", "#2f6f4e", "#8a5a2b", "#52616b"];
 const PANEL_LABELS = {
@@ -953,7 +988,7 @@ function yearIsIncluded(year, rules) {
 }
 
 function currentViewMode() {
-  return document.querySelector(".view-tab.active")?.dataset.view || "irf";
+  return activeViewMode || document.querySelector(".view-tab.active")?.dataset.view || "irf";
 }
 
 function defaultDecompHorizons(maxH) {
@@ -1003,8 +1038,23 @@ function renderDecompHorizonOptions(maxH) {
 }
 
 function syncViewControls() {
-  const decomp = currentViewMode() === "decomp";
+  const mode = currentViewMode();
+  const decomp = mode === "decomp";
+  const varMode = mode === "var";
   document.querySelectorAll(".decomp-control").forEach(el => el.classList.toggle("hidden", !decomp));
+  document.querySelectorAll(".var-control").forEach(el => el.classList.toggle("hidden", !varMode));
+  document.querySelectorAll(".lp-control").forEach(el => {
+    if (el.id !== "whitening-lag-wrap") el.classList.toggle("hidden", varMode);
+  });
+  if (varMode) {
+    document.getElementById("whitening-lag-wrap").classList.add("hidden");
+  } else {
+    syncWhiteningControls();
+  }
+  for (const id of ["shock-lags", "dep-lags", "use-whitening", "whitening-lags"]) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = varMode;
+  }
 }
 
 function syncExcludeYearControls() {
@@ -1016,6 +1066,121 @@ function syncExcludeYearControls() {
     el.closest(".check-row").classList.toggle("hidden", !available);
     if (!available) el.checked = false;
   });
+}
+
+function viewStateKey(view) {
+  return view === "var" ? "var" : "lp";
+}
+
+function capturePanelState() {
+  return {
+    shock: document.getElementById("shock").value,
+    aggregation: document.getElementById("aggregation").value,
+    includedYears: document.getElementById("included-years").value,
+    includeZlb: document.getElementById("include-zlb").checked,
+    includeCovid: document.getElementById("include-covid").checked,
+    excludeYears: Array.from(document.querySelectorAll(".exclude-year-check:checked:not(:disabled)")).map(el => el.value),
+    excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
+    imputeZeros: document.getElementById("impute-zeros").checked,
+    shockLags: document.getElementById("shock-lags").value,
+    depLags: document.getElementById("dep-lags").value,
+    macroLags: document.getElementById("macro-lags").value,
+    useWhitening: document.getElementById("use-whitening").checked,
+    whiteningLags: document.getElementById("whitening-lags").value,
+    horizon: document.getElementById("horizon").value,
+    scaleMode: document.getElementById("scale-mode").value,
+    scaleBp: document.getElementById("scale-bp").value,
+    varLags: document.getElementById("var-lags").value,
+    varScaleBp: document.getElementById("var-scale-bp").value,
+    varBootstrapDraws: document.getElementById("var-bootstrap-draws").value,
+    controls: Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])")).map(el => el.value),
+    macroControls: Array.from(document.querySelectorAll(".control-check:checked[data-kind='macro']")).map(el => el.value)
+  };
+}
+
+function applyPanelState(state) {
+  if (!state) return;
+  if (state.shock && allSeries()[state.shock]) document.getElementById("shock").value = state.shock;
+  document.getElementById("aggregation").value = state.aggregation ?? "main";
+  document.getElementById("included-years").value = state.includedYears ?? "1993-2025";
+  document.getElementById("include-zlb").checked = !!state.includeZlb;
+  document.getElementById("include-covid").checked = !!state.includeCovid;
+  const excludeYears = new Set(state.excludeYears || []);
+  document.querySelectorAll(".exclude-year-check").forEach(el => {
+    el.checked = excludeYears.has(el.value);
+  });
+  document.getElementById("exclude-unscheduled").checked = !!state.excludeUnscheduled;
+  document.getElementById("impute-zeros").checked = !!state.imputeZeros;
+  document.getElementById("shock-lags").value = state.shockLags ?? 12;
+  document.getElementById("dep-lags").value = state.depLags ?? 12;
+  document.getElementById("macro-lags").value = state.macroLags ?? 12;
+  document.getElementById("use-whitening").checked = !!state.useWhitening;
+  document.getElementById("whitening-lags").value = state.whiteningLags ?? 8;
+  document.getElementById("horizon").value = state.horizon ?? 24;
+  document.getElementById("scale-mode").value = state.scaleMode ?? (DATA.meta.defaults.scale_mode ?? "shock-rmse");
+  configureScaleTarget(false);
+  document.getElementById("scale-bp").value = state.scaleBp ?? scaleTargetConfig(document.getElementById("scale-mode").value).value;
+  document.getElementById("var-lags").value = state.varLags ?? 12;
+  document.getElementById("var-scale-bp").value = state.varScaleBp ?? VAR_Y2_TARGET_BP;
+  document.getElementById("var-bootstrap-draws").value = state.varBootstrapDraws ?? VAR_BOOTSTRAP_DEFAULT;
+  const regularControls = new Set(state.controls || []);
+  const macroControls = new Set(state.macroControls || []);
+  document.querySelectorAll(".control-check").forEach(el => {
+    el.checked = el.dataset.kind === "macro" ? macroControls.has(el.value) : regularControls.has(el.value);
+    el.disabled = false;
+    el.closest(".check-row").style.color = "";
+  });
+  syncWhiteningControls();
+  syncExcludeYearControls();
+  renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
+  syncBsControls();
+  updateGroupToggles();
+  syncViewControls();
+}
+
+function defaultVarState() {
+  return {
+    shock: allSeries().mps ? "mps" : document.getElementById("shock").value,
+    aggregation: "month-sum",
+    includedYears: "1988-2019",
+    includeZlb: true,
+    includeCovid: false,
+    excludeYears: [],
+    excludeUnscheduled: false,
+    imputeZeros: false,
+    shockLags: 0,
+    depLags: 0,
+    macroLags: 0,
+    useWhitening: false,
+    whiteningLags: DATA.meta.defaults.whitening_lags ?? 8,
+    horizon: 48,
+    scaleMode: DATA.meta.defaults.scale_mode ?? "shock-rmse",
+    scaleBp: DATA.meta.defaults.scale_to_shock_sd ?? 1,
+    varLags: 12,
+    varScaleBp: VAR_Y2_TARGET_BP,
+    varBootstrapDraws: VAR_BOOTSTRAP_DEFAULT,
+    controls: DATA.controls.market.slice(),
+    macroControls: []
+  };
+}
+
+function activateView(view) {
+  const previousView = currentViewMode();
+  const previousKey = viewStateKey(previousView);
+  VIEW_STATE[previousKey] = capturePanelState();
+  activeViewMode = view;
+  document.querySelectorAll(".view-tab").forEach(el => {
+    const active = el.dataset.view === view;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  const nextKey = viewStateKey(view);
+  if (nextKey !== previousKey) {
+    applyPanelState(VIEW_STATE[nextKey] || (nextKey === "var" ? defaultVarState() : VIEW_STATE.lp));
+  } else {
+    syncViewControls();
+  }
+  runSpec();
 }
 
 function getSettings() {
@@ -1050,6 +1215,9 @@ function getSettings() {
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     useWhitening: document.getElementById("use-whitening").checked,
     whiteningLags: Math.max(0, Number.parseInt(document.getElementById("whitening-lags").value || "8", 10)),
+    varLags: Math.max(1, Number.parseInt(document.getElementById("var-lags").value || "12", 10)),
+    varScaleTarget: Math.max(0.01, Number.parseFloat(document.getElementById("var-scale-bp").value || `${VAR_Y2_TARGET_BP}`)),
+    varBootstrapDraws: Math.max(100, Number.parseInt(document.getElementById("var-bootstrap-draws").value || `${VAR_BOOTSTRAP_DEFAULT}`, 10)),
     horizon,
     scaleTarget: readScaleTarget(scaleMode),
     scaleMode,
@@ -1336,6 +1504,10 @@ function groupedProxyValue(items, mode, shockKey) {
 }
 
 function buildVarProxyLookup(settings, shockKey) {
+  const monthlySource = VAR_PROXY_SOURCE[shockKey];
+  if (monthlySource) {
+    return row => finite(row[monthlySource]) ? row[monthlySource] : null;
+  }
   if (isMonthlySeries(shockKey)) {
     return row => sourceValue(row, shockKey);
   }
@@ -1406,7 +1578,7 @@ function olsMulti(design, yMatrix) {
   }
   const beta = Array.from({length: k}, () => Array(m).fill(0));
   for (let j = 0; j < m; j++) {
-    const sol = solveLinear(xtx, xty.map(row => row[j]));
+    const sol = solveLinearStable(xtx, xty.map(row => row[j]));
     if (!sol) return null;
     for (let a = 0; a < k; a++) beta[a][j] = sol[a];
   }
@@ -1434,7 +1606,7 @@ function fitVarx(varsData, p, exog) {
     for (let a = 0; a < design[i].length; a++) fit += design[i][a] * beta[a][j];
     return val - fit;
   }));
-  return {beta, res, n, p, kExog: exog ? exog[0].length : 0};
+  return {beta, res, n, p, t: y.length, kExog: exog ? exog[0].length : 0};
 }
 
 function covarianceMatrix(rows, denom) {
@@ -1476,7 +1648,7 @@ function proxyVarxIrfs(varsData, proxy, exog, p, horizon) {
     val + b21[i] * sig11 * b21[j] - sig21[i] * b21[j] - b21[i] * sig21[j]
   ));
   const v = sig21.map((val, i) => val - b21[i] * sig11);
-  const solved = solveLinear(zzp, v);
+  const solved = solveLinearStable(zzp, v);
   if (!solved) return null;
   const b12b12p = v.reduce((acc, val, i) => acc + val * solved[i], 0);
   const b11sq = sig11 - b12b12p;
@@ -1499,12 +1671,114 @@ function proxyVarxIrfs(varsData, proxy, exog, p, horizon) {
 
   return {
     irfs: irs.slice(p, p + horizon + 1),
+    fit,
     n: varsData.length,
     t: t,
     tM,
     p,
     firstStageControls: firstStage[0].length - 2,
     rawImpact: impact[0]
+  };
+}
+
+function seededRandom(seed = 1234) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function quantile(values, q) {
+  const clean = values.filter(finite).sort((a, b) => a - b);
+  if (!clean.length) return null;
+  const pos = (clean.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return clean[lo];
+  return clean[lo] + (clean[hi] - clean[lo]) * (pos - lo);
+}
+
+function simulateVarx(varsData, fit, resb, exog) {
+  const p = fit.p;
+  const t = fit.t;
+  const n = fit.n;
+  const out = Array.from({length: p + t}, () => Array(n).fill(0));
+  for (let i = 0; i < p; i++) out[i] = varsData[i].slice();
+  for (let j = p; j < p + t; j++) {
+    const row = [];
+    for (let lag = 1; lag <= p; lag++) row.push(...out[j - lag]);
+    if (fit.kExog) row.push(...exog[j]);
+    const next = Array(n).fill(0);
+    for (let col = 0; col < n; col++) {
+      for (let a = 0; a < row.length; a++) next[col] += row[a] * fit.beta[a][col];
+      next[col] += fit.beta[row.length][col] + resb[j - p][col];
+    }
+    out[j] = next;
+  }
+  return out;
+}
+
+function proxyVarxBootstrap(varsData, proxy, exog, p, horizon, draws, scaleTarget) {
+  const base = proxyVarxIrfs(varsData, proxy, exog, p, horizon);
+  if (!base) return null;
+  const y2Impact = base.irfs[0][0];
+  if (!finite(y2Impact) || Math.abs(y2Impact) < EPS) return null;
+  const baseScale = scaleTarget / y2Impact;
+  const scaled = base.irfs.map(row => row.map(v => finite(v) ? cleanZero(v * baseScale) : null));
+
+  const res = base.fit.res;
+  const t = base.fit.t;
+  const n = base.fit.n;
+  const tM = base.tM;
+  const means = Array(n).fill(0);
+  for (const row of res) {
+    for (let j = 0; j < n; j++) means[j] += row[j] / t;
+  }
+  const resDemeaned = res.map(row => row.map((v, j) => v - means[j]));
+  const rng = seededRandom(1234);
+  const boot = [];
+
+  for (let b = 0; b < draws; b++) {
+    const signs = Array.from({length: t}, () => rng() > 0.5 ? -1 : 1);
+    const resb = resDemeaned.map((row, i) => row.map(v => v * signs[i]));
+    const varsb = simulateVarx(varsData, base.fit, resb, exog);
+    const proxyTail = proxy.slice(proxy.length - tM);
+    const signsTail = signs.slice(t - tM);
+    const proxyB = proxyTail.map((v, i) => v * signsTail[i]);
+    const fitB = proxyVarxIrfs(varsb, proxyB, exog, p, horizon);
+    if (!fitB || !fitB.irfs.length) continue;
+    const impact = fitB.irfs[0][0];
+    if (!finite(impact) || Math.abs(impact) < EPS) continue;
+    const scale = scaleTarget / impact;
+    boot.push(fitB.irfs.map(row => row.map(v => v * scale)));
+  }
+
+  if (boot.length < Math.max(20, Math.ceil(draws * 0.2))) return null;
+  const qLow = (1 - VAR_BAND_LEVEL) / 2;
+  const qHigh = 1 - qLow;
+  const lo = [];
+  const hi = [];
+  for (let h = 0; h <= horizon; h++) {
+    const loRow = [];
+    const hiRow = [];
+    for (let j = 0; j < n; j++) {
+      const vals = boot.map(draw => draw[h][j]);
+      loRow.push(cleanZero(quantile(vals, qLow)));
+      hiRow.push(cleanZero(quantile(vals, qHigh)));
+    }
+    lo.push(loRow);
+    hi.push(hiRow);
+  }
+  return {
+    ...base,
+    scaled,
+    lo,
+    hi,
+    scale: baseScale,
+    draws,
+    validDraws: boot.length,
+    level: VAR_BAND_LEVEL
   };
 }
 
@@ -1527,6 +1801,20 @@ function solveLinear(a, b) {
     }
   }
   return m.map(row => row[n]);
+}
+
+function solveLinearStable(a, b) {
+  const direct = solveLinear(a, b);
+  if (direct) return direct;
+  const n = b.length;
+  const diag = a.reduce((acc, row, i) => acc + Math.abs(row[i] || 0), 0) / Math.max(1, n);
+  const scale = diag > EPS ? diag : 1;
+  for (const lambda of [1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1]) {
+    const adjusted = a.map((row, i) => row.map((v, j) => v + (i === j ? lambda * scale : 0)));
+    const sol = solveLinear(adjusted, b);
+    if (sol) return sol;
+  }
+  return null;
 }
 
 function residualize(v, z) {
@@ -1891,26 +2179,27 @@ function runOutcome(settings, rows, outcomeKey, maxH) {
 }
 
 function runVarSpec(settings) {
-  const p = Math.max(1, settings.shockLags);
+  const p = settings.varLags;
   const varData = buildVarData(settings, settings.shock);
   if (varData.rows.length <= p + VAR_OUTCOME_ORDER.length * p + 8) {
     showError("The selected sample has too few usable monthly VAR observations.");
     return;
   }
-  const fit = proxyVarxIrfs(varData.vars, varData.proxy, varData.exog, p, settings.horizon);
-  if (!fit || !fit.irfs.length) {
-    showError("Proxy VARX estimation failed for this series and control set.");
+  const target = settings.varScaleTarget / 100;
+  const result = proxyVarxBootstrap(
+    varData.vars,
+    varData.proxy,
+    varData.exog,
+    p,
+    settings.horizon,
+    settings.varBootstrapDraws,
+    target
+  );
+  if (!result || !result.irfs.length) {
+    showError("Proxy VARX estimation or bootstrap failed for this series and control set.");
     return;
   }
-  const y2Impact = fit.irfs[0][0];
-  if (!finite(y2Impact) || Math.abs(y2Impact) < EPS) {
-    showError("Proxy VARX scaling failed because the 2Y impact response is unavailable or effectively zero.");
-    return;
-  }
-  const target = VAR_Y2_TARGET_BP / 100;
-  const scale = target / y2Impact;
-  const scaledIrfs = fit.irfs.map(row => row.map(v => finite(v) ? cleanZero(v * scale) : null));
-  renderVarPlot(settings, varData, fit, scaledIrfs, scale);
+  renderVarPlot(settings, varData, result);
 }
 
 function runSpec() {
@@ -2134,11 +2423,11 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
   Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
 }
 
-function renderVarPlot(settings, varData, fit, scaledIrfs, scale) {
+function renderVarPlot(settings, varData, result) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = seriesSpec(settings.shock).label;
   document.getElementById("chart-title").textContent = `Proxy VARX: ${shockLabel}`;
-  document.getElementById("chart-subtitle").textContent = `Monthly proxy VAR with controls, normalized to ${VAR_Y2_TARGET_BP}bp 2Y impact`;
+  document.getElementById("chart-subtitle").textContent = `${Math.round(VAR_BAND_LEVEL * 100)}% wild-bootstrap percentile band, normalized to ${fmtTarget(settings.varScaleTarget)}bp 2Y impact`;
 
   const traces = [];
   const annotations = [];
@@ -2157,7 +2446,7 @@ function renderVarPlot(settings, varData, fit, scaledIrfs, scale) {
   const yPadTop = 0.055;
   const colW = (1 - xGap) / 2;
   const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
-  const horizons = scaledIrfs.map((_, h) => h);
+  const horizons = result.scaled.map((_, h) => h);
 
   VAR_OUTCOME_ORDER.forEach((outcome, i) => {
     const col = i % 2;
@@ -2212,15 +2501,30 @@ function renderVarPlot(settings, varData, fit, scaledIrfs, scale) {
       xaxis: xRef,
       yaxis: yRef
     });
+    const bandX = horizons.concat(horizons.slice().reverse());
+    const bandY = result.hi.map(row => row[i]).concat(result.lo.map(row => row[i]).reverse());
+    traces.push({
+      x: bandX,
+      y: bandY,
+      type: "scatter",
+      mode: "lines",
+      fill: "toself",
+      fillcolor: "rgba(22, 124, 128, 0.16)",
+      line: {color: "rgba(22, 124, 128, 0)"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
     traces.push({
       x: horizons,
-      y: scaledIrfs.map(row => row[i]),
+      y: result.scaled.map(row => row[i]),
       type: "scatter",
       mode: "lines+markers",
       line: {color: "#167c80", width: 2.4},
       marker: {color: "#17201b", size: 4},
       hovertemplate: horizons.map((h, idx) =>
-        `${VAR_OUTCOMES[outcome].label}<br>h=${h}<br>response=${fmt(scaledIrfs[idx][i], 4)}<br>n=${fit.n}<extra></extra>`
+        `${VAR_OUTCOMES[outcome].label}<br>h=${h}<br>response=${fmt(result.scaled[idx][i], 4)}<br>${Math.round(VAR_BAND_LEVEL * 100)}% band=[${fmt(result.lo[idx][i], 4)}, ${fmt(result.hi[idx][i], 4)}]<br>n=${result.n}<extra></extra>`
       ),
       showlegend: false,
       xaxis: xRef,
@@ -2242,8 +2546,9 @@ function renderVarPlot(settings, varData, fit, scaledIrfs, scale) {
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">VARX proxy</span>`,
     `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
-    `<span class="pill">p=${fit.p}</span>`,
-    `<span class="pill">${VAR_Y2_TARGET_BP}bp 2Y impact</span>`,
+    `<span class="pill">p=${result.p}</span>`,
+    `<span class="pill">${fmtTarget(settings.varScaleTarget)}bp 2Y impact</span>`,
+    `<span class="pill">${result.validDraws}/${result.draws} bootstrap</span>`,
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${covidText}</span>`,
     `<span class="pill">${excludedYearsText}</span>`,
@@ -2254,14 +2559,15 @@ function renderVarPlot(settings, varData, fit, scaledIrfs, scale) {
     metric("Rows", varData.rows.length),
     metric("View", "Proxy VARX"),
     metric("Date range", `${minDate} to ${maxDate}`),
-    metric("VAR lags", fit.p),
+    metric("VAR lags", result.p),
     metric("Outcomes", "2Y, CPI, IP, EBP"),
     metric("Controls", varData.controlCount),
-    metric("First-stage controls", fit.firstStageControls),
-    metric("Proxy obs", fit.tM),
-    metric("Scale", `${VAR_Y2_TARGET_BP}bp 2Y impact`),
-    metric("Raw 2Y impact", fmt(fit.irfs[0][0], 4)),
-    metric("Scale factor", fmt(scale, 3)),
+    metric("First-stage controls", result.firstStageControls),
+    metric("Proxy obs", result.tM),
+    metric("Bootstrap", `${result.validDraws} of ${result.draws}`),
+    metric("Scale", `${fmtTarget(settings.varScaleTarget)}bp 2Y impact`),
+    metric("Raw 2Y impact", fmt(result.irfs[0][0], 4)),
+    metric("Scale factor", fmt(result.scale, 3)),
     metric("Max horizon", settings.horizon)
   ].join("");
 }
@@ -2457,6 +2763,12 @@ function showError(message) {
 }
 
 function renderOptions() {
+  activeViewMode = "irf";
+  document.querySelectorAll(".view-tab").forEach(el => {
+    const active = el.dataset.view === "irf";
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-selected", active ? "true" : "false");
+  });
   const shockSel = document.getElementById("shock");
   shockSel.innerHTML = Object.entries(allSeries())
     .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
@@ -2474,6 +2786,9 @@ function renderOptions() {
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
   configureScaleTarget(true);
+  document.getElementById("var-lags").value = 12;
+  document.getElementById("var-scale-bp").value = VAR_Y2_TARGET_BP;
+  document.getElementById("var-bootstrap-draws").value = VAR_BOOTSTRAP_DEFAULT;
   document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
   document.getElementById("include-covid").checked = DATA.meta.defaults.include_covid ?? false;
   const defaultExcludeYears = new Set(DATA.meta.defaults.exclude_lead_years || []);
@@ -2484,12 +2799,14 @@ function renderOptions() {
   document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
   document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
   renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
-  syncViewControls();
 
   renderControlChecks("controls-market", DATA.controls.market, "regular", "market");
   renderControlChecks("controls-greenbook", DATA.controls.greenbook, "regular", "greenbook");
   renderControlChecks("controls-fred-macro", DATA.controls.fred_macro, "macro", "fred_macro");
   syncBsControls();
+  syncViewControls();
+  VIEW_STATE.lp = capturePanelState();
+  VIEW_STATE.var = null;
   document.querySelectorAll(".control-check").forEach(el => el.addEventListener("change", runSpec));
 }
 
@@ -2567,15 +2884,7 @@ async function init() {
   document.getElementById("toggle-market-controls").addEventListener("change", event => setControlGroup("market", event.target.checked));
   document.getElementById("toggle-greenbook-controls").addEventListener("change", event => setControlGroup("greenbook", event.target.checked));
   document.querySelectorAll(".view-tab").forEach(button => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll(".view-tab").forEach(el => {
-        const active = el === button;
-        el.classList.toggle("active", active);
-        el.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      syncViewControls();
-      runSpec();
-    });
+    button.addEventListener("click", () => activateView(button.dataset.view));
   });
   document.getElementById("decomp-default-horizons").addEventListener("click", () => {
     setDecompHorizons(defaultDecompHorizons(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10))));
@@ -2607,7 +2916,7 @@ async function init() {
     renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
     runSpec();
   });
-  for (const id of ["included-years", "shock-lags", "whitening-lags", "dep-lags", "macro-lags", "scale-bp"]) {
+  for (const id of ["included-years", "shock-lags", "whitening-lags", "dep-lags", "macro-lags", "scale-bp", "var-lags", "var-scale-bp", "var-bootstrap-draws"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   if (window.lucide) window.lucide.createIcons();
