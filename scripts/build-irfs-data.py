@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import math
 import os
+import io
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -94,6 +96,7 @@ RAW_SHOCK_COLUMNS = [
 EVENT_SCALE_COLUMNS = ["ust2y"]
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
+GSW_YIELD_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
 VAR_CONTROL_MAP = {
     "NFP_SURP": "varctl_nfp_surp",
     "NFP_12M": "varctl_nfp_12m",
@@ -186,32 +189,80 @@ def add_target_ffr_change(macro: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_var_outcomes(macro: pd.DataFrame) -> pd.DataFrame:
+    macro = macro.copy()
     var_path = SOURCE_ROOT / "bs" / "gk" / "data" / "var_data2.csv"
-    if not var_path.exists():
-        return macro
-    var_data = pd.read_csv(var_path, encoding="utf-8-sig")
-    if "date" not in var_data.columns:
-        return macro
-    var_data["month"] = pd.to_datetime(var_data["date"], errors="coerce").dt.strftime("%Y-%m")
-    var_data = var_data.rename(
-        columns={
-            "y2": "var_y2",
-            "logcpi": "var_logcpi",
-            "logip": "var_logip",
-            "ebp": "var_ebp",
-            **VAR_CONTROL_MAP,
-        }
-    )
-    keep = [
-        "month",
-        *[col for col in VAR_OUTCOME_COLUMNS + VAR_CONTROL_COLUMNS if col in var_data.columns],
-    ]
-    if len(keep) == 1:
-        return macro
-    for col in keep:
-        if col != "month":
-            var_data[col] = pd.to_numeric(var_data[col], errors="coerce")
-    return macro.merge(var_data[keep], on="month", how="left")
+    if var_path.exists():
+        var_data = pd.read_csv(var_path, encoding="utf-8-sig")
+        if "date" in var_data.columns:
+            var_data["month"] = pd.to_datetime(var_data["date"], errors="coerce").dt.strftime("%Y-%m")
+            var_data = var_data.rename(
+                columns={
+                    "y2": "var_y2",
+                    "logcpi": "var_logcpi",
+                    "logip": "var_logip",
+                    "ebp": "var_ebp",
+                    **VAR_CONTROL_MAP,
+                }
+            )
+            keep = [
+                "month",
+                *[col for col in VAR_OUTCOME_COLUMNS + VAR_CONTROL_COLUMNS if col in var_data.columns],
+            ]
+            if len(keep) > 1:
+                for col in keep:
+                    if col != "month":
+                        var_data[col] = pd.to_numeric(var_data[col], errors="coerce")
+                macro = macro.merge(var_data[keep], on="month", how="left")
+
+    for source, dest in [("CPIAUCSL", "var_logcpi"), ("INDPRO", "var_logip")]:
+        if source in macro.columns:
+            vals = pd.to_numeric(macro[source], errors="coerce")
+            calc = 100 * np.log(vals.where(vals > 0))
+            macro[dest] = macro[dest].fillna(calc) if dest in macro.columns else calc
+    if "ebp" in macro.columns:
+        ebp = pd.to_numeric(macro["ebp"], errors="coerce")
+        macro["var_ebp"] = macro["var_ebp"].fillna(ebp) if "var_ebp" in macro.columns else ebp
+
+    y2 = read_monthly_sveny02()
+    if not y2.empty:
+        macro = macro.merge(y2, on="month", how="left")
+        macro["var_y2"] = macro["var_y2"].fillna(macro["sveny02"]) if "var_y2" in macro.columns else macro["sveny02"]
+        macro = macro.drop(columns=["sveny02"])
+    return macro
+
+
+def read_monthly_sveny02() -> pd.DataFrame:
+    local_path = SOURCE_ROOT / "bs" / "gk" / "data" / "feds200628.csv"
+    sources: list[str | Path] = [local_path, GSW_YIELD_URL]
+
+    for source in sources:
+        try:
+            if isinstance(source, Path):
+                if not source.exists():
+                    continue
+                text = source.read_text(encoding="utf-8-sig")
+            else:
+                request = urllib.request.Request(source, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    text = response.read().decode("utf-8-sig")
+            lines = text.splitlines()
+            header_idx = next(i for i, line in enumerate(lines) if line.startswith("Date,"))
+            raw = pd.read_csv(io.StringIO("\n".join(lines[header_idx:])), na_values=["NA"])
+            if not {"Date", "SVENY02"}.issubset(raw.columns):
+                continue
+            raw["date"] = pd.to_datetime(raw["Date"], errors="coerce")
+            raw["sveny02"] = pd.to_numeric(raw["SVENY02"], errors="coerce")
+            raw = raw.dropna(subset=["date", "sveny02"])
+            if raw.empty:
+                continue
+            monthly = raw.set_index("date")[["sveny02"]].resample("ME").mean()
+            monthly.index = monthly.index.to_period("M").to_timestamp()
+            monthly = monthly.reset_index().rename(columns={"date": "daten"})
+            monthly["month"] = monthly["daten"].dt.strftime("%Y-%m")
+            return monthly[["month", "sveny02"]]
+        except Exception:
+            continue
+    return pd.DataFrame(columns=["month", "sveny02"])
 
 
 def read_external_shocks() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -418,6 +469,7 @@ def main() -> None:
                 "test/mondat.dta",
                 "codex/dff_fedfunds_tffr_monthly.csv",
                 "bs/gk/data/var_data2.csv",
+                "bs/gk/data/feds200628.csv",
                 "test/intermediates/GBFOMCmapping.csv",
                 "test/intermediates/gbweb_row_format.xlsx",
                 "BJMW-BRW-shocks-updated-1.xlsx",

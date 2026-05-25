@@ -656,7 +656,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=var-lp-proxies-20260525";
+const DATA_URL = "irfs-data.json?v=var-years-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -1157,7 +1157,7 @@ function defaultVarState() {
   return {
     shock: allSeries().mps ? "mps" : document.getElementById("shock").value,
     aggregation: "month-sum",
-    includedYears: "1988-2019",
+    includedYears: "1988-2025",
     includeZlb: true,
     includeCovid: false,
     excludeYears: [],
