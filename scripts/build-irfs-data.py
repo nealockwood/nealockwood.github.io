@@ -19,6 +19,7 @@ import io
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -111,6 +112,12 @@ EVENT_VALUE_COLUMNS = list(dict.fromkeys(EVENT_SCALE_COLUMNS + EVENT_RESPONSE_CO
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
 GSW_YIELD_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
+FRED_GRAPH_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+ECO3MIN_DTB3_URL = "https://eco3min.fr/dataset/us-3m-treasury-bill.csv"
+NYFED_ALL_RATES_URL = (
+    "https://markets.newyorkfed.org/api/rates/all/search.json"
+    "?startDate={start_date}&endDate={end_date}&type=EFFR"
+)
 VAR_CONTROL_MAP = {
     "NFP_SURP": "varctl_nfp_surp",
     "NFP_12M": "varctl_nfp_12m",
@@ -129,6 +136,38 @@ OUTCOMES = {
     "ffr": {"label": "Federal Funds Rate", "source": "ffr", "transform": "diff"},
     "ebp": {"label": "Excess Bond Premium", "source": "ebp", "transform": "diff"},
 }
+
+RATE_OUTCOMES = {
+    "ffr": {
+        "label": "Federal Funds Rate",
+        "panel_label": "FFR",
+        "source": "rate_ffr",
+        "transform": "diff",
+        "frequency": "daily-window",
+    },
+    "tb3m": {
+        "label": "3-Month Treasury",
+        "panel_label": "3M",
+        "source": "rate_3m",
+        "transform": "diff",
+        "frequency": "daily-window",
+    },
+    "gsw1y": {
+        "label": "1-Year Treasury",
+        "panel_label": "1Y",
+        "source": "rate_1y",
+        "transform": "diff",
+        "frequency": "daily-window",
+    },
+    "gsw2y": {
+        "label": "2-Year Treasury",
+        "panel_label": "2Y",
+        "source": "rate_2y",
+        "transform": "diff",
+        "frequency": "daily-window",
+    },
+}
+RATE_COLUMNS = [spec["source"] for spec in RATE_OUTCOMES.values()]
 
 
 def value(x):
@@ -245,9 +284,9 @@ def add_var_outcomes(macro: pd.DataFrame) -> pd.DataFrame:
     return macro
 
 
-def read_monthly_sveny02() -> pd.DataFrame:
+def read_gsw_yields() -> pd.DataFrame:
     local_path = SOURCE_ROOT / "bs" / "gk" / "data" / "feds200628.csv"
-    sources: list[str | Path] = [local_path, GSW_YIELD_URL]
+    sources: list[str | Path] = [GSW_YIELD_URL, local_path]
 
     for source in sources:
         try:
@@ -262,21 +301,139 @@ def read_monthly_sveny02() -> pd.DataFrame:
             lines = text.splitlines()
             header_idx = next(i for i, line in enumerate(lines) if line.startswith("Date,"))
             raw = pd.read_csv(io.StringIO("\n".join(lines[header_idx:])), na_values=["NA"])
-            if not {"Date", "SVENY02"}.issubset(raw.columns):
+            if not {"Date", "SVENY01", "SVENY02"}.issubset(raw.columns):
                 continue
             raw["date"] = pd.to_datetime(raw["Date"], errors="coerce")
-            raw["sveny02"] = pd.to_numeric(raw["SVENY02"], errors="coerce")
-            raw = raw.dropna(subset=["date", "sveny02"])
+            raw["rate_1y"] = pd.to_numeric(raw["SVENY01"], errors="coerce")
+            raw["rate_2y"] = pd.to_numeric(raw["SVENY02"], errors="coerce")
+            raw = raw.dropna(subset=["date"])
             if raw.empty:
                 continue
-            monthly = raw.set_index("date")[["sveny02"]].resample("ME").mean()
-            monthly.index = monthly.index.to_period("M").to_timestamp()
-            monthly = monthly.reset_index().rename(columns={"date": "daten"})
-            monthly["month"] = monthly["daten"].dt.strftime("%Y-%m")
-            return monthly[["month", "sveny02"]]
+            return raw[["date", "rate_1y", "rate_2y"]].sort_values("date")
         except Exception:
             continue
-    return pd.DataFrame(columns=["month", "sveny02"])
+    return pd.DataFrame(columns=["date", "rate_1y", "rate_2y"])
+
+
+def read_monthly_sveny02() -> pd.DataFrame:
+    raw = read_gsw_yields()
+    if raw.empty:
+        return pd.DataFrame(columns=["month", "sveny02"])
+    monthly = raw.set_index("date")[["rate_2y"]].resample("ME").mean()
+    monthly.index = monthly.index.to_period("M").to_timestamp()
+    monthly = monthly.reset_index().rename(columns={"date": "daten", "rate_2y": "sveny02"})
+    monthly["month"] = monthly["daten"].dt.strftime("%Y-%m")
+    return monthly[["month", "sveny02"]]
+
+
+def read_fred_daily(series_id: str, out_col: str) -> pd.DataFrame:
+    request = urllib.request.Request(
+        FRED_GRAPH_URL.format(series_id=series_id),
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    with urllib.request.urlopen(request, timeout=12) as response:
+        text = response.read().decode("utf-8-sig")
+    raw = pd.read_csv(io.StringIO(text), na_values=[".", "NA"])
+    if "observation_date" in raw.columns:
+        raw = raw.rename(columns={"observation_date": "date"})
+    if series_id not in raw.columns or "date" not in raw.columns:
+        raise ValueError(f"FRED series {series_id} did not contain expected columns")
+    raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+    raw[out_col] = pd.to_numeric(raw[series_id], errors="coerce")
+    return raw[["date", out_col]].dropna(subset=["date"]).sort_values("date")
+
+
+def read_local_daily_ffr() -> pd.DataFrame:
+    local_path = SOURCE_ROOT / "test" / "intermediates" / "FFRfred.dta"
+    if not local_path.exists():
+        return pd.DataFrame(columns=["date", "rate_ffr"])
+    raw, _ = pyreadstat.read_dta(local_path)
+    if "fomc" not in raw.columns or "FFR" not in raw.columns:
+        return pd.DataFrame(columns=["date", "rate_ffr"])
+    raw["date"] = pd.to_datetime(raw["fomc"], errors="coerce")
+    raw["rate_ffr"] = pd.to_numeric(raw["FFR"], errors="coerce")
+    return raw[["date", "rate_ffr"]].dropna(subset=["date"]).sort_values("date")
+
+
+def read_nyfed_effr(start_date: str = "2016-03-01") -> pd.DataFrame:
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    request = urllib.request.Request(
+        NYFED_ALL_RATES_URL.format(start_date=start_date, end_date=end_date),
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    with urllib.request.urlopen(request, timeout=25) as response:
+        payload = json.loads(response.read().decode("utf-8-sig"))
+    rows = [row for row in payload.get("refRates", []) if row.get("type") == "EFFR"]
+    if not rows:
+        return pd.DataFrame(columns=["date", "rate_ffr"])
+    raw = pd.DataFrame(rows)
+    raw["date"] = pd.to_datetime(raw["effectiveDate"], errors="coerce")
+    raw["rate_ffr"] = pd.to_numeric(raw["percentRate"], errors="coerce")
+    return raw[["date", "rate_ffr"]].dropna(subset=["date"]).sort_values("date")
+
+
+def read_combined_daily_ffr() -> pd.DataFrame:
+    sources = [read_local_daily_ffr()]
+    try:
+        sources.append(read_nyfed_effr())
+    except Exception:
+        pass
+    out = pd.concat([source for source in sources if not source.empty], ignore_index=True)
+    if out.empty:
+        return pd.DataFrame(columns=["date", "rate_ffr"])
+    return out.sort_values("date").drop_duplicates(subset=["date"], keep="last")
+
+
+def read_eco3min_dtb3() -> pd.DataFrame:
+    request = urllib.request.Request(ECO3MIN_DTB3_URL, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        text = response.read().decode("utf-8-sig")
+    raw = pd.read_csv(io.StringIO(text), na_values=[".", "NA"])
+    if "date" not in raw.columns:
+        return pd.DataFrame(columns=["date", "rate_3m"])
+    value_col = "yield_3m" if "yield_3m" in raw.columns else raw.columns[-1]
+    raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+    raw["rate_3m"] = pd.to_numeric(raw[value_col], errors="coerce")
+    return raw[["date", "rate_3m"]].dropna(subset=["date"]).sort_values("date")
+
+
+def first_available_daily(readers: list[tuple[str, Callable[[], pd.DataFrame]]]) -> tuple[pd.DataFrame, str]:
+    errors = []
+    for name, reader in readers:
+        try:
+            data = reader()
+            if not data.empty:
+                return data, name
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+    raise RuntimeError("No daily source available; " + "; ".join(errors))
+
+
+def read_daily_rates() -> tuple[pd.DataFrame, dict[str, str]]:
+    ffr, ffr_source = first_available_daily(
+        [
+            ("FRED DFF", lambda: read_fred_daily("DFF", "rate_ffr")),
+            ("test/intermediates/FFRfred.dta + NY Fed EFFR", read_combined_daily_ffr),
+        ]
+    )
+    three_month, three_month_source = first_available_daily(
+        [
+            ("FRED DGS3MO", lambda: read_fred_daily("DGS3MO", "rate_3m")),
+            ("Eco3min mirror of FRED DTB3", read_eco3min_dtb3),
+        ]
+    )
+    gsw = read_gsw_yields()
+    if gsw.empty:
+        raise RuntimeError("No GSW daily yield data available")
+    out = ffr.merge(three_month, on="date", how="outer").merge(gsw, on="date", how="outer")
+    out = out.sort_values("date")
+    sources = {
+        "rate_ffr": ffr_source,
+        "rate_3m": three_month_source,
+        "rate_1y": "Federal Reserve GSW feds200628 SVENY01",
+        "rate_2y": "Federal Reserve GSW feds200628 SVENY02",
+    }
+    return out, sources
 
 
 def read_external_shocks() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -470,11 +627,24 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
     return rows
 
 
+def daily_rate_rows(daily_rates: pd.DataFrame) -> list[dict]:
+    rows = []
+    for _, row in daily_rates.sort_values("date").iterrows():
+        rec = {"date": date_key(row["date"])}
+        for col in RATE_COLUMNS:
+            if col in row:
+                rec[col] = value(row[col])
+        if any(isinstance(rec.get(col), (int, float)) for col in RATE_COLUMNS):
+            rows.append(rec)
+    return rows
+
+
 def main() -> None:
     if not SOURCE_ROOT.exists():
         raise SystemExit(f"Source repo not found: {SOURCE_ROOT}")
 
     macro = read_macro()
+    daily_rates, daily_rate_sources = read_daily_rates()
     events = prep_events(macro)
     payload = {
         "meta": {
@@ -489,10 +659,15 @@ def main() -> None:
                 "test/intermediates/gbweb_row_format.xlsx",
                 "BJMW-BRW-shocks-updated-1.xlsx",
                 "BJMW-2025-monetary-policy-shocks-series.xlsx",
+                "FRED DFF or test/intermediates/FFRfred.dta + NY Fed EFFR",
+                "FRED DGS3MO or Eco3min mirror of FRED DTB3",
+                "Federal Reserve GSW feds200628 SVENY01/SVENY02",
             ],
+            "daily_rate_sources": daily_rate_sources,
             "defaults": {
                 "series": "mp1",
                 "shock": "mp1",
+                "rate_outcome": "ffr",
                 "horizon": 24,
                 "shock_lags": 8,
                 "use_whitening": False,
@@ -513,6 +688,7 @@ def main() -> None:
                 "ci": 0.9,
             },
         },
+        "rate_outcomes": RATE_OUTCOMES,
         "series": {
             "mp1": {"label": "MP1", "source": "prep.csv"},
             "ff4": {"label": "FF4", "source": "prep.csv"},
@@ -534,6 +710,7 @@ def main() -> None:
             "fred_macro": FRED_MACRO_CONTROLS,
             "bs_mandatory": MARKET_CONTROLS,
         },
+        "daily_rates": daily_rate_rows(daily_rates),
         "macro": macro_rows(macro, events),
         "events": events,
     }

@@ -628,6 +628,10 @@
           <input id="dep-lags" type="number" min="0" max="60" step="1" value="12">
         </div>
       </div>
+      <div class="lp-control" style="margin-top: 10px;">
+        <label for="rate-outcome">Interest-rate outcome</label>
+        <select id="rate-outcome"></select>
+      </div>
       <div class="lp-control" style="margin-top: 9px;">
         <label class="check-row"><input id="lp-log-levels" type="checkbox"><span>Use log levels</span></label>
         <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
@@ -651,7 +655,7 @@
         <label for="scale-mode">Scale mode</label>
         <select id="scale-mode">
           <option value="ust2y-impact">UST2Y impact</option>
-          <option value="ffr-h0">FFR h=0</option>
+          <option value="ffr-h0">Rate h=0</option>
           <option value="shock-rmse">Series residual SD</option>
           <option value="none">None</option>
         </select>
@@ -756,7 +760,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=ffr-ebp-toggle-20260525";
+const DATA_URL = "irfs-data.json?v=rate-outcome-windows-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -765,6 +769,8 @@ let DATA = null;
 let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
+let dailyRateOrdinals = [];
+let dailyRatePrefix = {};
 let activeViewMode = "irf";
 let tableOutcomeLagSelection = [];
 const VIEW_STATE = {lp: null, var: null};
@@ -889,6 +895,29 @@ function outcomeLabel(key) {
   return PANEL_LABELS[key] || DATA?.outcomes?.[key]?.label || key;
 }
 
+function rateOutcomeKey(settings = {}) {
+  return settings.rateOutcome || DATA?.meta?.defaults?.rate_outcome || "ffr";
+}
+
+function rateOutcomeSpec(settings = {}) {
+  const key = rateOutcomeKey(settings);
+  return DATA?.rate_outcomes?.[key] || DATA?.rate_outcomes?.ffr || DATA?.outcomes?.ffr || {};
+}
+
+function rateOutcomeLabel(settings = {}) {
+  const spec = rateOutcomeSpec(settings);
+  return spec.panel_label || spec.label || "Rate";
+}
+
+function panelOutcomeLabel(key, settings = {}) {
+  if (key === "ffr") return rateOutcomeLabel(settings);
+  return PANEL_LABELS[key] || DATA?.outcomes?.[key]?.label || key;
+}
+
+function isRateOutcome(key) {
+  return !!DATA?.rate_outcomes?.[key];
+}
+
 function truthyFlag(v) {
   return v === 1 || v === true || v === "1";
 }
@@ -935,7 +964,101 @@ function monthValue(month, source) {
   return row[source];
 }
 
+function dateOrdinal(date) {
+  if (!date || date.length < 10) return null;
+  const y = Number.parseInt(date.slice(0, 4), 10);
+  const m = Number.parseInt(date.slice(5, 7), 10);
+  const d = Number.parseInt(date.slice(8, 10), 10);
+  if (![y, m, d].every(Number.isFinite)) return null;
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function lowerBound(arr, target) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function upperBound(arr, target) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function dailyRangeTouchesSuppressedMonths(startOrd, endOrd, settings) {
+  if (endOrd < startOrd) return false;
+  let dt = new Date(startOrd * 86400000);
+  dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
+  const end = new Date(endOrd * 86400000);
+  while (dt <= end) {
+    const month = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+    if (isSuppressedLeadMonth(month, settings)) return true;
+    dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1));
+  }
+  return false;
+}
+
+function dailyRateAverage(rateKey, startOrd, endOrd, settings = {}, suppressLeadWindow = true) {
+  const prefix = dailyRatePrefix[rateKey];
+  if (!prefix || !dailyRateOrdinals.length || !Number.isFinite(startOrd) || !Number.isFinite(endOrd)) return null;
+  if (suppressLeadWindow && dailyRangeTouchesSuppressedMonths(startOrd, endOrd, settings)) return null;
+  const i = lowerBound(dailyRateOrdinals, startOrd);
+  const j = upperBound(dailyRateOrdinals, endOrd);
+  if (j <= i) return null;
+  const count = prefix.count[j] - prefix.count[i];
+  if (count <= 0) return null;
+  return (prefix.sum[j] - prefix.sum[i]) / count;
+}
+
+function buildDailyRatePrefixes() {
+  const rows = (DATA.daily_rates || [])
+    .map(row => ({...row, _ord: dateOrdinal(row.date)}))
+    .filter(row => Number.isFinite(row._ord))
+    .sort((a, b) => a._ord - b._ord);
+  dailyRateOrdinals = rows.map(row => row._ord);
+  dailyRatePrefix = {};
+  const rateSources = Object.values(DATA.rate_outcomes || {}).map(spec => spec.source);
+  for (const source of rateSources) {
+    const sum = [0];
+    const count = [0];
+    for (const row of rows) {
+      const v = row[source];
+      sum.push(sum[sum.length - 1] + (finite(v) ? v : 0));
+      count.push(count[count.length - 1] + (finite(v) ? 1 : 0));
+    }
+    dailyRatePrefix[source] = {sum, count};
+  }
+}
+
+function rateBaseOrdinal(baseMonth, row = null) {
+  if (row && Number.isFinite(row._rateBaseOrdinal)) return row._rateBaseOrdinal;
+  const monthRow = macroByMonth.get(baseMonth);
+  const baseDate = monthRow?.date || `${baseMonth}-01`;
+  const ord = dateOrdinal(baseDate);
+  return Number.isFinite(ord) ? ord - 1 : null;
+}
+
+function rateWindowLevel(outcomeKey, baseMonth, windowIndex, settings = {}, row = null, suppressLeadWindow = true) {
+  const source = DATA.rate_outcomes?.[outcomeKey]?.source;
+  const anchor = rateBaseOrdinal(baseMonth, row);
+  if (!source || !Number.isFinite(anchor)) return null;
+  const start = anchor + windowIndex * 30 + 1;
+  const end = anchor + (windowIndex + 1) * 30;
+  return dailyRateAverage(source, start, end, settings, suppressLeadWindow);
+}
+
 function transformedOutcomeLevel(outcomeKey, month) {
+  if (isRateOutcome(outcomeKey)) return null;
   const spec = DATA.outcomes[outcomeKey];
   const raw = monthValue(month, spec.source);
   if (!finite(raw)) return null;
@@ -973,7 +1096,14 @@ function macroLagValue(controlKey, baseMonth, lag) {
   return monthValue(months[idx], controlKey);
 }
 
-function responseValue(outcomeKey, baseMonth, h, settings = {}) {
+function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
+  if (isRateOutcome(outcomeKey)) {
+    const lead = rateWindowLevel(outcomeKey, baseMonth, h, settings, row);
+    if (!finite(lead)) return null;
+    if (settings.lpLogLevels) return lead;
+    const prev = rateWindowLevel(outcomeKey, baseMonth, -1, settings, row, false);
+    return finite(prev) ? lead - prev : null;
+  }
   const spec = DATA.outcomes[outcomeKey];
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
@@ -995,7 +1125,14 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}) {
   return lead - prev;
 }
 
-function dependentDelta(outcomeKey, baseMonth, lag, settings = {}) {
+function dependentDelta(outcomeKey, baseMonth, lag, settings = {}, row = null) {
+  if (isRateOutcome(outcomeKey)) {
+    const cur = rateWindowLevel(outcomeKey, baseMonth, -lag, settings, row, false);
+    if (!finite(cur)) return null;
+    if (settings.lpLogLevels) return cur;
+    const prev = rateWindowLevel(outcomeKey, baseMonth, -lag - 1, settings, row, false);
+    return finite(prev) ? cur - prev : null;
+  }
   const spec = DATA.outcomes[outcomeKey];
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
@@ -1026,8 +1163,9 @@ function scaleTargetConfig(mode) {
     };
   }
   if (mode === "ffr-h0") {
+    const label = rateOutcomeLabel({rateOutcome: document.getElementById("rate-outcome")?.value});
     return {
-      label: "FFR h=0 target",
+      label: `${label} h=0 target`,
       unit: "basis points",
       value: DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp ?? 50,
       min: 0.01,
@@ -1271,6 +1409,7 @@ function capturePanelState() {
     excludeYears: Array.from(document.querySelectorAll(".exclude-year-check:checked:not(:disabled)")).map(el => el.value),
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
+    rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: document.getElementById("shock-lags").value,
     depLags: document.getElementById("dep-lags").value,
     lpLogLevels: document.getElementById("lp-log-levels").checked,
@@ -1303,6 +1442,11 @@ function applyPanelState(state) {
   });
   document.getElementById("exclude-unscheduled").checked = !!state.excludeUnscheduled;
   document.getElementById("impute-zeros").checked = !!state.imputeZeros;
+  if (state.rateOutcome && DATA.rate_outcomes?.[state.rateOutcome]) {
+    document.getElementById("rate-outcome").value = state.rateOutcome;
+  } else {
+    document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
+  }
   document.getElementById("shock-lags").value = state.shockLags ?? (DATA.meta.defaults.shock_lags ?? 8);
   document.getElementById("dep-lags").value = state.depLags ?? 12;
   document.getElementById("lp-log-levels").checked = !!state.lpLogLevels;
@@ -1343,6 +1487,7 @@ function defaultVarState() {
     excludeYears: [],
     excludeUnscheduled: false,
     imputeZeros: false,
+    rateOutcome: DATA.meta.defaults.rate_outcome ?? "ffr",
     shockLags: 0,
     depLags: 0,
     lpLogLevels: false,
@@ -1408,6 +1553,7 @@ function getSettings() {
     includedYearRules: includedYears.rules,
     includedYearsDisplay: includedYears.display || "all",
     includedYearsError: includedYears.error,
+    rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
     lpLogLevels: document.getElementById("lp-log-levels").checked,
@@ -1447,6 +1593,7 @@ function aggregateMonth(items, mode, shockKey) {
   rec.source = "aggregated";
   rec.date = base.date;
   rec.month = base.month;
+  rec.first_obs_date = sorted[0].date;
   if (mode === "month-sum") {
     rec[shockKey] = sumFiniteRows(sorted, shockKey);
     for (const key of MONTH_SUM_SCALE_COLUMNS) {
@@ -1503,6 +1650,25 @@ function sortAnalysisRows(rows) {
   });
 }
 
+function assignRateBaseDates(rows) {
+  const firstByMonth = new Map();
+  for (const row of rows.slice().sort((a, b) => {
+    const ad = a.first_obs_date || a.date;
+    const bd = b.first_obs_date || b.date;
+    return ad.localeCompare(bd);
+  })) {
+    if (!row.month) continue;
+    const first = row.first_obs_date || row.date;
+    if (first && !firstByMonth.has(row.month)) firstByMonth.set(row.month, first);
+  }
+  for (const row of rows) {
+    const first = firstByMonth.get(row.month) || row.first_obs_date || row.date;
+    const ord = dateOrdinal(first);
+    row._rateBaseOrdinal = Number.isFinite(ord) ? ord - 1 : null;
+  }
+  return rows;
+}
+
 function attachSeriesHistory(rows, settings, shockKey) {
   const history = [];
   for (const row of rows) {
@@ -1521,7 +1687,8 @@ function buildMonthlySeriesRows(settings, shockKey) {
   const rows = DATA.macro
     .filter(row => finite(seriesValue(row, shockKey)))
     .map(row => ({...row, source: "monthly-series"}));
-  attachSeriesHistory(sortAnalysisRows(rows), settings, shockKey);
+  assignRateBaseDates(sortAnalysisRows(rows));
+  attachSeriesHistory(rows, settings, shockKey);
   return rows.filter(row => rowPassesYearFilter(row, settings));
 }
 
@@ -1544,6 +1711,9 @@ function buildAnalysisRows(settings, shockKey) {
       .map(m => {
         const items = grouped.get(m.month) || [];
         const rec = {date: m.date, month: m.month, source: items.length ? "event-month" : "imputed"};
+        if (items.length) {
+          rec.first_obs_date = items.slice().sort((a, b) => a.date.localeCompare(b.date))[0].date;
+        }
         let total = 0;
         let found = false;
         for (const item of items) {
@@ -1575,7 +1745,8 @@ function buildAnalysisRows(settings, shockKey) {
     rows = supportRows;
   }
 
-  attachSeriesHistory(sortAnalysisRows(rows), settings, shockKey);
+  assignRateBaseDates(sortAnalysisRows(rows));
+  attachSeriesHistory(rows, settings, shockKey);
   return rows.filter(row => rowPassesYearFilter(row, settings));
 }
 
@@ -1593,7 +1764,7 @@ function buildUsedControls(settings, row, outcomeKey, options = {}) {
 
   for (const lagOutcome of outcomeLagKeys) {
     for (let i = 1; i <= settings.depLags; i++) {
-      const v = dependentDelta(lagOutcome, row.month, i, settings);
+      const v = dependentDelta(lagOutcome, row.month, i, settings, row);
       if (!finite(v)) return null;
       zi.push(v);
     }
@@ -1622,7 +1793,7 @@ function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
   const rowDates = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
-    const yi = responseValue(outcomeKey, row.month, h, settings);
+    const yi = responseValue(outcomeKey, row.month, h, settings, row);
     if (!finite(yi) || !finite(row._x)) continue;
 
     const zi = buildUsedControls(settings, row, outcomeKey, options);
@@ -1659,7 +1830,7 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     if (!finite(row._x)) continue;
-    if (!finite(responseValue(outcomeKey, row.month, 0, settings))) continue;
+    if (!finite(responseValue(outcomeKey, row.month, 0, settings, row))) continue;
     const ust2y = sourceValue(row, "ust2y");
     if (!finite(ust2y)) continue;
 
@@ -1687,7 +1858,7 @@ function buildSeriesOnlyControls(settings, row, options = {}) {
 
   for (const lagOutcome of outcomeLagKeys) {
     for (let i = 1; i <= settings.depLags; i++) {
-      const v = dependentDelta(lagOutcome, row.month, i, settings);
+      const v = dependentDelta(lagOutcome, row.month, i, settings, row);
       if (!finite(v)) return null;
       zi.push(v);
     }
@@ -2381,7 +2552,7 @@ function buildDecompLine(settings, rows, outcomeKey, h, scale) {
   };
 }
 
-function decompPlotLine(line, outcomeKey) {
+function decompPlotLine(line, label) {
   const dates = [];
   const values = [];
   const hover = [];
@@ -2389,7 +2560,7 @@ function decompPlotLine(line, outcomeKey) {
     dates.push(line.dates[i]);
     values.push(line.values[i]);
     hover.push(
-      `${DATA.outcomes[outcomeKey].label}<br>${line.dates[i]}<br>h=${line.h}<br>contribution=${fmt(line.values[i], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
+      `${label}<br>${line.dates[i]}<br>h=${line.h}<br>contribution=${fmt(line.values[i], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
     );
   }
   return {dates, values, hover};
@@ -2517,23 +2688,25 @@ function runSpec() {
   }
 
   const maxH = Math.max(settings.horizon, 1);
+  const rateKey = rateOutcomeKey(settings);
+  const rateLabel = rateOutcomeLabel(settings);
   let scaleDisplay = "1.000";
-  let ffrH0Display = "NA";
+  let rateH0Display = "NA";
   const rawByOutcome = {};
   for (const outcome of NON_FFR_OUTCOMES) {
     rawByOutcome[outcome] = runOutcome(settings, rows, outcome, maxH);
   }
-  const rawFfrByLag = {};
+  const rawRateByLag = {};
   for (const outcome of NON_FFR_OUTCOMES) {
-    rawFfrByLag[outcome] = runOutcome(settings, rows, "ffr", maxH, {outcomeLagKeys: [outcome]});
+    rawRateByLag[outcome] = runOutcome(settings, rows, rateKey, maxH, {outcomeLagKeys: [outcome]});
   }
-  const ffrH0Values = NON_FFR_OUTCOMES
-    .map(outcome => rawFfrByLag[outcome][0]?.beta)
+  const rateH0Values = NON_FFR_OUTCOMES
+    .map(outcome => rawRateByLag[outcome][0]?.beta)
     .filter(finite);
-  if (ffrH0Values.length) {
-    const minH0 = Math.min(...ffrH0Values);
-    const maxH0 = Math.max(...ffrH0Values);
-    ffrH0Display = Math.abs(maxH0 - minH0) < 1e-8
+  if (rateH0Values.length) {
+    const minH0 = Math.min(...rateH0Values);
+    const maxH0 = Math.max(...rateH0Values);
+    rateH0Display = Math.abs(maxH0 - minH0) < 1e-8
       ? fmt(minH0, 4)
       : `${fmt(minH0, 4)}-${fmt(maxH0, 4)}`;
   }
@@ -2569,20 +2742,20 @@ function runSpec() {
     const target = settings.scaleTarget / 100;
     const h0s = [];
     for (const outcome of NON_FFR_OUTCOMES) {
-      const ffrH0 = rawFfrByLag[outcome][0]?.beta;
-      if (!finite(ffrH0) || Math.abs(ffrH0) < EPS) {
-        showError(`Scaling failed because the FFR h=0 coefficient for the ${outcomeLabel(outcome)} lag set is unavailable or effectively zero.`);
+      const rateH0 = rawRateByLag[outcome][0]?.beta;
+      if (!finite(rateH0) || Math.abs(rateH0) < EPS) {
+        showError(`Scaling failed because the ${rateLabel} h=0 coefficient for the ${outcomeLabel(outcome)} lag set is unavailable or effectively zero.`);
         return;
       }
-      scaleByOutcome[outcome] = target / ffrH0;
-      h0s.push(ffrH0);
+      scaleByOutcome[outcome] = target / rateH0;
+      h0s.push(rateH0);
     }
     const minH0 = Math.min(...h0s);
     const maxH0 = Math.max(...h0s);
     const h0Display = Math.abs(maxH0 - minH0) < 1e-8
       ? fmt(minH0, 4)
       : `${fmt(minH0, 4)}-${fmt(maxH0, 4)}`;
-    scaleDisplay = `${fmtTarget(settings.scaleTarget)}bp FFR; h0 ${h0Display}`;
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)}bp ${rateLabel}; h0 ${h0Display}`;
   } else if (settings.scaleMode === "shock-rmse") {
     const rmseByOutcome = [];
     for (const outcome of NON_FFR_OUTCOMES) {
@@ -2625,7 +2798,7 @@ function runSpec() {
   }
   resultsByOutcome.ffrVariants = Object.fromEntries(NON_FFR_OUTCOMES.map(outcome => {
     const scale = scaleByOutcome[outcome] ?? 1;
-    return [outcome, rawFfrByLag[outcome].slice(0, settings.horizon + 1).map(r => {
+    return [outcome, rawRateByLag[outcome].slice(0, settings.horizon + 1).map(r => {
       const mid = finite(r.beta) ? r.beta * scale : null;
       return {
         ...r,
@@ -2636,7 +2809,7 @@ function runSpec() {
   }));
   const primaryFfrLagOutcome = "ebp";
   const primaryFfrScale = scaleByOutcome[primaryFfrLagOutcome] ?? 1;
-  resultsByOutcome.ffrPrimary = rawFfrByLag[primaryFfrLagOutcome].slice(0, settings.horizon + 1).map(r => {
+  resultsByOutcome.ffrPrimary = rawRateByLag[primaryFfrLagOutcome].slice(0, settings.horizon + 1).map(r => {
     const mid = finite(r.beta) ? r.beta * primaryFfrScale : null;
     const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * primaryFfrScale : null;
     const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * primaryFfrScale : null;
@@ -2648,7 +2821,7 @@ function runSpec() {
       lagOutcome: primaryFfrLagOutcome
     };
   });
-  render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0Display, unscheduledSupportRows);
+  render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, rateH0Display, unscheduledSupportRows);
 }
 
 function axisRef(i, axis) {
@@ -2718,7 +2891,7 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
       automargin: true
     };
     annotations.push({
-      text: `<b>${PANEL_LABELS[outcome] || DATA.outcomes[outcome].label}</b>`,
+      text: `<b>${panelOutcomeLabel(outcome, settings)}</b>`,
       x: (xDomain[0] + xDomain[1]) / 2,
       y: yDomain[1] + 0.035,
       xref: "paper",
@@ -2739,11 +2912,12 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
       yaxis: yRef
     });
 
-    const scale = scaleByOutcome[outcome] ?? 1;
+    const plotOutcome = outcome === "ffr" ? rateOutcomeKey(settings) : outcome;
+    const scale = outcome === "ffr" ? (scaleByOutcome.ebp ?? 1) : (scaleByOutcome[outcome] ?? 1);
     horizons.forEach((h, hIndex) => {
-      const line = buildDecompLine(settings, rows, outcome, h, scale);
+      const line = buildDecompLine(settings, rows, plotOutcome, h, scale);
       if (!line || !line.dates.length) return;
-      const plotLine = decompPlotLine(line, outcome);
+      const plotLine = decompPlotLine(line, panelOutcomeLabel(outcome, settings));
       const color = DECOMP_COLORS[hIndex % DECOMP_COLORS.length];
       const showLegend = !legendShown.has(h);
       if (showLegend) legendShown.add(h);
@@ -2966,15 +3140,15 @@ function renderMarketResponseTable(settings, tableRows) {
   el.classList.remove("hidden");
 }
 
-function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0Display, unscheduledSupportRows) {
+function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, rateH0Display, unscheduledSupportRows) {
   document.getElementById("error").classList.add("hidden");
   const shockLabel = seriesSpec(settings.shock).label;
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = settings.viewMode === "decomp"
     ? "Cumulative FWL contributions by selected horizon"
     : (settings.showTreatmentPaths
-      ? "90% HC1 robust confidence bands; FFR shows treatment paths by outcome-lag set without bands"
-      : "90% HC1 robust confidence bands; FFR uses EBP outcome lags");
+      ? `90% HC1 robust confidence bands; ${rateOutcomeLabel(settings)} shows treatment paths by outcome-lag set without bands`
+      : `90% HC1 robust confidence bands; ${rateOutcomeLabel(settings)} uses EBP outcome lags`);
 
   if (settings.viewMode === "decomp") {
     renderDecompPlot(settings, rows, scaleByOutcome);
@@ -3030,7 +3204,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
       automargin: true
     };
     annotations.push({
-      text: `<b>${PANEL_LABELS[outcome] || DATA.outcomes[outcome].label}</b>`,
+      text: `<b>${panelOutcomeLabel(outcome, settings)}</b>`,
       x: (xDomain[0] + xDomain[1]) / 2,
       y: yDomain[1] + 0.035,
       xref: "paper",
@@ -3075,7 +3249,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
           name: `${PANEL_LABELS[lagOutcome] || DATA.outcomes[lagOutcome].label} lags`,
           showlegend: true,
           hovertemplate: valid.map(r =>
-            `FFR<br>${PANEL_LABELS[lagOutcome] || DATA.outcomes[lagOutcome].label} lags<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>n=${r.n}<extra></extra>`
+            `${rateOutcomeLabel(settings)}<br>${PANEL_LABELS[lagOutcome] || DATA.outcomes[lagOutcome].label} lags<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>n=${r.n}<extra></extra>`
           ),
           xaxis: axisRef(i, "x"),
           yaxis: axisRef(i, "y")
@@ -3108,7 +3282,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
       line: {color: "#167c80", width: 2.4},
       marker: {color: "#17201b", size: 4},
       hovertemplate: valid.map(r =>
-        `${DATA.outcomes[outcome].label}${outcome === "ffr" ? "<br>EBP lags" : ""}<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
+        `${panelOutcomeLabel(outcome, settings)}${outcome === "ffr" ? "<br>EBP lags" : ""}<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
       ),
       showlegend: false,
       xaxis: axisRef(i, "x"),
@@ -3184,7 +3358,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     metric("Controls", controlsCount),
     metric("Outcome form", settings.lpLogLevels ? "levels y(t+h)" : "y(t+h)-y(t-1)"),
     metric("Scale", scaleDisplay),
-    metric("FFR h=0 raw", ffrH0Display),
+    metric(`${rateOutcomeLabel(settings)} h=0 raw`, rateH0Display),
     metric("Series lags", settings.useWhitening ? "replaced" : settings.shockLags),
     metric("Whitening", settings.useWhitening ? settings.whiteningLags : "off"),
     metric("Outcome lags", settings.depLags),
@@ -3218,8 +3392,13 @@ function renderOptions() {
   shockSel.innerHTML = Object.entries(allSeries())
     .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
     .join("");
+  const rateSel = document.getElementById("rate-outcome");
+  rateSel.innerHTML = Object.entries(DATA.rate_outcomes || {})
+    .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
+    .join("");
 
   document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
+  document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
   document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
   document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
@@ -3325,6 +3504,7 @@ async function init() {
   months = DATA.macro.map(row => row.month);
   macroByMonth = new Map(DATA.macro.map(row => [row.month, row]));
   monthIndex = new Map(months.map((m, i) => [m, i]));
+  buildDailyRatePrefixes();
   document.getElementById("data-stamp").textContent = `Snapshot ${DATA.meta.built_at.slice(0, 10)} - ${DATA.events.length} events`;
   renderOptions();
   document.getElementById("run-btn").addEventListener("click", runSpec);
@@ -3345,6 +3525,10 @@ async function init() {
   });
   document.getElementById("shock").addEventListener("change", () => {
     syncBsControls();
+    runSpec();
+  });
+  document.getElementById("rate-outcome").addEventListener("change", () => {
+    configureScaleTarget(false);
     runSpec();
   });
   for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "show-treatment-paths"]) {
