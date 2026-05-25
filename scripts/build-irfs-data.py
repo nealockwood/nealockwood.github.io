@@ -104,7 +104,6 @@ EVENT_RESPONSE_COLUMNS = [
     "sp500",
     "spfut",
     "ois1y",
-    "ois2y",
     "tips5y",
     "tips10y",
     "tips30y",

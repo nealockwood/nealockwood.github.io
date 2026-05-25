@@ -712,7 +712,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=lp-response-table-20260525";
+const DATA_URL = "irfs-data.json?v=lp-response-table-sd-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -763,7 +763,6 @@ const MARKET_RESPONSE_SPECS = [
   {key: "sp500", label: "S&P 500 Index"},
   {key: "spfut", label: "S&P 500 Futures"},
   {key: "ois1y", label: "1-Year OIS Rate"},
-  {key: "ois2y", label: "2-Year OIS Rate"},
   {key: "tips5y", label: "5-Year TIPS Yield"},
   {key: "tips10y", label: "10-Year TIPS Yield"},
   {key: "tips30y", label: "30-Year TIPS Yield"},
@@ -2058,6 +2057,15 @@ function cleanZ(controls) {
   return {z, k: 1 + keep.length};
 }
 
+function sampleSd(values) {
+  const clean = values.filter(finite);
+  const n = clean.length;
+  if (n < 2) return null;
+  const mean = clean.reduce((acc, v) => acc + v, 0) / n;
+  const ss = clean.reduce((acc, v) => acc + (v - mean) * (v - mean), 0);
+  return Math.sqrt(ss / (n - 1));
+}
+
 function partialOls(y, x, controls) {
   const n = y.length;
   if (n < 8) return null;
@@ -2084,6 +2092,7 @@ function partialOls(y, x, controls) {
   return {
     beta,
     se: Math.sqrt(Math.max(0, variance)),
+    xResidualSd: sampleSd(rx),
     n,
     p,
     droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
@@ -2168,6 +2177,7 @@ function whitenedOls(y, x, controls, lags) {
   return {
     beta,
     se: Math.sqrt(Math.max(0, variance)),
+    xResidualSd: sampleSd(model.r),
     n: model.n,
     p,
     indices: model.indices,
@@ -2316,14 +2326,17 @@ function runOutcome(settings, rows, outcomeKey, maxH) {
 
 function marketResponseRows(settings, rows) {
   return MARKET_RESPONSE_SPECS.map(spec => {
-    const reg = buildMarketResponseRegressionData(settings, rows, spec.key, {includeShockLags: !settings.useWhitening});
-    const fit = fitShockResponse(reg.y, reg.x, reg.controls, settings);
-    const startIndex = fit?.indices?.length ? fit.indices[0] : 0;
-    const startDate = fit && reg.rowDates.length ? reg.rowDates[startIndex] : null;
+    const reg = buildMarketResponseRegressionData(settings, rows, spec.key, {includeShockLags: true});
+    const fit = partialOls(reg.y, reg.x, reg.controls);
+    const startDate = fit && reg.rowDates.length ? reg.rowDates[0] : null;
+    const residualSd = fit?.xResidualSd ?? null;
+    const beta = fit && finite(fit.beta) && finite(residualSd) ? fit.beta * residualSd : null;
+    const se = fit && finite(fit.se) && finite(residualSd) ? fit.se * residualSd : null;
     return {
       ...spec,
-      beta: fit?.beta ?? null,
-      se: fit?.se ?? null,
+      beta,
+      se,
+      residualSd,
       n: fit?.n ?? 0,
       startYear: startDate ? startDate.slice(0, 4) : "NA"
     };
@@ -2752,12 +2765,12 @@ function renderMarketResponseTable(tableRows) {
     </tr>
   `).join("");
   el.innerHTML = `
-    <div class="table-title">Financial Response Regressions</div>
+    <div class="table-title">Financial Response Regressions, 1 Residual-SD Series Move</div>
     <table>
       <thead><tr><th>Name</th><th>Estimate</th></tr></thead>
       <tbody>${body}</tbody>
     </table>
-    <div class="table-note">Parentheses report HC1 standard errors.</div>
+    <div class="table-note">Estimates are scaled by the sample SD of the series residualized on the included controls. Parentheses report HC1 standard errors.</div>
   `;
   el.classList.remove("hidden");
 }
