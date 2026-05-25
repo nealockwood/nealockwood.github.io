@@ -405,6 +405,61 @@
     gap: 10px;
   }
 
+  .lp-response-table {
+    border-top: 1px solid var(--line);
+    padding: 14px 18px 16px;
+  }
+
+  .lp-response-table .table-title {
+    font-size: 13px;
+    font-weight: 850;
+    color: #26352d;
+    margin-bottom: 8px;
+  }
+
+  .lp-response-table table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+  }
+
+  .lp-response-table th,
+  .lp-response-table td {
+    border-top: 1px solid #e8ede8;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .lp-response-table th {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .lp-response-table .response-name,
+  .lp-response-table .response-estimate {
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .lp-response-table .response-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .lp-response-table .table-note {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
   .metric {
     background: #f8faf8;
     border: 1px solid #e8ede8;
@@ -652,11 +707,12 @@
     <div id="error" class="error hidden"></div>
     <div id="plot"></div>
     <div class="diagnostics" id="diagnostics"></div>
+    <div class="lp-response-table hidden" id="lp-response-table"></div>
   </main>
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=var-years-20260525";
+const DATA_URL = "irfs-data.json?v=lp-response-table-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -697,7 +753,23 @@ const PANEL_LABELS = {
   ip: "Industrial Production",
   ebp: "EBP"
 };
-const MONTH_SUM_SCALE_COLUMNS = ["ust2y"];
+const MARKET_RESPONSE_SPECS = [
+  {key: "ust3m", label: "3-Month Treasury Yield"},
+  {key: "ust6m", label: "6-Month Treasury Yield"},
+  {key: "ust2y", label: "2-Year Treasury Yield"},
+  {key: "ust5y", label: "5-Year Treasury Yield"},
+  {key: "ust10y", label: "10-Year Treasury Yield"},
+  {key: "ust30y", label: "30-Year Treasury Yield"},
+  {key: "sp500", label: "S&P 500 Index"},
+  {key: "spfut", label: "S&P 500 Futures"},
+  {key: "ois1y", label: "1-Year OIS Rate"},
+  {key: "ois2y", label: "2-Year OIS Rate"},
+  {key: "tips5y", label: "5-Year TIPS Yield"},
+  {key: "tips10y", label: "10-Year TIPS Yield"},
+  {key: "tips30y", label: "30-Year TIPS Yield"},
+  {key: "usdjpy", label: "U.S. Dollar / Japanese Yen Exchange Rate"}
+];
+const MONTH_SUM_SCALE_COLUMNS = MARKET_RESPONSE_SPECS.map(spec => spec.key);
 const DEFAULT_UST2Y_TARGET_BP = 10;
 
 const CONTROL_LABELS = {
@@ -1369,8 +1441,10 @@ function buildAnalysisRows(settings, shockKey) {
           }
         }
         rec[shockKey] = found ? total : 0;
-        const ust2ySum = sumFiniteRows(items, "ust2y");
-        rec.ust2y = finite(ust2ySum) ? ust2ySum : (items.length ? null : 0);
+        for (const key of MONTH_SUM_SCALE_COLUMNS) {
+          const responseSum = sumFiniteRows(items, key);
+          rec[key] = finite(responseSum) ? responseSum : (items.length ? null : 0);
+        }
         const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
         for (const key of allControls) {
           for (let i = 0; i < items.length; i++) {
@@ -1482,6 +1556,54 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
     controls.push(zi);
   }
   return {y, x, controls};
+}
+
+function buildSeriesOnlyControls(settings, row, options = {}) {
+  const includeShockLags = options.includeShockLags !== false;
+  const zi = [];
+  if (includeShockLags) {
+    for (let i = 0; i < settings.shockLags; i++) {
+      const v = row._shockLags[i];
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+
+  for (const c of settings.controls) {
+    const v = sourceValue(row, c);
+    if (!finite(v)) return null;
+    zi.push(v);
+  }
+
+  for (const c of settings.macroControls) {
+    for (let lag = 1; lag <= settings.macroLags; lag++) {
+      const v = macroLagValue(c, row.month, lag);
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+  return zi;
+}
+
+function buildMarketResponseRegressionData(settings, rows, responseKey, options = {}) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  const rowDates = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const yi = sourceValue(row, responseKey);
+    if (!finite(yi) || !finite(row._x)) continue;
+
+    const zi = buildSeriesOnlyControls(settings, row, options);
+    if (!zi) continue;
+
+    y.push(yi);
+    x.push(row._x);
+    controls.push(zi);
+    rowDates.push(row.date);
+  }
+  return {y, x, controls, rowDates};
 }
 
 function varControlValue(row, key) {
@@ -2048,6 +2170,7 @@ function whitenedOls(y, x, controls, lags) {
     se: Math.sqrt(Math.max(0, variance)),
     n: model.n,
     p,
+    indices: model.indices,
     droppedControls: model.droppedControls,
     droppedWhiteningLags: model.droppedWhiteningLags
   };
@@ -2189,6 +2312,22 @@ function runOutcome(settings, rows, outcomeKey, maxH) {
     });
   }
   return results;
+}
+
+function marketResponseRows(settings, rows) {
+  return MARKET_RESPONSE_SPECS.map(spec => {
+    const reg = buildMarketResponseRegressionData(settings, rows, spec.key, {includeShockLags: !settings.useWhitening});
+    const fit = fitShockResponse(reg.y, reg.x, reg.controls, settings);
+    const startIndex = fit?.indices?.length ? fit.indices[0] : 0;
+    const startDate = fit && reg.rowDates.length ? reg.rowDates[startIndex] : null;
+    return {
+      ...spec,
+      beta: fit?.beta ?? null,
+      se: fit?.se ?? null,
+      n: fit?.n ?? 0,
+      startYear: startDate ? startDate.slice(0, 4) : "NA"
+    };
+  });
 }
 
 function runVarSpec(settings) {
@@ -2438,6 +2577,7 @@ function renderDecompPlot(settings, rows, scaleByOutcome) {
 
 function renderVarPlot(settings, varData, result) {
   document.getElementById("error").classList.add("hidden");
+  document.getElementById("lp-response-table").classList.add("hidden");
   const shockLabel = seriesSpec(settings.shock).label;
   document.getElementById("chart-title").textContent = `Proxy VARX: ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = `${Math.round(VAR_BAND_LEVEL * 100)}% wild-bootstrap percentile band, normalized to ${fmtTarget(settings.varScaleTarget)}bp 2Y impact`;
@@ -2590,6 +2730,36 @@ function renderVarPlot(settings, varData, result) {
     metric("Scale factor", fmt(result.scale, 3)),
     metric("Max horizon", settings.horizon)
   ].join("");
+}
+
+function renderMarketResponseTable(tableRows) {
+  const el = document.getElementById("lp-response-table");
+  if (!tableRows.length) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  const body = tableRows.map(row => `
+    <tr title="n=${row.n}">
+      <td>
+        <span class="response-name">${row.label}</span>
+        <span class="response-sub">(starts ${row.startYear})</span>
+      </td>
+      <td>
+        <span class="response-estimate">${fmt(row.beta, 4)}</span>
+        <span class="response-sub">(${fmt(row.se, 4)})</span>
+      </td>
+    </tr>
+  `).join("");
+  el.innerHTML = `
+    <div class="table-title">Financial Response Regressions</div>
+    <table>
+      <thead><tr><th>Name</th><th>Estimate</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <div class="table-note">Parentheses report HC1 standard errors.</div>
+  `;
+  el.classList.remove("hidden");
 }
 
 function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0, unscheduledSupportRows) {
@@ -2750,6 +2920,8 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
   ].join("");
 
+  renderMarketResponseTable(marketResponseRows(settings, rows));
+
   document.getElementById("diagnostics").innerHTML = [
     metric("Rows", rows.length),
     metric("View", settings.viewMode === "decomp" ? "LP decomp" : "IRF panel"),
@@ -2781,6 +2953,7 @@ function showError(message) {
   el.textContent = message;
   el.classList.remove("hidden");
   Plotly.purge("plot");
+  document.getElementById("lp-response-table").classList.add("hidden");
   document.getElementById("diagnostics").innerHTML = "";
   document.getElementById("status-pills").innerHTML = `<span class="pill warn">No result</span>`;
 }

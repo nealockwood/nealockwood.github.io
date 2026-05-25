@@ -94,6 +94,23 @@ RAW_SHOCK_COLUMNS = [
 ]
 
 EVENT_SCALE_COLUMNS = ["ust2y"]
+EVENT_RESPONSE_COLUMNS = [
+    "ust3m",
+    "ust6m",
+    "ust2y",
+    "ust5y",
+    "ust10y",
+    "ust30y",
+    "sp500",
+    "spfut",
+    "ois1y",
+    "ois2y",
+    "tips5y",
+    "tips10y",
+    "tips30y",
+    "usdjpy",
+]
+EVENT_VALUE_COLUMNS = list(dict.fromkeys(EVENT_SCALE_COLUMNS + EVENT_RESPONSE_COLUMNS))
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
 GSW_YIELD_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
@@ -348,7 +365,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
     numeric_cols = sorted(
         set(
             RAW_SHOCK_COLUMNS
-            + EVENT_SCALE_COLUMNS
+            + EVENT_VALUE_COLUMNS
             + MARKET_CONTROLS
             + GREENBOOK_CONTROLS
             + ["unscheduled", "main", "nzlb", "possible", "scheduled", "ff4_mr", "brw", "ns"]
@@ -385,6 +402,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         "possible",
         "scheduled",
         *EVENT_SCALE_COLUMNS,
+        *[col for col in EVENT_RESPONSE_COLUMNS if col not in EVENT_SCALE_COLUMNS],
         *RAW_SHOCK_COLUMNS,
         "mps",
         "bs",
@@ -411,7 +429,7 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
         MARKET_CONTROLS
         + FRED_MACRO_CONTROLS
         + TARGET_FFR_COLUMNS
-        + EVENT_SCALE_COLUMNS
+        + EVENT_VALUE_COLUMNS
         + VAR_OUTCOME_COLUMNS
         + VAR_CONTROL_COLUMNS
     )
@@ -423,7 +441,7 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
         if not month:
             continue
         dest = monthly_event_values.setdefault(month, {})
-        for col in EVENT_SCALE_COLUMNS:
+        for col in EVENT_VALUE_COLUMNS:
             val = row.get(col)
             if isinstance(val, (int, float)) and math.isfinite(float(val)):
                 dest[col] = dest.get(col, 0.0) + float(val)
