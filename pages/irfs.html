@@ -309,6 +309,13 @@
     flex-wrap: wrap;
   }
 
+  .graph-toggle {
+    margin-left: auto;
+    margin-bottom: 0;
+    padding-bottom: 7px;
+    white-space: nowrap;
+  }
+
   .view-tabs {
     display: inline-flex;
     border: 1px solid var(--line);
@@ -410,11 +417,39 @@
     padding: 14px 18px 16px;
   }
 
+  .response-table-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
   .lp-response-table .table-title {
     font-size: 13px;
     font-weight: 850;
     color: #26352d;
-    margin-bottom: 8px;
+    margin-bottom: 0;
+  }
+
+  .table-lag-control {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .table-lag-control label {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .table-lag-control .top-dropdown {
+    min-width: 210px;
+  }
+
+  .table-lag-control .horizon-list {
+    grid-template-columns: 1fr;
   }
 
   .lp-response-table table {
@@ -519,6 +554,14 @@
     .diagnostics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    .graph-toggle,
+    .table-lag-control {
+      margin-left: 0;
+    }
+    .response-table-head {
+      align-items: flex-start;
+      flex-direction: column;
+    }
     .grid-3 {
       grid-template-columns: 1fr;
     }
@@ -613,15 +656,6 @@
           <option value="none">None</option>
         </select>
       </div>
-      <div class="lp-control" style="margin-top: 10px;">
-        <label>Response table outcome lags</label>
-        <details class="top-dropdown" id="table-lag-dropdown">
-          <summary id="table-lag-summary">None</summary>
-          <div class="dropdown-panel">
-            <div class="horizon-list" id="table-lag-options"></div>
-          </div>
-        </details>
-      </div>
     </div>
 
     <div class="section">
@@ -679,6 +713,7 @@
           <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
           <button class="view-tab" type="button" data-view="var" role="tab" aria-selected="false">VAR</button>
         </div>
+        <label class="check-row graph-toggle lp-graph-control"><input id="show-treatment-paths" type="checkbox"><span>Show all treatment paths</span></label>
         <div class="decomp-control hidden">
           <label>Horizon lines</label>
           <details class="top-dropdown" id="decomp-horizon-dropdown">
@@ -721,7 +756,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=ffr-lag-lines-20260525";
+const DATA_URL = "irfs-data.json?v=ffr-ebp-toggle-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -731,6 +766,7 @@ let macroByMonth = new Map();
 let monthIndex = new Map();
 let months = [];
 let activeViewMode = "irf";
+let tableOutcomeLagSelection = [];
 const VIEW_STATE = {lp: null, var: null};
 const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
 const NON_FFR_OUTCOMES = OUTCOME_ORDER.filter(key => key !== "ffr");
@@ -1139,13 +1175,17 @@ function renderDecompHorizonOptions(maxH) {
 }
 
 function selectedTableOutcomeLags() {
-  return Array.from(document.querySelectorAll(".table-lag-check:checked"))
+  const checks = Array.from(document.querySelectorAll(".table-lag-check"));
+  if (!checks.length) return tableOutcomeLagSelection.slice();
+  tableOutcomeLagSelection = checks.filter(el => el.checked)
     .map(el => el.value)
     .filter(key => NON_FFR_OUTCOMES.includes(key));
+  return tableOutcomeLagSelection.slice();
 }
 
 function setTableOutcomeLags(keys) {
-  const selected = new Set(keys || []);
+  tableOutcomeLagSelection = Array.from(new Set((keys || []).filter(key => NON_FFR_OUTCOMES.includes(key))));
+  const selected = new Set(tableOutcomeLagSelection);
   document.querySelectorAll(".table-lag-check").forEach(el => {
     el.checked = selected.has(el.value);
   });
@@ -1153,22 +1193,30 @@ function setTableOutcomeLags(keys) {
 }
 
 function updateTableLagSummary() {
+  const summary = document.getElementById("table-lag-summary");
+  if (!summary) return;
   const keys = selectedTableOutcomeLags();
   const text = keys.length
     ? keys.map(key => PANEL_LABELS[key] || DATA.outcomes[key].label).join(", ")
     : "None";
-  document.getElementById("table-lag-summary").textContent = text.length > 38
+  summary.textContent = text.length > 38
     ? `${keys.length} outcomes`
     : text;
 }
 
-function renderTableLagOptions() {
-  const previous = new Set(selectedTableOutcomeLags());
-  document.getElementById("table-lag-options").innerHTML = NON_FFR_OUTCOMES.map(key => (
+function renderTableLagOptions(selectedKeys = tableOutcomeLagSelection) {
+  const container = document.getElementById("table-lag-options");
+  if (!container) return;
+  const previous = new Set((selectedKeys || []).filter(key => NON_FFR_OUTCOMES.includes(key)));
+  tableOutcomeLagSelection = Array.from(previous);
+  container.innerHTML = NON_FFR_OUTCOMES.map(key => (
     `<label class="check-row"><input class="table-lag-check" type="checkbox" value="${key}" ${previous.has(key) ? "checked" : ""}><span>${PANEL_LABELS[key] || DATA.outcomes[key].label}</span></label>`
   )).join("");
-  document.querySelectorAll(".table-lag-check").forEach(el => {
+  container.querySelectorAll(".table-lag-check").forEach(el => {
     el.addEventListener("change", () => {
+      tableOutcomeLagSelection = Array.from(container.querySelectorAll(".table-lag-check:checked"))
+        .map(input => input.value)
+        .filter(key => NON_FFR_OUTCOMES.includes(key));
       updateTableLagSummary();
       runSpec();
     });
@@ -1178,10 +1226,12 @@ function renderTableLagOptions() {
 
 function syncViewControls() {
   const mode = currentViewMode();
+  const irf = mode === "irf";
   const decomp = mode === "decomp";
   const varMode = mode === "var";
   document.querySelectorAll(".decomp-control").forEach(el => el.classList.toggle("hidden", !decomp));
   document.querySelectorAll(".var-control").forEach(el => el.classList.toggle("hidden", !varMode));
+  document.querySelectorAll(".lp-graph-control").forEach(el => el.classList.toggle("hidden", !irf));
   document.querySelectorAll(".lp-control").forEach(el => {
     if (el.id !== "whitening-lag-wrap") el.classList.toggle("hidden", varMode);
   });
@@ -1230,6 +1280,7 @@ function capturePanelState() {
     horizon: document.getElementById("horizon").value,
     scaleMode: document.getElementById("scale-mode").value,
     scaleBp: document.getElementById("scale-bp").value,
+    showTreatmentPaths: document.getElementById("show-treatment-paths").checked,
     tableOutcomeLags: selectedTableOutcomeLags(),
     varLags: document.getElementById("var-lags").value,
     varScaleBp: document.getElementById("var-scale-bp").value,
@@ -1262,6 +1313,7 @@ function applyPanelState(state) {
   document.getElementById("scale-mode").value = state.scaleMode ?? (DATA.meta.defaults.scale_mode ?? "shock-rmse");
   configureScaleTarget(false);
   document.getElementById("scale-bp").value = state.scaleBp ?? scaleTargetConfig(document.getElementById("scale-mode").value).value;
+  document.getElementById("show-treatment-paths").checked = !!state.showTreatmentPaths;
   setTableOutcomeLags(state.tableOutcomeLags || []);
   document.getElementById("var-lags").value = state.varLags ?? 12;
   document.getElementById("var-scale-bp").value = state.varScaleBp ?? VAR_Y2_TARGET_BP;
@@ -1300,6 +1352,8 @@ function defaultVarState() {
     horizon: 24,
     scaleMode: DATA.meta.defaults.scale_mode ?? "shock-rmse",
     scaleBp: DATA.meta.defaults.scale_to_shock_sd ?? 1,
+    showTreatmentPaths: false,
+    tableOutcomeLags: [],
     varLags: 12,
     varScaleBp: VAR_Y2_TARGET_BP,
     varBootstrapDraws: VAR_BOOTSTRAP_DEFAULT,
@@ -1366,6 +1420,7 @@ function getSettings() {
     horizon,
     scaleTarget: readScaleTarget(scaleMode),
     scaleMode,
+    showTreatmentPaths: document.getElementById("show-treatment-paths").checked,
     tableOutcomeLags: selectedTableOutcomeLags(),
     controls: Array.from(new Set([...selectedRegularControls, ...forced])),
     macroControls: Array.from(new Set(selectedMacroControls))
@@ -2579,6 +2634,20 @@ function runSpec() {
       };
     })];
   }));
+  const primaryFfrLagOutcome = "ebp";
+  const primaryFfrScale = scaleByOutcome[primaryFfrLagOutcome] ?? 1;
+  resultsByOutcome.ffrPrimary = rawFfrByLag[primaryFfrLagOutcome].slice(0, settings.horizon + 1).map(r => {
+    const mid = finite(r.beta) ? r.beta * primaryFfrScale : null;
+    const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * primaryFfrScale : null;
+    const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * primaryFfrScale : null;
+    return {
+      ...r,
+      betaScaled: finite(mid) ? cleanZero(mid) : null,
+      lo: finite(a) && finite(b) ? cleanZero(Math.min(a, b)) : null,
+      hi: finite(a) && finite(b) ? cleanZero(Math.max(a, b)) : null,
+      lagOutcome: primaryFfrLagOutcome
+    };
+  });
   render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, ffrH0Display, unscheduledSupportRows);
 }
 
@@ -2855,7 +2924,7 @@ function renderVarPlot(settings, varData, result) {
   ].join("");
 }
 
-function renderMarketResponseTable(tableRows) {
+function renderMarketResponseTable(settings, tableRows) {
   const el = document.getElementById("lp-response-table");
   if (!tableRows.length) {
     el.classList.add("hidden");
@@ -2875,13 +2944,25 @@ function renderMarketResponseTable(tableRows) {
     </tr>
   `).join("");
   el.innerHTML = `
-    <div class="table-title">Financial Response Regressions (normalized to 1 residual-SD increase)</div>
+    <div class="response-table-head">
+      <div class="table-title">Financial Response Regressions (normalized to 1 residual-SD increase)</div>
+      <div class="table-lag-control">
+        <label>Outcome lags</label>
+        <details class="top-dropdown" id="table-lag-dropdown">
+          <summary id="table-lag-summary">None</summary>
+          <div class="dropdown-panel">
+            <div class="horizon-list" id="table-lag-options"></div>
+          </div>
+        </details>
+      </div>
+    </div>
     <table>
       <thead><tr><th>Name</th><th>Estimate</th></tr></thead>
       <tbody>${body}</tbody>
     </table>
     <div class="table-note">Estimates are scaled by the sample SD of the series residualized on the included controls. Parentheses report HC1 standard errors. *, **, and *** denote two-sided significance at the 10%, 5%, and 1% levels.</div>
   `;
+  renderTableLagOptions(settings.tableOutcomeLags || []);
   el.classList.remove("hidden");
 }
 
@@ -2891,7 +2972,9 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
   document.getElementById("chart-subtitle").textContent = settings.viewMode === "decomp"
     ? "Cumulative FWL contributions by selected horizon"
-    : "90% HC1 robust confidence bands; FFR shows point estimates by outcome-lag set";
+    : (settings.showTreatmentPaths
+      ? "90% HC1 robust confidence bands; FFR shows treatment paths by outcome-lag set without bands"
+      : "90% HC1 robust confidence bands; FFR uses EBP outcome lags");
 
   if (settings.viewMode === "decomp") {
     renderDecompPlot(settings, rows, scaleByOutcome);
@@ -2957,11 +3040,11 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     });
 
     const panelResults = outcome === "ffr"
-      ? (resultsByOutcome.ffrVariants?.[NON_FFR_OUTCOMES[0]] || [])
+      ? (settings.showTreatmentPaths
+        ? (resultsByOutcome.ffrVariants?.[NON_FFR_OUTCOMES[0]] || [])
+        : (resultsByOutcome.ffrPrimary || []))
       : (resultsByOutcome[outcome] || []);
-    const valid = outcome === "ffr"
-      ? []
-      : panelResults.filter(r => finite(r.betaScaled) && finite(r.lo) && finite(r.hi));
+    const valid = panelResults.filter(r => finite(r.betaScaled) && finite(r.lo) && finite(r.hi));
     const x = panelResults.length
       ? panelResults.map(r => r.h)
       : Array.from({length: settings.horizon + 1}, (_, h) => h);
@@ -2977,7 +3060,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
       yaxis: axisRef(i, "y")
     };
     traces.push(zeroTrace);
-    if (outcome === "ffr") {
+    if (outcome === "ffr" && settings.showTreatmentPaths) {
       NON_FFR_OUTCOMES.forEach((lagOutcome, lagIndex) => {
         const results = resultsByOutcome.ffrVariants?.[lagOutcome] || [];
         const valid = results.filter(r => finite(r.betaScaled));
@@ -3025,7 +3108,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
       line: {color: "#167c80", width: 2.4},
       marker: {color: "#17201b", size: 4},
       hovertemplate: valid.map(r =>
-        `${DATA.outcomes[outcome].label}<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
+        `${DATA.outcomes[outcome].label}${outcome === "ffr" ? "<br>EBP lags" : ""}<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
       ),
       showlegend: false,
       xaxis: axisRef(i, "x"),
@@ -3039,14 +3122,19 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
 
   const minDate = rows.length ? rows[0].date : "NA";
   const maxDate = rows.length ? rows[rows.length - 1].date : "NA";
+  const displayedFfrResults = settings.showTreatmentPaths
+    ? NON_FFR_OUTCOMES.flatMap(outcome => resultsByOutcome.ffrVariants?.[outcome] || [])
+    : (resultsByOutcome.ffrPrimary || []);
   const allResults = [
     ...NON_FFR_OUTCOMES.flatMap(outcome => resultsByOutcome[outcome] || []),
-    ...NON_FFR_OUTCOMES.flatMap(outcome => resultsByOutcome.ffrVariants?.[outcome] || [])
+    ...displayedFfrResults
   ];
   const validH = allResults.filter(r => r.n > 0);
   const h0n = Math.min(...[
     ...NON_FFR_OUTCOMES.map(outcome => resultsByOutcome[outcome]?.[0]?.n || 0),
-    ...NON_FFR_OUTCOMES.map(outcome => resultsByOutcome.ffrVariants?.[outcome]?.[0]?.n || 0)
+    ...(settings.showTreatmentPaths
+      ? NON_FFR_OUTCOMES.map(outcome => resultsByOutcome.ffrVariants?.[outcome]?.[0]?.n || 0)
+      : [resultsByOutcome.ffrPrimary?.[0]?.n || 0])
   ]);
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
   const monthlySeries = isMonthlySeries(settings.shock);
@@ -3081,7 +3169,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
   ].join("");
 
-  renderMarketResponseTable(marketResponseRows(settings, rows));
+  renderMarketResponseTable(settings, marketResponseRows(settings, rows));
 
   document.getElementById("diagnostics").innerHTML = [
     metric("Rows", rows.length),
@@ -3144,7 +3232,8 @@ function renderOptions() {
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
   configureScaleTarget(true);
-  renderTableLagOptions();
+  document.getElementById("show-treatment-paths").checked = DATA.meta.defaults.show_treatment_paths ?? false;
+  setTableOutcomeLags([]);
   document.getElementById("var-lags").value = 12;
   document.getElementById("var-scale-bp").value = VAR_Y2_TARGET_BP;
   document.getElementById("var-bootstrap-draws").value = VAR_BOOTSTRAP_DEFAULT;
@@ -3258,7 +3347,7 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels"]) {
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "show-treatment-paths"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   document.querySelectorAll(".exclude-year-check").forEach(el => el.addEventListener("change", runSpec));
