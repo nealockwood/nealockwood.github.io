@@ -712,7 +712,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=lp-response-table-sd-20260525";
+const DATA_URL = "irfs-data.json?v=lp-response-table-trim-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -761,11 +761,9 @@ const MARKET_RESPONSE_SPECS = [
   {key: "ust10y", label: "10-Year Treasury Yield"},
   {key: "ust30y", label: "30-Year Treasury Yield"},
   {key: "sp500", label: "S&P 500 Index"},
-  {key: "spfut", label: "S&P 500 Futures"},
-  {key: "ois1y", label: "1-Year OIS Rate"},
-  {key: "tips5y", label: "5-Year TIPS Yield"},
-  {key: "tips10y", label: "10-Year TIPS Yield"},
-  {key: "tips30y", label: "30-Year TIPS Yield"},
+  {key: "tips5y", label: "5-Year Breakeven Inflation"},
+  {key: "tips10y", label: "10-Year Breakeven Inflation"},
+  {key: "tips30y", label: "30-Year Breakeven Inflation"},
   {key: "usdjpy", label: "U.S. Dollar / Japanese Yen Exchange Rate"}
 ];
 const MONTH_SUM_SCALE_COLUMNS = MARKET_RESPONSE_SPECS.map(spec => spec.key);
@@ -2765,7 +2763,7 @@ function renderMarketResponseTable(tableRows) {
     </tr>
   `).join("");
   el.innerHTML = `
-    <div class="table-title">Financial Response Regressions, 1 Residual-SD Series Move</div>
+    <div class="table-title">Financial Response Regressions (normalized to 1 residual-SD increase)</div>
     <table>
       <thead><tr><th>Name</th><th>Estimate</th></tr></thead>
       <tbody>${body}</tbody>
