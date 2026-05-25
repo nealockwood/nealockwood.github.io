@@ -434,6 +434,7 @@ def main() -> None:
                 "use_whitening": False,
                 "whitening_lags": 8,
                 "dependent_lags": 12,
+                "lp_log_levels": False,
                 "macro_lags": 12,
                 "aggregation": "main",
                 "included_years": "1993-2025",

@@ -531,6 +531,7 @@
         </div>
       </div>
       <div class="lp-control" style="margin-top: 9px;">
+        <label class="check-row"><input id="lp-log-levels" type="checkbox"><span>Use log levels</span></label>
         <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
       </div>
       <div id="whitening-lag-wrap" class="lp-control hidden" style="margin-top: 10px;">
@@ -655,7 +656,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=var-view-20260524";
+const DATA_URL = "irfs-data.json?v=lp-level-form-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -813,6 +814,17 @@ function monthValue(month, source) {
   return row[source];
 }
 
+function transformedOutcomeLevel(outcomeKey, month) {
+  const spec = DATA.outcomes[outcomeKey];
+  const raw = monthValue(month, spec.source);
+  if (!finite(raw)) return null;
+  if (spec.transform === "logdiff100") {
+    if (raw <= 0) return null;
+    return 100 * Math.log(raw);
+  }
+  return raw;
+}
+
 function isZlbMonth(month) {
   const row = macroByMonth.get(month);
   return row ? truthyFlag(row.zlb) : false;
@@ -846,9 +858,11 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}) {
   if (baseIdx === undefined) return null;
   const leadIdx = baseIdx + h;
   const prevIdx = baseIdx - 1;
-  if (leadIdx < 0 || leadIdx >= months.length || prevIdx < 0) return null;
+  if (leadIdx < 0 || leadIdx >= months.length) return null;
   const leadMonth = months[leadIdx];
   if (isSuppressedLeadMonth(leadMonth, settings)) return null;
+  if (settings.lpLogLevels) return transformedOutcomeLevel(outcomeKey, leadMonth);
+  if (prevIdx < 0) return null;
   const prevMonth = months[prevIdx];
   const lead = monthValue(leadMonth, spec.source);
   const prev = monthValue(prevMonth, spec.source);
@@ -860,13 +874,15 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}) {
   return lead - prev;
 }
 
-function dependentDelta(outcomeKey, baseMonth, lag) {
+function dependentDelta(outcomeKey, baseMonth, lag, settings = {}) {
   const spec = DATA.outcomes[outcomeKey];
   const baseIdx = monthIndex.get(baseMonth);
   if (baseIdx === undefined) return null;
   const curIdx = baseIdx - lag;
   const prevIdx = baseIdx - lag - 1;
-  if (curIdx < 0 || prevIdx < 0) return null;
+  if (curIdx < 0) return null;
+  if (settings.lpLogLevels) return transformedOutcomeLevel(outcomeKey, months[curIdx]);
+  if (prevIdx < 0) return null;
   const cur = monthValue(months[curIdx], spec.source);
   const prev = monthValue(months[prevIdx], spec.source);
   if (!finite(cur) || !finite(prev)) return null;
@@ -1084,6 +1100,7 @@ function capturePanelState() {
     imputeZeros: document.getElementById("impute-zeros").checked,
     shockLags: document.getElementById("shock-lags").value,
     depLags: document.getElementById("dep-lags").value,
+    lpLogLevels: document.getElementById("lp-log-levels").checked,
     macroLags: document.getElementById("macro-lags").value,
     useWhitening: document.getElementById("use-whitening").checked,
     whiteningLags: document.getElementById("whitening-lags").value,
@@ -1113,6 +1130,7 @@ function applyPanelState(state) {
   document.getElementById("impute-zeros").checked = !!state.imputeZeros;
   document.getElementById("shock-lags").value = state.shockLags ?? 12;
   document.getElementById("dep-lags").value = state.depLags ?? 12;
+  document.getElementById("lp-log-levels").checked = !!state.lpLogLevels;
   document.getElementById("macro-lags").value = state.macroLags ?? 12;
   document.getElementById("use-whitening").checked = !!state.useWhitening;
   document.getElementById("whitening-lags").value = state.whiteningLags ?? 8;
@@ -1150,6 +1168,7 @@ function defaultVarState() {
     imputeZeros: false,
     shockLags: 0,
     depLags: 0,
+    lpLogLevels: false,
     macroLags: 0,
     useWhitening: false,
     whiteningLags: DATA.meta.defaults.whitening_lags ?? 8,
@@ -1212,6 +1231,7 @@ function getSettings() {
     includedYearsError: includedYears.error,
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
+    lpLogLevels: document.getElementById("lp-log-levels").checked,
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     useWhitening: document.getElementById("use-whitening").checked,
     whiteningLags: Math.max(0, Number.parseInt(document.getElementById("whitening-lags").value || "8", 10)),
@@ -1388,7 +1408,7 @@ function buildUsedControls(settings, row, outcomeKey, options = {}) {
   }
 
   for (let i = 1; i <= settings.depLags; i++) {
-    const v = dependentDelta(outcomeKey, row.month, i);
+    const v = dependentDelta(outcomeKey, row.month, i, settings);
     if (!finite(v)) return null;
     zi.push(v);
   }
@@ -2708,6 +2728,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     : "no extra lead years excluded";
   const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
   const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
+  const outcomeFormText = settings.lpLogLevels ? "log levels" : "changes from t-1";
   const viewText = settings.viewMode === "decomp"
     ? `LP decomp h=${settings.decompHorizons.join(",")}`
     : "IRF panel";
@@ -2719,6 +2740,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     `<span class="pill">${monthlySeries ? "monthly series" : settings.aggregation}</span>`,
     `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
     `<span class="pill">${viewText}</span>`,
+    `<span class="pill">${outcomeFormText}</span>`,
     `<span class="pill">${estimatorText}</span>`,
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${covidText}</span>`,
@@ -2739,6 +2761,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     metric("h=0 n", h0n),
     metric("Min n", minN),
     metric("Controls", controlsCount),
+    metric("Outcome form", settings.lpLogLevels ? "levels y(t+h)" : "y(t+h)-y(t-1)"),
     metric("Scale", scaleDisplay),
     metric("FFR h=0 raw", fmt(ffrH0, 4)),
     metric("Series lags", settings.useWhitening ? "replaced" : settings.shockLags),
@@ -2782,6 +2805,7 @@ function renderOptions() {
   document.getElementById("whitening-lags").value = DATA.meta.defaults.whitening_lags ?? 8;
   syncWhiteningControls();
   document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
+  document.getElementById("lp-log-levels").checked = DATA.meta.defaults.lp_log_levels ?? false;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
@@ -2899,7 +2923,7 @@ async function init() {
     syncBsControls();
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros"]) {
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   document.querySelectorAll(".exclude-year-check").forEach(el => el.addEventListener("change", runSpec));
