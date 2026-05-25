@@ -94,7 +94,6 @@ RAW_SHOCK_COLUMNS = [
 EVENT_SCALE_COLUMNS = ["ust2y"]
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
-VAR_PROXY_COLUMNS = ["var_mps"]
 VAR_CONTROL_MAP = {
     "NFP_SURP": "varctl_nfp_surp",
     "NFP_12M": "varctl_nfp_12m",
@@ -200,13 +199,12 @@ def add_var_outcomes(macro: pd.DataFrame) -> pd.DataFrame:
             "logcpi": "var_logcpi",
             "logip": "var_logip",
             "ebp": "var_ebp",
-            "MPS": "var_mps",
             **VAR_CONTROL_MAP,
         }
     )
     keep = [
         "month",
-        *[col for col in VAR_OUTCOME_COLUMNS + VAR_PROXY_COLUMNS + VAR_CONTROL_COLUMNS if col in var_data.columns],
+        *[col for col in VAR_OUTCOME_COLUMNS + VAR_CONTROL_COLUMNS if col in var_data.columns],
     ]
     if len(keep) == 1:
         return macro
@@ -364,7 +362,6 @@ def macro_rows(macro: pd.DataFrame, events: list[dict]) -> list[dict]:
         + TARGET_FFR_COLUMNS
         + EVENT_SCALE_COLUMNS
         + VAR_OUTCOME_COLUMNS
-        + VAR_PROXY_COLUMNS
         + VAR_CONTROL_COLUMNS
     )
     monthly_greenbook_controls = read_greenbook_monthly_controls()

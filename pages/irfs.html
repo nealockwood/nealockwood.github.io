@@ -656,7 +656,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=lp-level-form-20260525";
+const DATA_URL = "irfs-data.json?v=var-lp-proxies-20260525";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -682,9 +682,6 @@ const VAR_MARKET_CONTROL_SOURCE = {
   slope_3m: "varctl_slope_3m",
   bcom_3m: "varctl_bcom_3m",
   tr_skew: "varctl_tr_skew"
-};
-const VAR_PROXY_SOURCE = {
-  mps: "var_mps"
 };
 const VAR_Y2_TARGET_BP = 25;
 const VAR_BOOTSTRAP_DEFAULT = 1000;
@@ -1524,10 +1521,6 @@ function groupedProxyValue(items, mode, shockKey) {
 }
 
 function buildVarProxyLookup(settings, shockKey) {
-  const monthlySource = VAR_PROXY_SOURCE[shockKey];
-  if (monthlySource) {
-    return row => finite(row[monthlySource]) ? row[monthlySource] : null;
-  }
   if (isMonthlySeries(shockKey)) {
     return row => sourceValue(row, shockKey);
   }
@@ -2562,6 +2555,11 @@ function renderVarPlot(settings, varData, result) {
   const excludedYearsText = settings.excludeLeadYears.length
     ? `excluded years ${settings.excludeLeadYears.join(", ")}`
     : "no extra years excluded";
+  const monthlySeries = isMonthlySeries(settings.shock);
+  const unscheduledSupportRows = countUnscheduledSupportRows(settings, settings.shock);
+  const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
+    ? `unscheduled excluded (${unscheduledSupportRows})`
+    : `unscheduled included (${unscheduledSupportRows})`);
 
   document.getElementById("status-pills").innerHTML = [
     `<span class="pill">VARX proxy</span>`,
@@ -2572,6 +2570,7 @@ function renderVarPlot(settings, varData, result) {
     `<span class="pill">${zlbText}</span>`,
     `<span class="pill">${covidText}</span>`,
     `<span class="pill">${excludedYearsText}</span>`,
+    `<span class="pill">${unscheduledText}</span>`,
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
   ].join("");
 
@@ -2579,6 +2578,7 @@ function renderVarPlot(settings, varData, result) {
     metric("Rows", varData.rows.length),
     metric("View", "Proxy VARX"),
     metric("Date range", `${minDate} to ${maxDate}`),
+    metric("Unscheduled rows", monthlySeries ? "n/a" : (settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`)),
     metric("VAR lags", result.p),
     metric("Outcomes", "2Y, CPI, IP, EBP"),
     metric("Controls", varData.controlCount),
