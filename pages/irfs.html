@@ -830,6 +830,15 @@ function fmtTarget(x) {
   return Number.parseFloat(cleanZero(x).toFixed(4)).toString();
 }
 
+function significanceStars(beta, se) {
+  if (!finite(beta) || !finite(se) || se <= 0) return "";
+  const z = Math.abs(beta / se);
+  if (z >= 2.5758293035489004) return "***";
+  if (z >= 1.959963984540054) return "**";
+  if (z >= Z90) return "*";
+  return "";
+}
+
 function outcomeLabel(key) {
   return PANEL_LABELS[key] || DATA?.outcomes?.[key]?.label || key;
 }
@@ -2757,7 +2766,7 @@ function renderMarketResponseTable(tableRows) {
         <span class="response-sub">(starts ${row.startYear})</span>
       </td>
       <td>
-        <span class="response-estimate">${fmt(row.beta, 4)}</span>
+        <span class="response-estimate">${fmt(row.beta, 4)}${significanceStars(row.beta, row.se)}</span>
         <span class="response-sub">(${fmt(row.se, 4)})</span>
       </td>
     </tr>
@@ -2768,7 +2777,7 @@ function renderMarketResponseTable(tableRows) {
       <thead><tr><th>Name</th><th>Estimate</th></tr></thead>
       <tbody>${body}</tbody>
     </table>
-    <div class="table-note">Estimates are scaled by the sample SD of the series residualized on the included controls. Parentheses report HC1 standard errors.</div>
+    <div class="table-note">Estimates are scaled by the sample SD of the series residualized on the included controls. Parentheses report HC1 standard errors. *, **, and *** denote two-sided significance at the 10%, 5%, and 1% levels.</div>
   `;
   el.classList.remove("hidden");
 }
