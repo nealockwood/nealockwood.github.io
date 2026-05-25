@@ -494,7 +494,7 @@ def main() -> None:
                 "series": "mp1",
                 "shock": "mp1",
                 "horizon": 24,
-                "shock_lags": 12,
+                "shock_lags": 8,
                 "use_whitening": False,
                 "whitening_lags": 8,
                 "dependent_lags": 12,
