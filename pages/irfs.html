@@ -176,6 +176,30 @@
     min-height: 24px;
   }
 
+  .mini-segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #f6f8f6;
+  }
+
+  .mini-segmented button {
+    min-height: 30px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .mini-segmented button.active {
+    color: var(--ink);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(23, 32, 27, 0.12);
+  }
+
   .control-list {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -584,6 +608,13 @@
         <label for="shock">Series</label>
         <select id="shock"></select>
       </div>
+      <div id="gss-pc-wrap" class="hidden" style="margin-top: 10px;">
+        <label>GSS PCs</label>
+        <div class="mini-segmented" aria-label="GSS principal components">
+          <button id="gss-both" class="active" type="button">PC1+PC2</button>
+          <button id="gss-pc1" type="button">PC1 only</button>
+        </div>
+      </div>
       <div style="margin-top: 10px;">
         <label for="aggregation">Aggregation</label>
         <select id="aggregation">
@@ -760,7 +791,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=rate-outcome-windows-20260525";
+const DATA_URL = "irfs-data.json?v=gss-pca-20260526";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -946,6 +977,16 @@ function isMonthlySeries(key) {
   return seriesSpec(key).frequency === "monthly";
 }
 
+function seriesComponentKeys(key, settings = null) {
+  const spec = seriesSpec(key);
+  if (key === "gss" && settings?.gssPcMode === "pc1") return ["gss_pc1"];
+  return spec.components || [key];
+}
+
+function isMultiSeries(key, settings = null) {
+  return seriesComponentKeys(key, settings).length > 1;
+}
+
 function sourceValue(row, key) {
   if (row && finite(row[key])) return row[key];
   const m = macroByMonth.get(row?.month);
@@ -954,8 +995,24 @@ function sourceValue(row, key) {
 }
 
 function seriesValue(row, key) {
+  const components = seriesComponentKeys(key);
+  if (components.length > 1) {
+    const vals = components.map(component => sourceValue(row, component));
+    return vals.every(finite) ? vals[0] : null;
+  }
+  if (components[0] !== key) return sourceValue(row, components[0]);
   if (isMonthlySeries(key)) return sourceValue(row, key);
   return finite(row?.[key]) ? row[key] : null;
+}
+
+function seriesVectorValue(row, key, settings = null) {
+  const vals = seriesComponentKeys(key, settings).map(component => sourceValue(row, component));
+  return vals.every(finite) ? vals : null;
+}
+
+function rowHasSeries(row, key, settings = null) {
+  const vals = seriesVectorValue(row, key, settings);
+  return !!vals && vals.every(finite);
 }
 
 function monthValue(month, source) {
@@ -1409,6 +1466,7 @@ function capturePanelState() {
     excludeYears: Array.from(document.querySelectorAll(".exclude-year-check:checked:not(:disabled)")).map(el => el.value),
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
+    gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
     rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: document.getElementById("shock-lags").value,
     depLags: document.getElementById("dep-lags").value,
@@ -1432,6 +1490,7 @@ function capturePanelState() {
 function applyPanelState(state) {
   if (!state) return;
   if (state.shock && allSeries()[state.shock]) document.getElementById("shock").value = state.shock;
+  setGssPcMode(state.gssPcMode || "both");
   document.getElementById("aggregation").value = state.aggregation ?? "main";
   document.getElementById("included-years").value = state.includedYears ?? "1993-2025";
   document.getElementById("include-zlb").checked = !!state.includeZlb;
@@ -1553,6 +1612,7 @@ function getSettings() {
     includedYearRules: includedYears.rules,
     includedYearsDisplay: includedYears.display || "all",
     includedYearsError: includedYears.error,
+    gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
     rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
@@ -1594,13 +1654,20 @@ function aggregateMonth(items, mode, shockKey) {
   rec.date = base.date;
   rec.month = base.month;
   rec.first_obs_date = sorted[0].date;
+  const shockComponents = seriesSpec(shockKey).components || [shockKey];
   if (mode === "month-sum") {
     rec[shockKey] = sumFiniteRows(sorted, shockKey);
+    for (const component of shockComponents) {
+      rec[component] = sumFiniteRows(sorted, component);
+    }
     for (const key of MONTH_SUM_SCALE_COLUMNS) {
       rec[key] = sumFiniteRows(sorted, key);
     }
   } else {
     rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
+    for (const component of shockComponents) {
+      rec[component] = finite(base[component]) ? base[component] : null;
+    }
   }
   const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
   for (const key of allControls) {
@@ -1630,7 +1697,7 @@ function filteredEventRows(settings, shockKey) {
 }
 
 function trimmedSupportRows(filteredRows, settings, shockKey) {
-  return filteredRows.filter(row => finite(seriesValue(row, shockKey)));
+  return filteredRows.filter(row => rowHasSeries(row, shockKey, settings));
 }
 
 function countUnscheduledSupportRows(settings, shockKey) {
@@ -1672,20 +1739,38 @@ function assignRateBaseDates(rows) {
 function attachSeriesHistory(rows, settings, shockKey) {
   const history = [];
   for (const row of rows) {
-    const value = seriesValue(row, shockKey);
-    row._x = finite(value) ? value : 0;
+    const vals = seriesVectorValue(row, shockKey, settings);
+    row._xVec = vals ? vals.slice() : seriesComponentKeys(shockKey, settings).map(() => 0);
+    row._x = row._xVec[0];
     row._shockLags = [];
+    row._shockLagVectors = [];
     for (let i = 1; i <= settings.shockLags; i++) {
-      row._shockLags.push(history.length >= i ? history[history.length - i] : null);
+      const lagVec = history.length >= i ? history[history.length - i] : null;
+      row._shockLagVectors.push(lagVec ? lagVec.slice() : row._xVec.map(() => null));
     }
-    history.push(row._x);
+    row._shockLags = row._shockLagVectors.flat();
+    history.push(row._xVec.slice());
   }
   return rows;
 }
 
+function shockLagControls(row, settings) {
+  const q = seriesComponentKeys(settings.shock, settings).length;
+  const out = [];
+  for (let i = 0; i < settings.shockLags; i++) {
+    const lagVec = row._shockLagVectors?.[i] || (q === 1 ? [row._shockLags?.[i]] : null);
+    if (!lagVec || lagVec.length < q) return null;
+    for (let j = 0; j < q; j++) {
+      if (!finite(lagVec[j])) return null;
+      out.push(lagVec[j]);
+    }
+  }
+  return out;
+}
+
 function buildMonthlySeriesRows(settings, shockKey) {
   const rows = DATA.macro
-    .filter(row => finite(seriesValue(row, shockKey)))
+    .filter(row => rowHasSeries(row, shockKey, settings))
     .map(row => ({...row, source: "monthly-series"}));
   assignRateBaseDates(sortAnalysisRows(rows));
   attachSeriesHistory(rows, settings, shockKey);
@@ -1723,6 +1808,10 @@ function buildAnalysisRows(settings, shockKey) {
           }
         }
         rec[shockKey] = found ? total : 0;
+        for (const component of seriesSpec(shockKey).components || [shockKey]) {
+          const componentSum = sumFiniteRows(items, component);
+          rec[component] = finite(componentSum) ? componentSum : 0;
+        }
         for (const key of MONTH_SUM_SCALE_COLUMNS) {
           const responseSum = sumFiniteRows(items, key);
           rec[key] = finite(responseSum) ? responseSum : (items.length ? null : 0);
@@ -1755,11 +1844,9 @@ function buildUsedControls(settings, row, outcomeKey, options = {}) {
   const outcomeLagKeys = options.outcomeLagKeys || [outcomeKey];
   const zi = [];
   if (includeShockLags) {
-    for (let i = 0; i < settings.shockLags; i++) {
-      const v = row._shockLags[i];
-      if (!finite(v)) return null;
-      zi.push(v);
-    }
+    const lags = shockLagControls(row, settings);
+    if (!lags) return null;
+    zi.push(...lags);
   }
 
   for (const lagOutcome of outcomeLagKeys) {
@@ -1794,13 +1881,14 @@ function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     const yi = responseValue(outcomeKey, row.month, h, settings, row);
-    if (!finite(yi) || !finite(row._x)) continue;
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
 
     const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
 
     y.push(yi);
-    x.push(row._x);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
     controls.push(zi);
     rowDates.push(row.date);
   }
@@ -1812,12 +1900,13 @@ function buildShockScaleData(settings, rows, outcomeKey, options = {}) {
   const controls = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
-    if (!finite(row._x)) continue;
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
 
     const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
 
-    x.push(row._x);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
     controls.push(zi);
   }
   return {x, controls};
@@ -1829,7 +1918,8 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
   const controls = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
-    if (!finite(row._x)) continue;
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
     if (!finite(responseValue(outcomeKey, row.month, 0, settings, row))) continue;
     const ust2y = sourceValue(row, "ust2y");
     if (!finite(ust2y)) continue;
@@ -1838,7 +1928,7 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
     if (!zi) continue;
 
     y.push(ust2y);
-    x.push(row._x);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
     controls.push(zi);
   }
   return {y, x, controls};
@@ -1849,11 +1939,9 @@ function buildSeriesOnlyControls(settings, row, options = {}) {
   const outcomeLagKeys = options.outcomeLagKeys || [];
   const zi = [];
   if (includeShockLags) {
-    for (let i = 0; i < settings.shockLags; i++) {
-      const v = row._shockLags[i];
-      if (!finite(v)) return null;
-      zi.push(v);
-    }
+    const lags = shockLagControls(row, settings);
+    if (!lags) return null;
+    zi.push(...lags);
   }
 
   for (const lagOutcome of outcomeLagKeys) {
@@ -1888,13 +1976,14 @@ function buildMarketResponseRegressionData(settings, rows, responseKey, options 
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     const yi = sourceValue(row, responseKey);
-    if (!finite(yi) || !finite(row._x)) continue;
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
 
     const zi = buildSeriesOnlyControls(settings, row, options);
     if (!zi) continue;
 
     y.push(yi);
-    x.push(row._x);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
     controls.push(zi);
     rowDates.push(row.date);
   }
@@ -2362,7 +2451,109 @@ function sampleSd(values) {
   return Math.sqrt(ss / (n - 1));
 }
 
+function isMatrixX(x) {
+  return Array.isArray(x?.[0]);
+}
+
+function residualizeMatrix(x, z) {
+  if (!x.length || !Array.isArray(x[0])) return null;
+  const q = x[0].length;
+  const cols = [];
+  for (let j = 0; j < q; j++) {
+    const col = x.map(row => row[j]);
+    const resid = residualize(col, z);
+    if (!resid) return null;
+    cols.push(resid);
+  }
+  return x.map((_, i) => cols.map(col => col[i]));
+}
+
+function invertMatrix(a) {
+  const n = a.length;
+  const inv = Array.from({length: n}, () => Array(n).fill(0));
+  for (let j = 0; j < n; j++) {
+    const basis = Array.from({length: n}, (_, i) => i === j ? 1 : 0);
+    const sol = solveLinear(a, basis);
+    if (!sol) return null;
+    for (let i = 0; i < n; i++) inv[i][j] = sol[i];
+  }
+  return inv;
+}
+
+function quadraticForm(v, m) {
+  let total = 0;
+  for (let i = 0; i < v.length; i++) {
+    for (let j = 0; j < v.length; j++) total += v[i] * m[i][j] * v[j];
+  }
+  return total;
+}
+
+function partialOlsMulti(y, x, controls) {
+  const n = y.length;
+  if (n < 8 || !x.length || !Array.isArray(x[0])) return null;
+  const q = x[0].length;
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualizeMatrix(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+
+  const xtx = Array.from({length: q}, () => Array(q).fill(0));
+  const xty = Array(q).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < q; a++) {
+      xty[a] += rx[i][a] * ry[i];
+      for (let b = 0; b < q; b++) xtx[a][b] += rx[i][a] * rx[i][b];
+    }
+  }
+  const betaVector = solveLinear(xtx, xty);
+  const inv = invertMatrix(xtx);
+  if (!betaVector || !inv) return null;
+
+  const residuals = ry.map((v, i) => v - betaVector.reduce((acc, b, j) => acc + b * rx[i][j], 0));
+  const p = k + q;
+  if (n <= p) return null;
+  const meat = Array.from({length: q}, () => Array(q).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < q; a++) {
+      for (let b = 0; b < q; b++) meat[a][b] += rx[i][a] * rx[i][b] * residuals[i] * residuals[i];
+    }
+  }
+  const cov = Array.from({length: q}, () => Array(q).fill(0));
+  for (let a = 0; a < q; a++) {
+    for (let b = 0; b < q; b++) {
+      let val = 0;
+      for (let r = 0; r < q; r++) {
+        for (let s = 0; s < q; s++) val += inv[a][r] * meat[r][s] * inv[s][b];
+      }
+      cov[a][b] = (n / (n - p)) * val;
+    }
+  }
+
+  const weights = Array.from({length: q}, (_, j) => sampleSd(rx.map(row => row[j])) || 0);
+  if (!weights.some(w => Math.abs(w) > EPS)) return null;
+  const beta = betaVector.reduce((acc, b, j) => acc + weights[j] * b, 0);
+  const variance = quadraticForm(weights, cov);
+  return {
+    beta,
+    se: Math.sqrt(Math.max(0, variance)),
+    betaVector,
+    combinationWeights: weights,
+    xResidualSd: 1,
+    n,
+    p,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
+  };
+}
+
 function partialOls(y, x, controls) {
+  if (isMatrixX(x)) return partialOlsMulti(y, x, controls);
   const n = y.length;
   if (n < 8) return null;
   let {z, k} = cleanZ(controls);
@@ -2483,11 +2674,13 @@ function whitenedOls(y, x, controls, lags) {
 }
 
 function fitShockResponse(y, x, controls, settings) {
+  if (isMatrixX(x)) return partialOlsMulti(y, x, controls);
   if (settings.useWhitening) return whitenedOls(y, x, controls, settings.whiteningLags);
   return partialOls(y, x, controls);
 }
 
 function standardDecompParts(y, x, controls) {
+  if (isMatrixX(x)) return standardDecompPartsMulti(y, x, controls);
   let {z, k} = cleanZ(controls);
   let rx = null;
   let ry = null;
@@ -2505,6 +2698,43 @@ function standardDecompParts(y, x, controls) {
   return {rx, yResidual: ry, denom, beta, n: y.length, p: k + 1};
 }
 
+function standardDecompPartsMulti(y, x, controls) {
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualizeMatrix(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const q = x[0].length;
+  const xtx = Array.from({length: q}, () => Array(q).fill(0));
+  const xty = Array(q).fill(0);
+  for (let i = 0; i < y.length; i++) {
+    for (let a = 0; a < q; a++) {
+      xty[a] += rx[i][a] * ry[i];
+      for (let b = 0; b < q; b++) xtx[a][b] += rx[i][a] * rx[i][b];
+    }
+  }
+  const betaVector = solveLinear(xtx, xty);
+  const inv = invertMatrix(xtx);
+  if (!betaVector || !inv) return null;
+  const weights = Array.from({length: q}, (_, j) => sampleSd(rx.map(row => row[j])) || 0);
+  if (!weights.some(w => Math.abs(w) > EPS)) return null;
+  const beta = betaVector.reduce((acc, b, j) => acc + weights[j] * b, 0);
+  const obsWeights = rx.map(row => {
+    let total = 0;
+    for (let a = 0; a < q; a++) {
+      for (let b = 0; b < q; b++) total += row[a] * inv[a][b] * weights[b];
+    }
+    return total;
+  });
+  return {rx: obsWeights, yResidual: ry, denom: 1, beta, n: y.length, p: k + q};
+}
+
 function buildDecompLine(settings, rows, outcomeKey, h, scale) {
   const reg = buildRegressionData(settings, rows, outcomeKey, h, {includeShockLags: !settings.useWhitening});
   if (reg.y.length < 8) return null;
@@ -2515,7 +2745,7 @@ function buildDecompLine(settings, rows, outcomeKey, h, scale) {
   let n = reg.y.length;
   let p = 0;
 
-  if (settings.useWhitening) {
+  if (settings.useWhitening && !isMatrixX(reg.x)) {
     const model = buildWhitenedShock(reg.x, reg.controls, settings.whiteningLags);
     if (!model) return null;
     const denom = model.r.reduce((acc, v) => acc + v * v, 0);
@@ -2569,6 +2799,16 @@ function decompPlotLine(line, label) {
 function shockResidualRmse(x, controls) {
   const n = x.length;
   if (n < 8) return null;
+  if (isMatrixX(x)) {
+    const fit = partialOlsMulti(Array.from({length: n}, () => 0), x, controls);
+    if (!fit) return null;
+    return {
+      rmse: 1,
+      n: fit.n,
+      p: fit.p,
+      droppedControls: fit.droppedControls
+    };
+  }
   let {z, k} = cleanZ(controls);
   let rx = null;
   while (true) {
@@ -2646,6 +2886,10 @@ function marketResponseRows(settings, rows) {
 }
 
 function runVarSpec(settings) {
+  if (isMultiSeries(settings.shock, settings)) {
+    showError("Proxy VARX requires a scalar proxy. Switch GSS to PC1 only for the VAR tab.");
+    return;
+  }
   const p = settings.varLags;
   const varData = buildVarData(settings, settings.shock);
   if (varData.rows.length <= p + VAR_OUTCOME_ORDER.length * p + 8) {
@@ -2678,6 +2922,10 @@ function runSpec() {
   }
   if (settings.viewMode === "var") {
     runVarSpec(settings);
+    return;
+  }
+  if (settings.useWhitening && isMultiSeries(settings.shock, settings)) {
+    showError("GSS PC1+PC2 does not support whitening. Switch to PC1 only or uncheck whitening.");
     return;
   }
   const rows = buildAnalysisRows(settings, settings.shock);
@@ -3312,7 +3560,8 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   ]);
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
   const monthlySeries = isMonthlySeries(settings.shock);
-  const shockControlCount = settings.useWhitening ? settings.whiteningLags : settings.shockLags;
+  const seriesLagCols = settings.shockLags * seriesComponentKeys(settings.shock, settings).length;
+  const shockControlCount = settings.useWhitening ? settings.whiteningLags : seriesLagCols;
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
   const covidText = settings.includeCovid ? "COVID included" : "COVID leads excluded";
@@ -3398,6 +3647,8 @@ function renderOptions() {
     .join("");
 
   document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
+  setGssPcMode("both");
+  syncGssControls();
   document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
   document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
@@ -3482,6 +3733,17 @@ function syncBsControls() {
   updateGroupToggles();
 }
 
+function setGssPcMode(mode) {
+  const pc1 = mode === "pc1";
+  document.getElementById("gss-both").classList.toggle("active", !pc1);
+  document.getElementById("gss-pc1").classList.toggle("active", pc1);
+}
+
+function syncGssControls() {
+  const isGss = document.getElementById("shock").value === "gss";
+  document.getElementById("gss-pc-wrap").classList.toggle("hidden", !isGss);
+}
+
 function syncWhiteningControls() {
   const enabled = document.getElementById("use-whitening").checked;
   const wrap = document.getElementById("whitening-lag-wrap");
@@ -3524,7 +3786,16 @@ async function init() {
     runSpec();
   });
   document.getElementById("shock").addEventListener("change", () => {
+    syncGssControls();
     syncBsControls();
+    runSpec();
+  });
+  document.getElementById("gss-both").addEventListener("click", () => {
+    setGssPcMode("both");
+    runSpec();
+  });
+  document.getElementById("gss-pc1").addEventListener("click", () => {
+    setGssPcMode("pc1");
     runSpec();
   });
   document.getElementById("rate-outcome").addEventListener("change", () => {

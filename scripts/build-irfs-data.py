@@ -28,6 +28,7 @@ import pyreadstat
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = Path(os.environ.get("MPS_REP_DIR", SITE_ROOT.parent / "mps_rep")).resolve()
+TERMPROP_ROOT = Path(os.environ.get("TERMPROP_DIR", SITE_ROOT.parent / "termprop")).resolve()
 OUTPUT_PATH = SITE_ROOT / "pages" / "irfs-data.json"
 
 MARKET_CONTROLS = [
@@ -110,6 +111,9 @@ EVENT_RESPONSE_COLUMNS = [
 ]
 EVENT_VALUE_COLUMNS = list(dict.fromkeys(EVENT_SCALE_COLUMNS + EVENT_RESPONSE_COLUMNS))
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
+GSS_HORIZONS = ["FF2", "ED2", "ED3", "ED4", "ED5", "ED6", "ED7", "ED8"]
+GSS_COMPONENT_COLUMNS = ["gss_pc1", "gss_pc2"]
+GSS_COLUMNS = ["gss", *GSS_COMPONENT_COLUMNS]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
 GSW_YIELD_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
 FRED_GRAPH_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
@@ -211,6 +215,52 @@ def compute_mps_from_pca(prep: pd.DataFrame) -> pd.Series:
     out = pd.Series(np.nan, index=prep.index, dtype=float)
     out.loc[valid] = 0.01 * pc1 / coef
     return out
+
+
+def compute_gss_pcs() -> pd.DataFrame:
+    fits_path = TERMPROP_ROOT / "ed_quadratic_fits.csv"
+    if not fits_path.exists():
+        return pd.DataFrame(columns=["date", *GSS_COLUMNS])
+
+    fits = pd.read_csv(fits_path)
+    required = {"Date", "Horizon", "Modified", "SourceED2"}
+    if not required.issubset(fits.columns):
+        return pd.DataFrame(columns=["date", *GSS_COLUMNS])
+
+    fits["date"] = pd.to_datetime(fits["Date"], errors="coerce").dt.normalize()
+    fits["Modified"] = pd.to_numeric(fits["Modified"], errors="coerce")
+    fits["SourceED2"] = pd.to_numeric(fits["SourceED2"], errors="coerce")
+    fits["raw_modified"] = fits["Modified"] * fits["SourceED2"] / 12.5
+    wide = (
+        fits[fits["Horizon"].isin(GSS_HORIZONS)]
+        .pivot_table(index="date", columns="Horizon", values="raw_modified", aggfunc="first")
+        .reindex(columns=GSS_HORIZONS)
+        .sort_index()
+    )
+    clean = wide.replace([np.inf, -np.inf], np.nan).dropna()
+    if len(clean) < 4:
+        return pd.DataFrame(columns=["date", *GSS_COLUMNS])
+
+    x = clean.to_numpy(dtype=float)
+    mean = x.mean(axis=0)
+    centered = x - mean
+    _, _, vt = np.linalg.svd(centered, full_matrices=False)
+    components = vt[:2].copy()
+
+    # Fix the arbitrary PCA signs so rebuilds do not flip the displayed series.
+    ed_slice = [GSS_HORIZONS.index(col) for col in GSS_HORIZONS if col.startswith("ED")]
+    if components[0, ed_slice].sum() < 0:
+        components[0] *= -1
+    if components.shape[0] > 1 and components[1, GSS_HORIZONS.index("FF2")] < 0:
+        components[1] *= -1
+
+    scores = centered @ components.T
+    out = pd.DataFrame(index=clean.index)
+    out["gss_pc1"] = scores[:, 0]
+    out["gss_pc2"] = scores[:, 1] if scores.shape[1] > 1 else np.nan
+    out["gss"] = out["gss_pc1"]
+    out = out.reset_index().rename(columns={"index": "date"})
+    return out[["date", *GSS_COLUMNS]]
 
 
 def read_macro() -> pd.DataFrame:
@@ -513,8 +563,10 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
     prep["month"] = prep["date"].dt.strftime("%Y-%m")
 
     brw, ns = read_external_shocks()
+    gss = compute_gss_pcs()
     events = prep.merge(brw[["date", "brw"]], on="date", how="left")
     events = events.merge(ns[["date", "ns"]], on="date", how="left")
+    events = events.merge(gss, on="date", how="left")
 
     numeric_cols = sorted(
         set(
@@ -522,6 +574,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
             + EVENT_VALUE_COLUMNS
             + MARKET_CONTROLS
             + GREENBOOK_CONTROLS
+            + GSS_COLUMNS
             + ["unscheduled", "main", "nzlb", "possible", "scheduled", "ff4_mr", "brw", "ns"]
         )
     )
@@ -562,6 +615,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         "bs",
         "ns",
         "brw",
+        *GSS_COLUMNS,
     ]
 
     for _, row in events.iterrows():
@@ -659,6 +713,7 @@ def main() -> None:
                 "test/intermediates/gbweb_row_format.xlsx",
                 "BJMW-BRW-shocks-updated-1.xlsx",
                 "BJMW-2025-monetary-policy-shocks-series.xlsx",
+                "../termprop/ed_quadratic_fits.csv",
                 "FRED DFF or test/intermediates/FFRfred.dta + NY Fed EFFR",
                 "FRED DGS3MO or Eco3min mirror of FRED DTB3",
                 "Federal Reserve GSW feds200628 SVENY01/SVENY02",
@@ -697,6 +752,11 @@ def main() -> None:
             "bs": {"label": "BS", "source": "MPS with mandatory Bauer-Swanson controls"},
             "ns": {"label": "NS", "source": "BJMW NSmethod_Nsdata"},
             "brw": {"label": "BRW", "source": "BJMW latest BRW file"},
+            "gss": {
+                "label": "GSS",
+                "source": "Adjusted raw FF2/ED2-ED8 PCA from termprop",
+                "components": GSS_COMPONENT_COLUMNS,
+            },
             "dtffr": {
                 "label": "Target FFR Change",
                 "source": "Fredup target FFR monthly change",
