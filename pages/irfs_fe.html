@@ -1243,9 +1243,19 @@ function macroLagValue(controlKey, baseMonth, lag) {
   return monthValue(months[idx], controlKey);
 }
 
+function feTargetYear(eventDate, h) {
+  const y = Number.parseInt(eventDate.slice(0, 4), 10);
+  const m = Number.parseInt(eventDate.slice(5, 7), 10);
+  const q0 = Math.floor((m - 1) / 3);
+  const total = y * 4 + q0 + h;
+  return Math.floor(total / 4);
+}
+
 function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
   if (FE_OUTCOMES_SET.has(outcomeKey)) {
     if (!FE_LOOKUP || !row || h < 0 || h > FE_MAX_H) return null;
+    const tY = feTargetYear(row.date, h);
+    if ((settings.excludeLeadYears || []).includes(tY)) return null;
     const rec = FE_LOOKUP[row.date];
     if (!rec) return null;
     const vals = rec[outcomeKey];
