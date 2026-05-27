@@ -1,0 +1,4181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Projection IRF Explorer</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f3;
+    --panel: #ffffff;
+    --ink: #17201b;
+    --muted: #66736c;
+    --line: #d9dfd8;
+    --teal: #167c80;
+    --teal-soft: rgba(22, 124, 128, 0.14);
+    --amber: #b66d12;
+    --rose: #9a4055;
+    --shadow: 0 16px 40px rgba(22, 32, 27, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px;
+    min-height: 100vh;
+  }
+
+  aside, main {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  aside {
+    border-radius: 8px;
+    padding: 16px;
+    overflow: auto;
+    max-height: calc(100vh - 36px);
+  }
+
+  main {
+    border-radius: 8px;
+    display: grid;
+    grid-template-rows: auto minmax(760px, 1fr) auto;
+    min-width: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  .stamp {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
+  .section {
+    border-top: 1px solid var(--line);
+    padding-top: 13px;
+    margin-top: 13px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(94px, 1fr));
+    gap: 10px;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #34443a;
+    margin-bottom: 5px;
+  }
+
+  .unit-note {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  select, input[type="number"], input[type="date"], input[type="text"] {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fbfcfb;
+    color: var(--ink);
+    font-size: 13px;
+    padding: 6px 9px;
+    outline: none;
+  }
+
+  select:focus, input:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px var(--teal-soft);
+  }
+
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    color: #26352d;
+    font-size: 13px;
+  }
+
+  .check-row input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--teal);
+    flex: 0 0 auto;
+  }
+
+  .check-row span {
+    overflow-wrap: anywhere;
+  }
+
+  .exclude-year-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 30px;
+  }
+
+  .exclude-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #34443a;
+    min-width: 54px;
+  }
+
+  .exclude-year-row .check-row {
+    margin-bottom: 0;
+    min-height: 24px;
+  }
+
+  .mini-segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #f6f8f6;
+  }
+
+  .mini-segmented button {
+    min-height: 30px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .mini-segmented button.active {
+    color: var(--ink);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(23, 32, 27, 0.12);
+  }
+
+  .control-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+
+  .control-group {
+    border-top: 1px solid #edf0ed;
+    padding-top: 9px;
+    margin-top: 9px;
+  }
+
+  .control-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .control-group-header .check-row {
+    margin-bottom: 0;
+    min-height: 24px;
+  }
+
+  .control-group-title {
+    font-size: 13px;
+    font-weight: 850;
+    color: #26352d;
+  }
+
+  .control-picker summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    list-style: none;
+    margin-bottom: 7px;
+  }
+
+  .control-picker summary::-webkit-details-marker { display: none; }
+
+  .control-picker summary::after {
+    content: " +";
+  }
+
+  .control-picker[open] summary::after {
+    content: " -";
+  }
+
+  button {
+    border: 0;
+    border-radius: 6px;
+    min-height: 38px;
+    padding: 9px 12px;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+
+  button svg { width: 16px; height: 16px; }
+
+  .primary {
+    width: 100%;
+    background: var(--teal);
+    color: white;
+  }
+
+  .secondary {
+    width: 100%;
+    background: #eef2ef;
+    color: #26352d;
+  }
+
+  .topbar {
+    padding: 16px 18px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .topbar-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .chart-title {
+    font-size: 18px;
+    font-weight: 850;
+    margin-bottom: 4px;
+  }
+
+  .chart-subtitle {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .status {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pill {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 12px;
+    color: #34443a;
+    background: #fbfcfb;
+    white-space: nowrap;
+  }
+
+  .pill.warn {
+    color: var(--rose);
+    border-color: rgba(154, 64, 85, 0.32);
+    background: rgba(154, 64, 85, 0.07);
+  }
+
+  .plot-controls {
+    margin-top: 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .graph-toggle {
+    margin-left: auto;
+    margin-bottom: 0;
+    padding-bottom: 7px;
+    white-space: nowrap;
+  }
+
+  .view-tabs {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    overflow: hidden;
+    background: #fbfcfb;
+  }
+
+  .view-tab {
+    min-height: 34px;
+    border-radius: 0;
+    padding: 7px 11px;
+    background: transparent;
+    color: #34443a;
+    border-right: 1px solid var(--line);
+  }
+
+  .view-tab:last-child { border-right: 0; }
+
+  .view-tab.active {
+    background: var(--teal);
+    color: white;
+  }
+
+  .top-dropdown {
+    position: relative;
+    min-width: 180px;
+  }
+
+  .top-dropdown summary {
+    min-height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fbfcfb;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 750;
+    padding: 7px 10px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .top-dropdown summary::-webkit-details-marker { display: none; }
+
+  .top-dropdown summary::after {
+    content: " ▾";
+    color: var(--muted);
+  }
+
+  .dropdown-panel {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 6px);
+    right: 0;
+    width: min(520px, calc(100vw - 52px));
+    max-height: 320px;
+    overflow: auto;
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 10px;
+  }
+
+  .dropdown-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .mini-action {
+    min-height: 30px;
+    padding: 6px 10px;
+    background: #eef2ef;
+    color: #26352d;
+  }
+
+  .horizon-list {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(48px, 1fr));
+    gap: 2px 8px;
+  }
+
+  #plot {
+    width: 100%;
+    min-height: 760px;
+  }
+
+  .diagnostics {
+    border-top: 1px solid var(--line);
+    padding: 12px 18px 16px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .lp-response-table {
+    border-top: 1px solid var(--line);
+    padding: 14px 18px 16px;
+  }
+
+  .response-table-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .lp-response-table .table-title {
+    font-size: 13px;
+    font-weight: 850;
+    color: #26352d;
+    margin-bottom: 0;
+  }
+
+  .table-lag-control {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .table-lag-control label {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .table-lag-control .top-dropdown {
+    min-width: 210px;
+  }
+
+  .table-lag-control .horizon-list {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-response-table table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+  }
+
+  .lp-response-table th,
+  .lp-response-table td {
+    border-top: 1px solid #e8ede8;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .lp-response-table th {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .lp-response-table .response-name,
+  .lp-response-table .response-estimate {
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .lp-response-table .response-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .lp-response-table .table-note {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .term-structure-block {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .term-structure-plot {
+    width: min(100%, 780px);
+    height: 360px;
+    margin: 0 auto;
+  }
+
+  .metric {
+    background: #f8faf8;
+    border: 1px solid #e8ede8;
+    border-radius: 8px;
+    padding: 9px 10px;
+  }
+
+  .metric .name {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .metric .value {
+    font-size: 15px;
+    font-weight: 850;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .error {
+    margin: 18px;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(154, 64, 85, 0.35);
+    background: rgba(154, 64, 85, 0.08);
+    color: #7e2f43;
+    font-weight: 700;
+  }
+
+  .hidden { display: none; }
+
+  @media (max-width: 940px) {
+    .app {
+      grid-template-columns: 1fr;
+      padding: 10px;
+    }
+    aside {
+      max-height: none;
+    }
+    main {
+      min-height: 760px;
+    }
+    .topbar {
+      display: block;
+    }
+    .topbar-head {
+      display: block;
+    }
+    .status {
+      justify-content: flex-start;
+      margin-top: 10px;
+    }
+    .diagnostics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .graph-toggle,
+    .table-lag-control {
+      margin-left: 0;
+    }
+    .response-table-head {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .grid-3 {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div>
+        <h1>Local Projection IRF Explorer</h1>
+        <div class="stamp" id="data-stamp">Loading data...</div>
+      </div>
+    </div>
+
+    <div class="section" style="border-top: 0; padding-top: 0; margin-top: 0;">
+      <div class="section-title">Specification</div>
+      <div>
+        <label for="shock">Series</label>
+        <select id="shock"></select>
+      </div>
+      <div id="gss-pc-wrap" class="hidden" style="margin-top: 10px;">
+        <label>GSS PCs</label>
+        <div class="mini-segmented" aria-label="GSS principal components">
+          <button id="gss-both" class="active" type="button">PC1+PC2</button>
+          <button id="gss-pc1" type="button">PC1 only</button>
+        </div>
+        <label class="check-row" id="gss-both-lags-wrap" style="margin-top: 8px;">
+          <input id="gss-both-lags" type="checkbox">
+          <span>Use both PCs for series lags</span>
+        </label>
+      </div>
+      <div id="ff2-options-wrap" class="hidden" style="margin-top: 10px;">
+        <label class="check-row">
+          <input id="ff2-use-ff3-no-next" type="checkbox">
+          <span>Use FF3 when no next-month row</span>
+        </label>
+      </div>
+      <div style="margin-top: 10px;">
+        <label for="aggregation">Aggregation</label>
+        <select id="aggregation">
+          <option value="main">main == 1</option>
+          <option value="all">All event rows</option>
+          <option value="month-sum">Monthly sum</option>
+          <option value="month-last">Monthly last</option>
+          <option value="month-first">Monthly first</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Filter</div>
+      <div>
+        <label for="included-years">Included years</label>
+        <input id="included-years" type="text" value="1993-2025" placeholder="1993-2007, 2012, 2024+">
+      </div>
+      <div style="margin-top: 9px;">
+        <label class="check-row"><input id="include-zlb" type="checkbox"><span>Include ZLB periods</span></label>
+        <label class="check-row"><input id="include-covid" type="checkbox"><span>Include COVID</span></label>
+        <div class="exclude-year-row">
+          <span class="exclude-label">Exclude</span>
+          <label class="check-row"><input class="exclude-year-check" type="checkbox" value="2008"><span>2008</span></label>
+          <label class="check-row"><input class="exclude-year-check" type="checkbox" value="2009"><span>2009</span></label>
+          <label class="check-row"><input class="exclude-year-check" type="checkbox" value="2010"><span>2010</span></label>
+        </div>
+        <label class="check-row"><input id="exclude-unscheduled" type="checkbox"><span>Exclude unscheduled meetings</span></label>
+        <label class="check-row"><input id="impute-zeros" type="checkbox"><span>Impute missing months with zeros</span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Series, Outcome, Scaling</div>
+      <div class="grid-2">
+        <div>
+          <label for="shock-lags">Series lags</label>
+          <input id="shock-lags" type="number" min="0" max="60" step="1" value="8">
+        </div>
+        <div>
+          <label for="dep-lags">Outcome lags</label>
+          <input id="dep-lags" type="number" min="0" max="60" step="1" value="12">
+        </div>
+      </div>
+      <div class="lp-control" style="margin-top: 10px;">
+        <label for="rate-outcome">Interest-rate outcome</label>
+        <select id="rate-outcome"></select>
+      </div>
+      <div class="lp-control" style="margin-top: 9px;">
+        <label class="check-row"><input id="lp-log-levels" type="checkbox"><span>Use log levels</span></label>
+        <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
+      </div>
+      <div id="whitening-lag-wrap" class="lp-control hidden" style="margin-top: 10px;">
+        <label for="whitening-lags">Whitening lags</label>
+        <input id="whitening-lags" type="number" min="0" max="60" step="1" value="8">
+      </div>
+      <div class="grid-2" style="margin-top: 10px;">
+        <div>
+          <label for="horizon">Horizon</label>
+          <input id="horizon" type="number" min="1" max="120" step="1" value="24">
+        </div>
+        <div class="lp-control">
+          <label id="scale-target-label" for="scale-bp">UST2Y target</label>
+          <input id="scale-bp" type="number" min="0.01" max="300" step="1" value="10">
+          <div class="unit-note" id="scale-target-unit">basis points</div>
+        </div>
+      </div>
+      <div class="lp-control" style="margin-top: 10px;">
+        <label for="scale-mode">Scale mode</label>
+        <select id="scale-mode">
+          <option value="ust2y-impact">UST2Y impact</option>
+          <option value="ffr-h0">Rate h=0</option>
+          <option value="shock-rmse">Series residual SD</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Controls</div>
+      <div class="control-group">
+        <div class="control-group-header">
+          <div class="control-group-title">Market / BS Controls</div>
+          <label class="check-row"><input id="toggle-market-controls" type="checkbox" data-group-toggle="market"><span>All Market</span></label>
+        </div>
+        <details class="control-picker">
+          <summary>Individual market controls</summary>
+          <div class="control-list" id="controls-market"></div>
+        </details>
+      </div>
+      <div class="control-group">
+        <div class="control-group-header">
+          <div class="control-group-title">Greenbook Controls</div>
+          <label class="check-row"><input id="toggle-greenbook-controls" type="checkbox" data-group-toggle="greenbook"><span>All Greenbook</span></label>
+        </div>
+        <details class="control-picker">
+          <summary>Individual Greenbook controls</summary>
+          <div class="control-list" id="controls-greenbook"></div>
+        </details>
+      </div>
+      <div class="control-group">
+        <div class="control-group-title">FRED Macro Controls</div>
+        <div style="margin-bottom: 9px;">
+          <label for="macro-lags">FRED macro-control lags</label>
+          <input id="macro-lags" type="number" min="0" max="60" step="1" value="12">
+        </div>
+        <div class="control-list" id="controls-fred-macro"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="grid-2">
+        <button class="secondary" id="reset-btn" type="button"><i data-lucide="rotate-ccw"></i>Reset</button>
+        <button class="primary" id="run-btn" type="button"><i data-lucide="play"></i>Run</button>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="topbar-head">
+        <div>
+          <div class="chart-title" id="chart-title">IRF</div>
+          <div class="chart-subtitle" id="chart-subtitle">90% HC1 robust confidence band</div>
+        </div>
+        <div class="status" id="status-pills"></div>
+      </div>
+      <div class="plot-controls">
+        <div class="view-tabs" role="tablist" aria-label="Plot view">
+          <button class="view-tab active" type="button" data-view="irf" role="tab" aria-selected="true">IRF panel</button>
+          <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
+          <button class="view-tab" type="button" data-view="var" role="tab" aria-selected="false">VAR</button>
+        </div>
+        <label class="check-row graph-toggle lp-graph-control"><input id="show-treatment-paths" type="checkbox"><span>Show all treatment paths</span></label>
+        <div class="decomp-control hidden">
+          <label>Horizon lines</label>
+          <details class="top-dropdown" id="decomp-horizon-dropdown">
+            <summary id="decomp-horizon-summary">h=3, 6, 9</summary>
+            <div class="dropdown-panel">
+              <div class="dropdown-actions">
+                <button class="mini-action" id="decomp-default-horizons" type="button">3, 6, 9</button>
+                <button class="mini-action" id="decomp-all-horizons" type="button">All</button>
+              </div>
+              <div class="horizon-list" id="decomp-horizons"></div>
+            </div>
+          </details>
+        </div>
+        <div class="var-control hidden">
+          <label>VAR</label>
+          <div class="grid-3">
+            <div>
+              <label for="var-lags">Lag length</label>
+              <input id="var-lags" type="number" min="1" max="24" step="1" value="12">
+            </div>
+            <div>
+              <label for="var-scale-bp">2Y impact</label>
+              <input id="var-scale-bp" type="number" min="0.01" max="300" step="1" value="25">
+              <div class="unit-note">basis points</div>
+            </div>
+            <div>
+              <label for="var-bootstrap-draws">Bootstrap</label>
+              <input id="var-bootstrap-draws" type="number" min="100" max="5000" step="100" value="1000">
+              <div class="unit-note">95% bands</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="error" class="error hidden"></div>
+    <div id="plot"></div>
+    <div class="diagnostics" id="diagnostics"></div>
+    <div class="lp-response-table hidden" id="lp-response-table"></div>
+  </main>
+</div>
+
+<script>
+const DATA_URL = "irfs-data.json?v=breakeven-fix-20260527";
+const Z90 = 1.6448536269514722;
+const Z95 = 1.959963984540054;
+const EPS = 1e-10;
+const DISPLAY_ZERO_TOL = 1e-10;
+
+let DATA = null;
+let macroByMonth = new Map();
+let monthIndex = new Map();
+let months = [];
+let dailyRateOrdinals = [];
+let dailyRatePrefix = {};
+let activeViewMode = "irf";
+let tableOutcomeLagSelection = [];
+const VIEW_STATE = {lp: null, var: null};
+const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
+const NON_FFR_OUTCOMES = OUTCOME_ORDER.filter(key => key !== "ffr");
+const VAR_OUTCOME_ORDER = ["y2", "cpi", "ip", "ebp"];
+const VAR_OUTCOMES = {
+  y2: {label: "2Y Treasury", source: "var_y2"},
+  cpi: {label: "CPI", source: "var_logcpi"},
+  ip: {label: "IP", source: "var_logip"},
+  ebp: {label: "EBP", source: "var_ebp"}
+};
+const VAR_MARKET_CONTROL_SOURCE = {
+  nfp_surp: "varctl_nfp_surp",
+  nfp_12m: "varctl_nfp_12m",
+  sp500_3m: "varctl_sp500_3m",
+  slope_3m: "varctl_slope_3m",
+  bcom_3m: "varctl_bcom_3m",
+  tr_skew: "varctl_tr_skew"
+};
+const VAR_Y2_TARGET_BP = 25;
+const VAR_BOOTSTRAP_DEFAULT = 1000;
+const VAR_BAND_LEVEL = 0.95;
+const DEFAULT_DECOMP_HORIZONS = [3, 6, 9];
+const DECOMP_COLORS = ["#167c80", "#9a4055", "#b66d12", "#4d6fb3", "#6c5b7b", "#2f6f4e", "#8a5a2b", "#52616b"];
+const PANEL_LABELS = {
+  ffr: "FFR",
+  y2: "2Y Treasury",
+  unrate: "Unemployment",
+  cpi: "CPI",
+  pce: "PCE",
+  ip: "Industrial Production",
+  ebp: "EBP"
+};
+const MARKET_RESPONSE_SPECS = [
+  {key: "ust3m", label: "3-Month Treasury Yield"},
+  {key: "ust6m", label: "6-Month Treasury Yield"},
+  {key: "ust2y", label: "2-Year Treasury Yield"},
+  {key: "ust5y", label: "5-Year Treasury Yield"},
+  {key: "ust10y", label: "10-Year Treasury Yield"},
+  {key: "ust30y", label: "30-Year Treasury Yield"},
+  {key: "sp500", label: "S&P 500 Index"},
+  {key: "bei5y", label: "5-Year Breakeven Inflation"},
+  {key: "bei10y", label: "10-Year Breakeven Inflation"},
+  {key: "bei30y", label: "30-Year Breakeven Inflation"},
+  {key: "usdjpy", label: "U.S. Dollar / Japanese Yen Exchange Rate"}
+];
+const MONTH_SUM_SCALE_COLUMNS = MARKET_RESPONSE_SPECS.map(spec => spec.key);
+const TERM_STRUCTURE_SPECS = Array.from({length: 7}, (_, i) => ({
+  key: `jk_ed${i + 2}`,
+  label: `ED${i + 2}`,
+  quarter: i
+}));
+const DEFAULT_UST2Y_TARGET_BP = 10;
+
+const CONTROL_LABELS = {
+  nfp_surp: "NFP surprise",
+  nfp_12m: "NFP 12m",
+  sp500_3m: "S&P 3m",
+  slope_3m: "Slope 3m",
+  bcom_3m: "BCOM 3m",
+  tr_skew: "TR skew",
+  gRGDPB1: "RGDP B1",
+  gRGDPF0: "RGDP F0",
+  gRGDPF1: "RGDP F1",
+  gRGDPF2: "RGDP F2",
+  gRGDPF3: "RGDP F3",
+  DgRGDPB1: "Δ RGDP B1",
+  DgRGDPF0: "Δ RGDP F0",
+  DgRGDPF1: "Δ RGDP F1",
+  DgRGDPF2: "Δ RGDP F2",
+  gPGDPB1: "PGDP B1",
+  gPGDPF0: "PGDP F0",
+  gPGDPF1: "PGDP F1",
+  gPGDPF2: "PGDP F2",
+  gPGDPF3: "PGDP F3",
+  DgPGDPB1: "Δ PGDP B1",
+  DgPGDPF0: "Δ PGDP F0",
+  DgPGDPF1: "Δ PGDP F1",
+  DgPGDPF2: "Δ PGDP F2",
+  UNEMPF0: "UNEMP F0",
+  ffr: "FFR",
+  ebp: "EBP",
+  GS1: "1Y Treasury",
+  dgdp: "Δ BBK GDP",
+  dunemp: "Δ Unemp",
+  dlip: "Δ log IP",
+  dlcpi: "Δ log CPI",
+  dlpce: "Δ log PCE",
+  dlsent: "Δ log sentiment",
+  dlnas: "Δ log NASDAQ",
+  dlmpu: "Δ log EPU"
+};
+
+function finite(v) {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+function asNumber(v) {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : null;
+}
+
+function cleanZero(v) {
+  return finite(v) && Math.abs(v) < DISPLAY_ZERO_TOL ? 0 : v;
+}
+
+function fmt(x, digits = 3) {
+  return finite(x) ? cleanZero(x).toFixed(digits) : "NA";
+}
+
+function fmtTarget(x) {
+  if (!finite(x)) return "NA";
+  return Number.parseFloat(cleanZero(x).toFixed(4)).toString();
+}
+
+function significanceStars(beta, se) {
+  if (!finite(beta) || !finite(se) || se <= 0) return "";
+  const z = Math.abs(beta / se);
+  if (z >= 2.5758293035489004) return "***";
+  if (z >= 1.959963984540054) return "**";
+  if (z >= Z90) return "*";
+  return "";
+}
+
+function outcomeLabel(key) {
+  return PANEL_LABELS[key] || DATA?.outcomes?.[key]?.label || key;
+}
+
+function rateOutcomeKey(settings = {}) {
+  return settings.rateOutcome || DATA?.meta?.defaults?.rate_outcome || "ffr";
+}
+
+function rateOutcomeSpec(settings = {}) {
+  const key = rateOutcomeKey(settings);
+  return DATA?.rate_outcomes?.[key] || DATA?.rate_outcomes?.ffr || DATA?.outcomes?.ffr || {};
+}
+
+function rateOutcomeLabel(settings = {}) {
+  const spec = rateOutcomeSpec(settings);
+  return spec.panel_label || spec.label || "Rate";
+}
+
+function panelOutcomeLabel(key, settings = {}) {
+  if (key === "ffr") return rateOutcomeLabel(settings);
+  return PANEL_LABELS[key] || DATA?.outcomes?.[key]?.label || key;
+}
+
+function isRateOutcome(key) {
+  return !!DATA?.rate_outcomes?.[key];
+}
+
+function truthyFlag(v) {
+  return v === 1 || v === true || v === "1";
+}
+
+function sumFiniteRows(rows, key) {
+  let total = 0;
+  let found = false;
+  for (const row of rows) {
+    if (finite(row[key])) {
+      total += row[key];
+      found = true;
+    }
+  }
+  return found ? total : null;
+}
+
+function allSeries() {
+  return DATA?.series || DATA?.shocks || {};
+}
+
+function seriesSpec(key) {
+  return allSeries()[key] || {};
+}
+
+function isMonthlySeries(key) {
+  return seriesSpec(key).frequency === "monthly";
+}
+
+function seriesComponentKeys(key, settings = null) {
+  const spec = seriesSpec(key);
+  if (key === "gss" && settings?.gssPcMode === "pc1") return ["gss_pc1"];
+  return spec.components || [key];
+}
+
+function isMultiSeries(key, settings = null) {
+  return seriesComponentKeys(key, settings).length > 1;
+}
+
+function seriesLagComponentIndexes(settings) {
+  const components = seriesComponentKeys(settings.shock, settings);
+  if (settings.shock === "gss" && settings.gssPcMode !== "pc1" && !settings.gssBothLagPcs) {
+    return [0];
+  }
+  return components.map((_, i) => i);
+}
+
+function sourceValue(row, key) {
+  if (row && finite(row[key])) return row[key];
+  const m = macroByMonth.get(row?.month);
+  if (m && finite(m[key])) return m[key];
+  return null;
+}
+
+function ff2RawValue(row) {
+  if (row && finite(row.ff2_lag)) return row.ff2_lag;
+  const jk = sourceValue(row, "jk_ff2");
+  return finite(jk) ? jk : sourceValue(row, "ff2");
+}
+
+function ff3RawValue(row) {
+  const jk = sourceValue(row, "jk_ff3");
+  return finite(jk) ? jk : sourceValue(row, "ff3");
+}
+
+function ff2CurrentValue(row, settings = null) {
+  if (row && finite(row.ff2_current)) return row.ff2_current;
+  if (settings?.shock === "ff2" && settings.ff2UseFf3NoNextMonth && !truthyFlag(row?.ff2_next_month_row)) {
+    const ff3 = ff3RawValue(row);
+    if (finite(ff3)) return ff3;
+  }
+  return ff2RawValue(row);
+}
+
+function seriesValue(row, key, settings = null) {
+  if (key === "ff2") return ff2CurrentValue(row, settings);
+  const components = seriesComponentKeys(key, settings);
+  if (components.length > 1) {
+    const vals = components.map(component => sourceValue(row, component));
+    return vals.every(finite) ? vals[0] : null;
+  }
+  if (components[0] !== key) return sourceValue(row, components[0]);
+  if (isMonthlySeries(key)) return sourceValue(row, key);
+  return finite(row?.[key]) ? row[key] : null;
+}
+
+function seriesVectorValue(row, key, settings = null) {
+  if (key === "ff2") {
+    const v = ff2CurrentValue(row, settings);
+    return finite(v) ? [v] : null;
+  }
+  const vals = seriesComponentKeys(key, settings).map(component => sourceValue(row, component));
+  return vals.every(finite) ? vals : null;
+}
+
+function seriesLagVectorValue(row, key, settings = null) {
+  if (key === "ff2") {
+    const v = ff2RawValue(row);
+    return finite(v) ? [v] : [null];
+  }
+  return seriesVectorValue(row, key, settings);
+}
+
+function rowHasSeries(row, key, settings = null) {
+  const vals = seriesVectorValue(row, key, settings);
+  return !!vals && vals.every(finite);
+}
+
+function monthValue(month, source) {
+  const row = macroByMonth.get(month);
+  if (!row || !finite(row[source])) return null;
+  return row[source];
+}
+
+function dateOrdinal(date) {
+  if (!date || date.length < 10) return null;
+  const y = Number.parseInt(date.slice(0, 4), 10);
+  const m = Number.parseInt(date.slice(5, 7), 10);
+  const d = Number.parseInt(date.slice(8, 10), 10);
+  if (![y, m, d].every(Number.isFinite)) return null;
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function lowerBound(arr, target) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function upperBound(arr, target) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function dailyRangeTouchesSuppressedMonths(startOrd, endOrd, settings) {
+  if (endOrd < startOrd) return false;
+  let dt = new Date(startOrd * 86400000);
+  dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
+  const end = new Date(endOrd * 86400000);
+  while (dt <= end) {
+    const month = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+    if (isSuppressedLeadMonth(month, settings)) return true;
+    dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1));
+  }
+  return false;
+}
+
+function dailyRateAverage(rateKey, startOrd, endOrd, settings = {}, suppressLeadWindow = true) {
+  const prefix = dailyRatePrefix[rateKey];
+  if (!prefix || !dailyRateOrdinals.length || !Number.isFinite(startOrd) || !Number.isFinite(endOrd)) return null;
+  if (suppressLeadWindow && dailyRangeTouchesSuppressedMonths(startOrd, endOrd, settings)) return null;
+  const i = lowerBound(dailyRateOrdinals, startOrd);
+  const j = upperBound(dailyRateOrdinals, endOrd);
+  if (j <= i) return null;
+  const count = prefix.count[j] - prefix.count[i];
+  if (count <= 0) return null;
+  return (prefix.sum[j] - prefix.sum[i]) / count;
+}
+
+function buildDailyRatePrefixes() {
+  const rows = (DATA.daily_rates || [])
+    .map(row => ({...row, _ord: dateOrdinal(row.date)}))
+    .filter(row => Number.isFinite(row._ord))
+    .sort((a, b) => a._ord - b._ord);
+  dailyRateOrdinals = rows.map(row => row._ord);
+  dailyRatePrefix = {};
+  const rateSources = Object.values(DATA.rate_outcomes || {}).map(spec => spec.source);
+  for (const source of rateSources) {
+    const sum = [0];
+    const count = [0];
+    for (const row of rows) {
+      const v = row[source];
+      sum.push(sum[sum.length - 1] + (finite(v) ? v : 0));
+      count.push(count[count.length - 1] + (finite(v) ? 1 : 0));
+    }
+    dailyRatePrefix[source] = {sum, count};
+  }
+}
+
+function rateBaseOrdinal(baseMonth, row = null) {
+  if (row && Number.isFinite(row._rateBaseOrdinal)) return row._rateBaseOrdinal;
+  const monthRow = macroByMonth.get(baseMonth);
+  const baseDate = monthRow?.date || `${baseMonth}-01`;
+  const ord = dateOrdinal(baseDate);
+  return Number.isFinite(ord) ? ord - 1 : null;
+}
+
+function rateWindowLevel(outcomeKey, baseMonth, windowIndex, settings = {}, row = null, suppressLeadWindow = true) {
+  const source = DATA.rate_outcomes?.[outcomeKey]?.source;
+  const anchor = rateBaseOrdinal(baseMonth, row);
+  if (!source || !Number.isFinite(anchor)) return null;
+  const start = anchor + windowIndex * 30 + 1;
+  const end = anchor + (windowIndex + 1) * 30;
+  return dailyRateAverage(source, start, end, settings, suppressLeadWindow);
+}
+
+function transformedOutcomeLevel(outcomeKey, month) {
+  if (isRateOutcome(outcomeKey)) return null;
+  const spec = DATA.outcomes[outcomeKey];
+  const raw = monthValue(month, spec.source);
+  if (!finite(raw)) return null;
+  if (spec.transform === "logdiff100") {
+    if (raw <= 0) return null;
+    return 100 * Math.log(raw);
+  }
+  return raw;
+}
+
+function isZlbMonth(month) {
+  const row = macroByMonth.get(month);
+  return row ? truthyFlag(row.zlb) : false;
+}
+
+function isCovidLeadMonth(month) {
+  return month >= "2020-03" && month <= "2021-03";
+}
+
+function excludedLeadYear(month, settings) {
+  const year = Number.parseInt(month?.slice(0, 4), 10);
+  return Number.isFinite(year) && (settings.excludeLeadYears || []).includes(year);
+}
+
+function isSuppressedLeadMonth(month, settings) {
+  return (!settings.includeCovid && isCovidLeadMonth(month)) ||
+    excludedLeadYear(month, settings);
+}
+
+function macroLagValue(controlKey, baseMonth, lag) {
+  const baseIdx = monthIndex.get(baseMonth);
+  if (baseIdx === undefined) return null;
+  const idx = baseIdx - lag;
+  if (idx < 0) return null;
+  return monthValue(months[idx], controlKey);
+}
+
+function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
+  if (isRateOutcome(outcomeKey)) {
+    const lead = rateWindowLevel(outcomeKey, baseMonth, h, settings, row);
+    if (!finite(lead)) return null;
+    if (settings.lpLogLevels) return lead;
+    const prev = rateWindowLevel(outcomeKey, baseMonth, -1, settings, row, false);
+    return finite(prev) ? lead - prev : null;
+  }
+  const spec = DATA.outcomes[outcomeKey];
+  const baseIdx = monthIndex.get(baseMonth);
+  if (baseIdx === undefined) return null;
+  const leadIdx = baseIdx + h;
+  const prevIdx = baseIdx - 1;
+  if (leadIdx < 0 || leadIdx >= months.length) return null;
+  const leadMonth = months[leadIdx];
+  if (isSuppressedLeadMonth(leadMonth, settings)) return null;
+  if (settings.lpLogLevels) return transformedOutcomeLevel(outcomeKey, leadMonth);
+  if (prevIdx < 0) return null;
+  const prevMonth = months[prevIdx];
+  const lead = monthValue(leadMonth, spec.source);
+  const prev = monthValue(prevMonth, spec.source);
+  if (!finite(lead) || !finite(prev)) return null;
+  if (spec.transform === "logdiff100") {
+    if (lead <= 0 || prev <= 0) return null;
+    return 100 * (Math.log(lead) - Math.log(prev));
+  }
+  return lead - prev;
+}
+
+function dependentDelta(outcomeKey, baseMonth, lag, settings = {}, row = null) {
+  if (isRateOutcome(outcomeKey)) {
+    const cur = rateWindowLevel(outcomeKey, baseMonth, -lag, settings, row, false);
+    if (!finite(cur)) return null;
+    if (settings.lpLogLevels) return cur;
+    const prev = rateWindowLevel(outcomeKey, baseMonth, -lag - 1, settings, row, false);
+    return finite(prev) ? cur - prev : null;
+  }
+  const spec = DATA.outcomes[outcomeKey];
+  const baseIdx = monthIndex.get(baseMonth);
+  if (baseIdx === undefined) return null;
+  const curIdx = baseIdx - lag;
+  const prevIdx = baseIdx - lag - 1;
+  if (curIdx < 0) return null;
+  if (settings.lpLogLevels) return transformedOutcomeLevel(outcomeKey, months[curIdx]);
+  if (prevIdx < 0) return null;
+  const cur = monthValue(months[curIdx], spec.source);
+  const prev = monthValue(months[prevIdx], spec.source);
+  if (!finite(cur) || !finite(prev)) return null;
+  if (spec.transform === "logdiff100") {
+    if (cur <= 0 || prev <= 0) return null;
+    return 100 * (Math.log(cur) - Math.log(prev));
+  }
+  return cur - prev;
+}
+
+function scaleTargetConfig(mode) {
+  if (mode === "ust2y-impact") {
+    return {
+      label: "UST2Y target",
+      unit: "basis points",
+      value: DATA.meta.defaults.scale_to_ust2y_bp ?? DEFAULT_UST2Y_TARGET_BP,
+      min: 0.01,
+      max: 300,
+      step: 1
+    };
+  }
+  if (mode === "ffr-h0") {
+    const label = rateOutcomeLabel({rateOutcome: document.getElementById("rate-outcome")?.value});
+    return {
+      label: `${label} h=0 target`,
+      unit: "basis points",
+      value: DATA.meta.defaults.scale_to_ffr_h0_bp ?? DATA.meta.defaults.scale_to_ffr_h1_bp ?? 50,
+      min: 0.01,
+      max: 300,
+      step: 1
+    };
+  }
+  if (mode === "shock-rmse") {
+    return {
+      label: "Series size",
+      unit: "residual standard deviations",
+      value: DATA.meta.defaults.scale_to_shock_sd ?? 1,
+      min: 0.01,
+      max: 20,
+      step: 0.25
+    };
+  }
+  return {
+    label: "Raw multiplier",
+    unit: "multiplier",
+    value: 1,
+    min: 0,
+    max: 20,
+    step: 0.25
+  };
+}
+
+function configureScaleTarget(resetValue = false) {
+  const mode = document.getElementById("scale-mode").value;
+  const cfg = scaleTargetConfig(mode);
+  const input = document.getElementById("scale-bp");
+  document.getElementById("scale-target-label").textContent = cfg.label;
+  document.getElementById("scale-target-unit").textContent = cfg.unit;
+  input.min = cfg.min;
+  input.max = cfg.max;
+  input.step = cfg.step;
+  if (resetValue || !input.value) input.value = cfg.value;
+}
+
+function readScaleTarget(mode) {
+  const cfg = scaleTargetConfig(mode);
+  const value = Number.parseFloat(document.getElementById("scale-bp").value);
+  return Number.isFinite(value) ? Math.max(cfg.min, value) : cfg.value;
+}
+
+function parseIncludedYears(text) {
+  const raw = (text || "").trim();
+  if (!raw) return {rules: [], error: null, display: ""};
+  const rules = [];
+  const labels = [];
+  for (const part of raw.split(",")) {
+    const token = part.trim();
+    if (!token) continue;
+    let match = token.match(/^(\d{4})$/);
+    if (match) {
+      const year = Number.parseInt(match[1], 10);
+      rules.push({start: year, end: year});
+      labels.push(String(year));
+      continue;
+    }
+
+    match = token.match(/^(\d{4})\s*-\s*(\d{4})$/);
+    if (match) {
+      const start = Number.parseInt(match[1], 10);
+      const end = Number.parseInt(match[2], 10);
+      if (end < start) return {rules: [], error: `bad year range ${token}`, display: raw};
+      rules.push({start, end});
+      labels.push(`${start}-${end}`);
+      continue;
+    }
+
+    match = token.match(/^(\d{4})\+$/);
+    if (match) {
+      const start = Number.parseInt(match[1], 10);
+      rules.push({start, end: Infinity});
+      labels.push(`${start}+`);
+      continue;
+    }
+
+    return {rules: [], error: `bad year token ${token}`, display: raw};
+  }
+  return {rules, error: null, display: labels.join(", ")};
+}
+
+function rowYear(row) {
+  const stamp = row?.month || row?.date;
+  if (!stamp || stamp.length < 4) return null;
+  const year = Number.parseInt(stamp.slice(0, 4), 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+function yearIsIncluded(year, rules) {
+  if (!rules.length) return true;
+  return Number.isFinite(year) && rules.some(rule => year >= rule.start && year <= rule.end);
+}
+
+function currentViewMode() {
+  return activeViewMode || document.querySelector(".view-tab.active")?.dataset.view || "irf";
+}
+
+function defaultDecompHorizons(maxH) {
+  const defaults = DEFAULT_DECOMP_HORIZONS.filter(h => h <= maxH);
+  return defaults.length ? defaults : [Math.max(0, maxH)];
+}
+
+function selectedDecompHorizons(maxH) {
+  const selected = Array.from(document.querySelectorAll(".decomp-horizon-check:checked"))
+    .map(el => Number.parseInt(el.value, 10))
+    .filter(h => Number.isInteger(h) && h >= 0 && h <= maxH);
+  const horizons = selected.length ? selected : defaultDecompHorizons(maxH);
+  return Array.from(new Set(horizons)).sort((a, b) => a - b);
+}
+
+function setDecompHorizons(horizons) {
+  const keep = new Set(horizons);
+  document.querySelectorAll(".decomp-horizon-check").forEach(el => {
+    el.checked = keep.has(Number.parseInt(el.value, 10));
+  });
+  updateDecompHorizonSummary();
+}
+
+function updateDecompHorizonSummary() {
+  const maxH = Math.max(0, Number.parseInt(document.getElementById("horizon").value || "0", 10));
+  const horizons = selectedDecompHorizons(maxH);
+  const text = horizons.length > 8
+    ? `${horizons.length} horizons`
+    : `h=${horizons.join(", ")}`;
+  document.getElementById("decomp-horizon-summary").textContent = text;
+}
+
+function renderDecompHorizonOptions(maxH) {
+  const previous = selectedDecompHorizons(maxH);
+  const selected = new Set(previous.length ? previous : defaultDecompHorizons(maxH));
+  const html = Array.from({length: maxH + 1}, (_, h) => (
+    `<label class="check-row"><input class="decomp-horizon-check" type="checkbox" value="${h}" ${selected.has(h) ? "checked" : ""}><span>h=${h}</span></label>`
+  )).join("");
+  document.getElementById("decomp-horizons").innerHTML = html;
+  document.querySelectorAll(".decomp-horizon-check").forEach(el => {
+    el.addEventListener("change", () => {
+      updateDecompHorizonSummary();
+      runSpec();
+    });
+  });
+  updateDecompHorizonSummary();
+}
+
+function selectedTableOutcomeLags() {
+  const checks = Array.from(document.querySelectorAll(".table-lag-check"));
+  if (!checks.length) return tableOutcomeLagSelection.slice();
+  tableOutcomeLagSelection = checks.filter(el => el.checked)
+    .map(el => el.value)
+    .filter(key => NON_FFR_OUTCOMES.includes(key));
+  return tableOutcomeLagSelection.slice();
+}
+
+function setTableOutcomeLags(keys) {
+  tableOutcomeLagSelection = Array.from(new Set((keys || []).filter(key => NON_FFR_OUTCOMES.includes(key))));
+  const selected = new Set(tableOutcomeLagSelection);
+  document.querySelectorAll(".table-lag-check").forEach(el => {
+    el.checked = selected.has(el.value);
+  });
+  updateTableLagSummary();
+}
+
+function updateTableLagSummary() {
+  const summary = document.getElementById("table-lag-summary");
+  if (!summary) return;
+  const keys = selectedTableOutcomeLags();
+  const text = keys.length
+    ? keys.map(key => PANEL_LABELS[key] || DATA.outcomes[key].label).join(", ")
+    : "None";
+  summary.textContent = text.length > 38
+    ? `${keys.length} outcomes`
+    : text;
+}
+
+function renderTableLagOptions(selectedKeys = tableOutcomeLagSelection) {
+  const container = document.getElementById("table-lag-options");
+  if (!container) return;
+  const previous = new Set((selectedKeys || []).filter(key => NON_FFR_OUTCOMES.includes(key)));
+  tableOutcomeLagSelection = Array.from(previous);
+  container.innerHTML = NON_FFR_OUTCOMES.map(key => (
+    `<label class="check-row"><input class="table-lag-check" type="checkbox" value="${key}" ${previous.has(key) ? "checked" : ""}><span>${PANEL_LABELS[key] || DATA.outcomes[key].label}</span></label>`
+  )).join("");
+  container.querySelectorAll(".table-lag-check").forEach(el => {
+    el.addEventListener("change", () => {
+      tableOutcomeLagSelection = Array.from(container.querySelectorAll(".table-lag-check:checked"))
+        .map(input => input.value)
+        .filter(key => NON_FFR_OUTCOMES.includes(key));
+      updateTableLagSummary();
+      runSpec();
+    });
+  });
+  updateTableLagSummary();
+}
+
+function syncViewControls() {
+  const mode = currentViewMode();
+  const irf = mode === "irf";
+  const decomp = mode === "decomp";
+  const varMode = mode === "var";
+  document.querySelectorAll(".decomp-control").forEach(el => el.classList.toggle("hidden", !decomp));
+  document.querySelectorAll(".var-control").forEach(el => el.classList.toggle("hidden", !varMode));
+  document.querySelectorAll(".lp-graph-control").forEach(el => el.classList.toggle("hidden", !irf));
+  document.querySelectorAll(".lp-control").forEach(el => {
+    if (el.id !== "whitening-lag-wrap") el.classList.toggle("hidden", varMode);
+  });
+  if (varMode) {
+    document.getElementById("whitening-lag-wrap").classList.add("hidden");
+  } else {
+    syncWhiteningControls();
+  }
+  for (const id of ["shock-lags", "dep-lags", "use-whitening", "whitening-lags"]) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = varMode;
+  }
+}
+
+function syncExcludeYearControls() {
+  const horizon = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
+  document.querySelectorAll(".exclude-year-check").forEach(el => {
+    const year = Number.parseInt(el.value, 10);
+    const available = year !== 2010 || horizon > 24;
+    el.disabled = !available;
+    el.closest(".check-row").classList.toggle("hidden", !available);
+    if (!available) el.checked = false;
+  });
+}
+
+function viewStateKey(view) {
+  return view === "var" ? "var" : "lp";
+}
+
+function capturePanelState() {
+  return {
+    shock: document.getElementById("shock").value,
+    aggregation: document.getElementById("aggregation").value,
+    includedYears: document.getElementById("included-years").value,
+    includeZlb: document.getElementById("include-zlb").checked,
+    includeCovid: document.getElementById("include-covid").checked,
+    excludeYears: Array.from(document.querySelectorAll(".exclude-year-check:checked:not(:disabled)")).map(el => el.value),
+    excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
+    imputeZeros: document.getElementById("impute-zeros").checked,
+    gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
+    gssBothLagPcs: document.getElementById("gss-both-lags").checked,
+    ff2UseFf3NoNextMonth: document.getElementById("ff2-use-ff3-no-next").checked,
+    rateOutcome: document.getElementById("rate-outcome").value,
+    shockLags: document.getElementById("shock-lags").value,
+    depLags: document.getElementById("dep-lags").value,
+    lpLogLevels: document.getElementById("lp-log-levels").checked,
+    macroLags: document.getElementById("macro-lags").value,
+    useWhitening: document.getElementById("use-whitening").checked,
+    whiteningLags: document.getElementById("whitening-lags").value,
+    horizon: document.getElementById("horizon").value,
+    scaleMode: document.getElementById("scale-mode").value,
+    scaleBp: document.getElementById("scale-bp").value,
+    showTreatmentPaths: document.getElementById("show-treatment-paths").checked,
+    tableOutcomeLags: selectedTableOutcomeLags(),
+    varLags: document.getElementById("var-lags").value,
+    varScaleBp: document.getElementById("var-scale-bp").value,
+    varBootstrapDraws: document.getElementById("var-bootstrap-draws").value,
+    controls: Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])")).map(el => el.value),
+    macroControls: Array.from(document.querySelectorAll(".control-check:checked[data-kind='macro']")).map(el => el.value)
+  };
+}
+
+function applyPanelState(state) {
+  if (!state) return;
+  if (state.shock && allSeries()[state.shock]) document.getElementById("shock").value = state.shock;
+  setGssPcMode(state.gssPcMode || "both");
+  document.getElementById("gss-both-lags").checked = !!state.gssBothLagPcs;
+  document.getElementById("ff2-use-ff3-no-next").checked = !!state.ff2UseFf3NoNextMonth;
+  syncSeriesControls();
+  document.getElementById("aggregation").value = state.aggregation ?? "main";
+  document.getElementById("included-years").value = state.includedYears ?? "1993-2025";
+  document.getElementById("include-zlb").checked = !!state.includeZlb;
+  document.getElementById("include-covid").checked = !!state.includeCovid;
+  const excludeYears = new Set(state.excludeYears || []);
+  document.querySelectorAll(".exclude-year-check").forEach(el => {
+    el.checked = excludeYears.has(el.value);
+  });
+  document.getElementById("exclude-unscheduled").checked = !!state.excludeUnscheduled;
+  document.getElementById("impute-zeros").checked = !!state.imputeZeros;
+  if (state.rateOutcome && DATA.rate_outcomes?.[state.rateOutcome]) {
+    document.getElementById("rate-outcome").value = state.rateOutcome;
+  } else {
+    document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
+  }
+  document.getElementById("shock-lags").value = state.shockLags ?? (DATA.meta.defaults.shock_lags ?? 8);
+  document.getElementById("dep-lags").value = state.depLags ?? 12;
+  document.getElementById("lp-log-levels").checked = !!state.lpLogLevels;
+  document.getElementById("macro-lags").value = state.macroLags ?? 12;
+  document.getElementById("use-whitening").checked = !!state.useWhitening;
+  document.getElementById("whitening-lags").value = state.whiteningLags ?? 8;
+  document.getElementById("horizon").value = state.horizon ?? 24;
+  document.getElementById("scale-mode").value = state.scaleMode ?? (DATA.meta.defaults.scale_mode ?? "shock-rmse");
+  configureScaleTarget(false);
+  document.getElementById("scale-bp").value = state.scaleBp ?? scaleTargetConfig(document.getElementById("scale-mode").value).value;
+  document.getElementById("show-treatment-paths").checked = !!state.showTreatmentPaths;
+  setTableOutcomeLags(state.tableOutcomeLags || []);
+  document.getElementById("var-lags").value = state.varLags ?? 12;
+  document.getElementById("var-scale-bp").value = state.varScaleBp ?? VAR_Y2_TARGET_BP;
+  document.getElementById("var-bootstrap-draws").value = state.varBootstrapDraws ?? VAR_BOOTSTRAP_DEFAULT;
+  const regularControls = new Set(state.controls || []);
+  const macroControls = new Set(state.macroControls || []);
+  document.querySelectorAll(".control-check").forEach(el => {
+    el.checked = el.dataset.kind === "macro" ? macroControls.has(el.value) : regularControls.has(el.value);
+    el.disabled = false;
+    el.closest(".check-row").style.color = "";
+  });
+  syncWhiteningControls();
+  syncExcludeYearControls();
+  renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
+  syncBsControls();
+  updateGroupToggles();
+  syncViewControls();
+}
+
+function defaultVarState() {
+  return {
+    shock: allSeries().mps ? "mps" : document.getElementById("shock").value,
+    aggregation: "month-sum",
+    includedYears: "1988-2025",
+    includeZlb: true,
+    includeCovid: false,
+    excludeYears: [],
+    excludeUnscheduled: false,
+    imputeZeros: false,
+    gssPcMode: "both",
+    gssBothLagPcs: false,
+    ff2UseFf3NoNextMonth: false,
+    rateOutcome: DATA.meta.defaults.rate_outcome ?? "ffr",
+    shockLags: 0,
+    depLags: 0,
+    lpLogLevels: false,
+    macroLags: 0,
+    useWhitening: false,
+    whiteningLags: DATA.meta.defaults.whitening_lags ?? 8,
+    horizon: 24,
+    scaleMode: DATA.meta.defaults.scale_mode ?? "shock-rmse",
+    scaleBp: DATA.meta.defaults.scale_to_shock_sd ?? 1,
+    showTreatmentPaths: false,
+    tableOutcomeLags: [],
+    varLags: 12,
+    varScaleBp: VAR_Y2_TARGET_BP,
+    varBootstrapDraws: VAR_BOOTSTRAP_DEFAULT,
+    controls: [],
+    macroControls: []
+  };
+}
+
+function activateView(view) {
+  const previousView = currentViewMode();
+  const previousKey = viewStateKey(previousView);
+  VIEW_STATE[previousKey] = capturePanelState();
+  activeViewMode = view;
+  document.querySelectorAll(".view-tab").forEach(el => {
+    const active = el.dataset.view === view;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  const nextKey = viewStateKey(view);
+  if (nextKey !== previousKey) {
+    applyPanelState(VIEW_STATE[nextKey] || (nextKey === "var" ? defaultVarState() : VIEW_STATE.lp));
+  } else {
+    syncViewControls();
+  }
+  runSpec();
+}
+
+function getSettings() {
+  syncExcludeYearControls();
+  const horizon = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
+  const selectedRegularControls = Array.from(document.querySelectorAll(".control-check:checked:not([data-kind='macro'])"))
+    .map(el => el.value);
+  const selectedMacroControls = Array.from(document.querySelectorAll(".control-check:checked[data-kind='macro']"))
+    .map(el => el.value);
+  const selectedExcludeYears = Array.from(document.querySelectorAll(".exclude-year-check:checked:not(:disabled)"))
+    .map(el => Number.parseInt(el.value, 10))
+    .filter(Number.isFinite);
+  const shock = document.getElementById("shock").value;
+  const forced = shock === "bs" ? DATA.controls.bs_mandatory : [];
+  const scaleMode = document.getElementById("scale-mode").value;
+  const includedYears = parseIncludedYears(document.getElementById("included-years").value);
+  return {
+    shock,
+    viewMode: currentViewMode(),
+    decompHorizons: selectedDecompHorizons(horizon),
+    aggregation: document.getElementById("aggregation").value,
+    includeZlb: document.getElementById("include-zlb").checked,
+    includeCovid: document.getElementById("include-covid").checked,
+    excludeLeadYears: selectedExcludeYears,
+    excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
+    imputeZeros: document.getElementById("impute-zeros").checked,
+    includedYearRules: includedYears.rules,
+    includedYearsDisplay: includedYears.display || "all",
+    includedYearsError: includedYears.error,
+    gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
+    gssBothLagPcs: document.getElementById("gss-both-lags").checked,
+    ff2UseFf3NoNextMonth: document.getElementById("ff2-use-ff3-no-next").checked,
+    rateOutcome: document.getElementById("rate-outcome").value,
+    shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
+    depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
+    lpLogLevels: document.getElementById("lp-log-levels").checked,
+    macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
+    useWhitening: document.getElementById("use-whitening").checked,
+    whiteningLags: Math.max(0, Number.parseInt(document.getElementById("whitening-lags").value || "8", 10)),
+    varLags: Math.max(1, Number.parseInt(document.getElementById("var-lags").value || "12", 10)),
+    varScaleTarget: Math.max(0.01, Number.parseFloat(document.getElementById("var-scale-bp").value || `${VAR_Y2_TARGET_BP}`)),
+    varBootstrapDraws: Math.max(100, Number.parseInt(document.getElementById("var-bootstrap-draws").value || `${VAR_BOOTSTRAP_DEFAULT}`, 10)),
+    horizon,
+    scaleTarget: readScaleTarget(scaleMode),
+    scaleMode,
+    showTreatmentPaths: document.getElementById("show-treatment-paths").checked,
+    tableOutcomeLags: selectedTableOutcomeLags(),
+    controls: Array.from(new Set([...selectedRegularControls, ...forced])),
+    macroControls: Array.from(new Set(selectedMacroControls))
+  };
+}
+
+function eventPassesBaseFilters(row, settings) {
+  const unscheduled = truthyFlag(row.unscheduled) || row.scheduled === 0;
+  if (settings.excludeUnscheduled && unscheduled) return false;
+  if (settings.aggregation === "main") {
+    return truthyFlag(row.main) || (row.main == null && row.scheduled === 1);
+  }
+  return true;
+}
+
+function rowPassesYearFilter(row, settings) {
+  return yearIsIncluded(rowYear(row), settings.includedYearRules);
+}
+
+function aggregateMonth(items, mode, shockKey, settings) {
+  const sorted = items.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const base = mode === "month-first" ? sorted[0] : sorted[sorted.length - 1];
+  const rec = {...base};
+  rec.source = "aggregated";
+  rec.date = base.date;
+  rec.month = base.month;
+  rec.first_obs_date = sorted[0].date;
+  const shockComponents = seriesSpec(shockKey).components || [shockKey];
+  if (mode === "month-sum") {
+    if (shockKey === "ff2") {
+      let rawTotal = 0;
+      let rawFound = false;
+      let currentTotal = 0;
+      let currentFound = false;
+      for (const item of sorted) {
+        const raw = ff2RawValue(item);
+        if (finite(raw)) {
+          rawTotal += raw;
+          rawFound = true;
+        }
+        const v = ff2CurrentValue(item, settings);
+        if (finite(v)) {
+          currentTotal += v;
+          currentFound = true;
+        }
+      }
+      rec.ff2_lag = rawFound ? rawTotal : null;
+      rec.ff2_current = currentFound ? currentTotal : null;
+      rec.ff2 = rec.ff2_lag;
+    } else {
+      rec[shockKey] = sumFiniteRows(sorted, shockKey);
+      for (const component of shockComponents) {
+        rec[component] = sumFiniteRows(sorted, component);
+      }
+    }
+    for (const key of MONTH_SUM_SCALE_COLUMNS) {
+      rec[key] = sumFiniteRows(sorted, key);
+    }
+    for (const spec of TERM_STRUCTURE_SPECS) {
+      rec[spec.key] = sumFiniteRows(sorted, spec.key);
+    }
+  } else {
+    if (shockKey === "ff2") {
+      rec.ff2_lag = ff2RawValue(base);
+      rec.ff2_current = ff2CurrentValue(base, settings);
+      rec.ff2 = rec.ff2_lag;
+    } else {
+      rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
+      for (const component of shockComponents) {
+        rec[component] = finite(base[component]) ? base[component] : null;
+      }
+    }
+    for (const spec of TERM_STRUCTURE_SPECS) {
+      rec[spec.key] = finite(base[spec.key]) ? base[spec.key] : null;
+    }
+  }
+  const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
+  for (const key of allControls) {
+    for (let i = 0; i < sorted.length; i++) {
+      if (finite(sorted[i][key])) {
+        rec[key] = sorted[i][key];
+        break;
+      }
+    }
+  }
+  rec.unscheduled = sorted.some(r => truthyFlag(r.unscheduled)) ? 1 : 0;
+  rec.main = sorted.some(r => truthyFlag(r.main)) ? 1 : 0;
+  return rec;
+}
+
+function filteredEventRows(settings, shockKey) {
+  let rows = DATA.events.filter(row => eventPassesBaseFilters(row, settings));
+  if (settings.aggregation.startsWith("month-")) {
+    const groups = new Map();
+    for (const row of rows) {
+      if (!groups.has(row.month)) groups.set(row.month, []);
+      groups.get(row.month).push(row);
+    }
+    rows = Array.from(groups.values()).map(items => aggregateMonth(items, settings.aggregation, shockKey, settings));
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function trimmedSupportRows(filteredRows, settings, shockKey) {
+  return filteredRows.filter(row => rowHasSeries(row, shockKey, settings));
+}
+
+function countUnscheduledSupportRows(settings, shockKey) {
+  if (isMonthlySeries(shockKey)) return 0;
+  const rowsWithUnscheduled = filteredEventRows({...settings, excludeUnscheduled: false}, shockKey);
+  return trimmedSupportRows(rowsWithUnscheduled, settings, shockKey)
+    .filter(row => rowPassesYearFilter(row, settings))
+    .filter(row => truthyFlag(row.unscheduled) || row.scheduled === 0)
+    .length;
+}
+
+function sortAnalysisRows(rows) {
+  return rows.sort((a, b) => {
+    const am = a.month || a.date.slice(0, 7);
+    const bm = b.month || b.date.slice(0, 7);
+    return am === bm ? a.date.localeCompare(b.date) : am.localeCompare(bm);
+  });
+}
+
+function assignRateBaseDates(rows) {
+  const firstByMonth = new Map();
+  for (const row of rows.slice().sort((a, b) => {
+    const ad = a.first_obs_date || a.date;
+    const bd = b.first_obs_date || b.date;
+    return ad.localeCompare(bd);
+  })) {
+    if (!row.month) continue;
+    const first = row.first_obs_date || row.date;
+    if (first && !firstByMonth.has(row.month)) firstByMonth.set(row.month, first);
+  }
+  for (const row of rows) {
+    const first = firstByMonth.get(row.month) || row.first_obs_date || row.date;
+    const ord = dateOrdinal(first);
+    row._rateBaseOrdinal = Number.isFinite(ord) ? ord - 1 : null;
+  }
+  return rows;
+}
+
+function attachSeriesHistory(rows, settings, shockKey) {
+  const history = [];
+  for (const row of rows) {
+    const vals = seriesVectorValue(row, shockKey, settings);
+    const lagVals = seriesLagVectorValue(row, shockKey, settings);
+    row._xVec = vals ? vals.slice() : seriesComponentKeys(shockKey, settings).map(() => 0);
+    row._x = row._xVec[0];
+    row._shockLags = [];
+    row._shockLagVectors = [];
+    for (let i = 1; i <= settings.shockLags; i++) {
+      const lagVec = history.length >= i ? history[history.length - i] : null;
+      row._shockLagVectors.push(lagVec ? lagVec.slice() : row._xVec.map(() => null));
+    }
+    row._shockLags = row._shockLagVectors.flat();
+    history.push(lagVals ? lagVals.slice() : row._xVec.map(() => null));
+  }
+  return rows;
+}
+
+function shockLagControls(row, settings) {
+  const indexes = seriesLagComponentIndexes(settings);
+  const out = [];
+  for (let i = 0; i < settings.shockLags; i++) {
+    const lagVec = row._shockLagVectors?.[i] || (indexes.length === 1 ? [row._shockLags?.[i]] : null);
+    if (!lagVec) return null;
+    for (const j of indexes) {
+      if (!finite(lagVec[j])) return null;
+      out.push(lagVec[j]);
+    }
+  }
+  return out;
+}
+
+function buildMonthlySeriesRows(settings, shockKey) {
+  const rows = DATA.macro
+    .filter(row => rowHasSeries(row, shockKey, settings))
+    .map(row => ({...row, source: "monthly-series"}));
+  assignRateBaseDates(sortAnalysisRows(rows));
+  attachSeriesHistory(rows, settings, shockKey);
+  return rows.filter(row => rowPassesYearFilter(row, settings));
+}
+
+function buildAnalysisRows(settings, shockKey) {
+  if (isMonthlySeries(shockKey)) return buildMonthlySeriesRows(settings, shockKey);
+  const filtered = filteredEventRows(settings, shockKey);
+  const supportRows = trimmedSupportRows(filtered, settings, shockKey);
+  let rows;
+  if (settings.imputeZeros) {
+    if (!supportRows.length) return [];
+    const startMonth = supportRows[0].month;
+    const endMonth = supportRows[supportRows.length - 1].month;
+    const grouped = new Map();
+    for (const row of filtered) {
+      if (!grouped.has(row.month)) grouped.set(row.month, []);
+      grouped.get(row.month).push(row);
+    }
+    rows = DATA.macro
+      .filter(m => m.month >= startMonth && m.month <= endMonth)
+      .map(m => {
+        const items = grouped.get(m.month) || [];
+        const rec = {date: m.date, month: m.month, source: items.length ? "event-month" : "imputed"};
+        if (items.length) {
+          rec.first_obs_date = items.slice().sort((a, b) => a.date.localeCompare(b.date))[0].date;
+        }
+        let total = 0;
+        let found = false;
+        for (const item of items) {
+          if (finite(item[shockKey])) {
+            total += item[shockKey];
+            found = true;
+          }
+        }
+        rec[shockKey] = found ? total : 0;
+        if (shockKey === "ff2") {
+          let rawTotal = 0;
+          let rawFound = false;
+          let currentTotal = 0;
+          let currentFound = false;
+          for (const item of items) {
+            const raw = ff2RawValue(item);
+            if (finite(raw)) {
+              rawTotal += raw;
+              rawFound = true;
+            }
+            const current = ff2CurrentValue(item, settings);
+            if (finite(current)) {
+              currentTotal += current;
+              currentFound = true;
+            }
+          }
+          rec.ff2_lag = rawFound ? rawTotal : 0;
+          rec.ff2_current = currentFound ? currentTotal : 0;
+          rec.ff2 = rec.ff2_lag;
+        } else {
+          for (const component of seriesSpec(shockKey).components || [shockKey]) {
+            const componentSum = sumFiniteRows(items, component);
+            rec[component] = finite(componentSum) ? componentSum : 0;
+          }
+        }
+        for (const key of MONTH_SUM_SCALE_COLUMNS) {
+          const responseSum = sumFiniteRows(items, key);
+          rec[key] = finite(responseSum) ? responseSum : (items.length ? null : 0);
+        }
+        for (const spec of TERM_STRUCTURE_SPECS) {
+          const termSum = sumFiniteRows(items, spec.key);
+          rec[spec.key] = finite(termSum) ? termSum : (items.length ? null : 0);
+        }
+        const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
+        for (const key of allControls) {
+          for (let i = 0; i < items.length; i++) {
+            if (finite(items[i][key])) {
+              rec[key] = items[i][key];
+              break;
+            }
+          }
+          if (!finite(rec[key]) && finite(m[key])) rec[key] = m[key];
+        }
+        rec.unscheduled = items.some(r => truthyFlag(r.unscheduled)) ? 1 : 0;
+        rec.main = items.some(r => truthyFlag(r.main)) ? 1 : 0;
+        return rec;
+      });
+  } else {
+    rows = supportRows;
+  }
+
+  assignRateBaseDates(sortAnalysisRows(rows));
+  attachSeriesHistory(rows, settings, shockKey);
+  return rows.filter(row => rowPassesYearFilter(row, settings));
+}
+
+function buildUsedControls(settings, row, outcomeKey, options = {}) {
+  const includeShockLags = options.includeShockLags !== false;
+  const outcomeLagKeys = options.outcomeLagKeys || [outcomeKey];
+  const zi = [];
+  if (includeShockLags) {
+    const lags = shockLagControls(row, settings);
+    if (!lags) return null;
+    zi.push(...lags);
+  }
+
+  for (const lagOutcome of outcomeLagKeys) {
+    for (let i = 1; i <= settings.depLags; i++) {
+      const v = dependentDelta(lagOutcome, row.month, i, settings, row);
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+
+  for (const c of settings.controls) {
+    const v = sourceValue(row, c);
+    if (!finite(v)) return null;
+    zi.push(v);
+  }
+
+  for (const c of settings.macroControls) {
+    for (let lag = 1; lag <= settings.macroLags; lag++) {
+      const v = macroLagValue(c, row.month, lag);
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+  return zi;
+}
+
+function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  const rowDates = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const yi = responseValue(outcomeKey, row.month, h, settings, row);
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
+
+    const zi = buildUsedControls(settings, row, outcomeKey, options);
+    if (!zi) continue;
+
+    y.push(yi);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
+    controls.push(zi);
+    rowDates.push(row.date);
+  }
+  return {y, x, controls, rowDates};
+}
+
+function buildShockScaleData(settings, rows, outcomeKey, options = {}) {
+  const x = [];
+  const controls = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
+
+    const zi = buildUsedControls(settings, row, outcomeKey, options);
+    if (!zi) continue;
+
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
+    controls.push(zi);
+  }
+  return {x, controls};
+}
+
+function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
+    if (!finite(responseValue(outcomeKey, row.month, 0, settings, row))) continue;
+    const ust2y = sourceValue(row, "ust2y");
+    if (!finite(ust2y)) continue;
+
+    const zi = buildUsedControls(settings, row, outcomeKey, options);
+    if (!zi) continue;
+
+    y.push(ust2y);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
+    controls.push(zi);
+  }
+  return {y, x, controls};
+}
+
+function buildSeriesOnlyControls(settings, row, options = {}) {
+  const includeShockLags = options.includeShockLags !== false;
+  const outcomeLagKeys = options.outcomeLagKeys || [];
+  const zi = [];
+  if (includeShockLags) {
+    const lags = shockLagControls(row, settings);
+    if (!lags) return null;
+    zi.push(...lags);
+  }
+
+  for (const lagOutcome of outcomeLagKeys) {
+    for (let i = 1; i <= settings.depLags; i++) {
+      const v = dependentDelta(lagOutcome, row.month, i, settings, row);
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+
+  for (const c of settings.controls) {
+    const v = sourceValue(row, c);
+    if (!finite(v)) return null;
+    zi.push(v);
+  }
+
+  for (const c of settings.macroControls) {
+    for (let lag = 1; lag <= settings.macroLags; lag++) {
+      const v = macroLagValue(c, row.month, lag);
+      if (!finite(v)) return null;
+      zi.push(v);
+    }
+  }
+  return zi;
+}
+
+function buildMarketResponseRegressionData(settings, rows, responseKey, options = {}) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  const rowDates = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const yi = sourceValue(row, responseKey);
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
+
+    const zi = buildSeriesOnlyControls(settings, row, options);
+    if (!zi) continue;
+
+    y.push(yi);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
+    controls.push(zi);
+    rowDates.push(row.date);
+  }
+  return {y, x, controls, rowDates};
+}
+
+function buildTermStructureRegressionData(settings, rows, responseKey, options = {}) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  const rowDates = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const yi = sourceValue(row, responseKey);
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
+
+    const zi = buildSeriesOnlyControls(settings, row, options);
+    if (!zi) continue;
+
+    y.push(yi);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
+    controls.push(zi);
+    rowDates.push(row.date);
+  }
+  return {y, x, controls, rowDates};
+}
+
+function varControlValue(row, key) {
+  const varSource = VAR_MARKET_CONTROL_SOURCE[key];
+  if (varSource && finite(row[varSource])) return row[varSource];
+  return sourceValue(row, key);
+}
+
+function buildVarControlRow(settings, row) {
+  const controls = [];
+  for (const c of settings.controls) {
+    const v = varControlValue(row, c);
+    if (!finite(v)) return null;
+    controls.push(v);
+  }
+  for (const c of settings.macroControls) {
+    for (let lag = 1; lag <= settings.macroLags; lag++) {
+      const v = macroLagValue(c, row.month, lag);
+      if (!finite(v)) return null;
+      controls.push(v);
+    }
+  }
+  return controls;
+}
+
+function groupedProxyValue(items, mode, shockKey, settings) {
+  const sorted = items.slice().sort((a, b) => a.date.localeCompare(b.date));
+  if (mode === "month-first") {
+    const row = sorted.find(r => finite(seriesValue(r, shockKey, settings)));
+    return row ? seriesValue(row, shockKey, settings) : null;
+  }
+  if (mode === "month-last") {
+    const row = sorted.slice().reverse().find(r => finite(seriesValue(r, shockKey, settings)));
+    return row ? seriesValue(row, shockKey, settings) : null;
+  }
+  if (shockKey === "ff2") {
+    let total = 0;
+    let found = false;
+    for (const row of sorted) {
+      const value = seriesValue(row, shockKey, settings);
+      if (finite(value)) {
+        total += value;
+        found = true;
+      }
+    }
+    return found ? total : null;
+  }
+  return sumFiniteRows(sorted, shockKey);
+}
+
+function buildVarProxyLookup(settings, shockKey) {
+  if (isMonthlySeries(shockKey)) {
+    return row => sourceValue(row, shockKey);
+  }
+
+  const rows = filteredEventRows(settings, shockKey);
+  const supportRows = trimmedSupportRows(rows, settings, shockKey);
+  if (!supportRows.length) return () => null;
+  const firstMonth = supportRows[0].month;
+  const lastMonth = supportRows[supportRows.length - 1].month;
+  const grouped = new Map();
+  for (const row of rows) {
+    if (!grouped.has(row.month)) grouped.set(row.month, []);
+    grouped.get(row.month).push(row);
+  }
+  const monthlyValues = new Map();
+  for (const [month, items] of grouped.entries()) {
+    monthlyValues.set(month, groupedProxyValue(items, settings.aggregation, shockKey, settings));
+  }
+  return row => {
+    if (row.month < firstMonth || row.month > lastMonth) return null;
+    if (!monthlyValues.has(row.month)) return 0;
+    return monthlyValues.get(row.month);
+  };
+}
+
+function buildVarData(settings, shockKey) {
+  const proxyForRow = buildVarProxyLookup(settings, shockKey);
+  const rows = [];
+  const vars = [];
+  const proxy = [];
+  const exog = [];
+  for (const row of DATA.macro) {
+    if (!rowPassesYearFilter(row, settings)) continue;
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if (isSuppressedLeadMonth(row.month, settings)) continue;
+    const y = VAR_OUTCOME_ORDER.map(key => row[VAR_OUTCOMES[key].source]);
+    if (!y.every(finite)) continue;
+    const x = proxyForRow(row);
+    if (!finite(x)) continue;
+    const controls = buildVarControlRow(settings, row);
+    if (!controls) continue;
+    rows.push(row);
+    vars.push(y);
+    proxy.push(x);
+    exog.push(controls);
+  }
+  return {
+    rows,
+    vars,
+    proxy,
+    exog: exog[0]?.length ? exog : null,
+    controlCount: exog[0]?.length || 0
+  };
+}
+
+function olsMulti(design, yMatrix) {
+  const n = design.length;
+  if (!n || !design[0]?.length || !yMatrix.length) return null;
+  const k = design[0].length;
+  const m = yMatrix[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array.from({length: k}, () => Array(m).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      for (let b = 0; b < k; b++) xtx[a][b] += design[i][a] * design[i][b];
+      for (let j = 0; j < m; j++) xty[a][j] += design[i][a] * yMatrix[i][j];
+    }
+  }
+  const beta = Array.from({length: k}, () => Array(m).fill(0));
+  for (let j = 0; j < m; j++) {
+    const sol = solveLinearStable(xtx, xty.map(row => row[j]));
+    if (!sol) return null;
+    for (let a = 0; a < k; a++) beta[a][j] = sol[a];
+  }
+  return beta;
+}
+
+function fitVarx(varsData, p, exog) {
+  const total = varsData.length;
+  const n = varsData[0]?.length || 0;
+  if (total <= p + n * p + 2) return null;
+  const design = [];
+  const y = [];
+  for (let t = p; t < total; t++) {
+    const row = [];
+    for (let lag = 1; lag <= p; lag++) row.push(...varsData[t - lag]);
+    if (exog) row.push(...exog[t]);
+    row.push(1);
+    design.push(row);
+    y.push(varsData[t]);
+  }
+  const beta = olsMulti(design, y);
+  if (!beta) return null;
+  const res = y.map((vals, i) => vals.map((val, j) => {
+    let fit = 0;
+    for (let a = 0; a < design[i].length; a++) fit += design[i][a] * beta[a][j];
+    return val - fit;
+  }));
+  return {beta, res, n, p, t: y.length, kExog: exog ? exog[0].length : 0};
+}
+
+function covarianceMatrix(rows, denom) {
+  const n = rows[0].length;
+  const out = Array.from({length: n}, () => Array(n).fill(0));
+  for (const row of rows) {
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) out[i][j] += row[i] * row[j] / denom;
+    }
+  }
+  return out;
+}
+
+function proxyVarxIrfs(varsData, proxy, exog, p, horizon) {
+  const fit = fitVarx(varsData, p, exog);
+  if (!fit) return null;
+  const t = fit.res.length;
+  const n = fit.n;
+  const tM = Math.min(proxy.length, t);
+  const denom = tM - n * p - 1;
+  if (tM < 8 || denom <= 0) return null;
+  const resM = fit.res.slice(t - tM);
+  const proxyTail = proxy.slice(proxy.length - tM);
+  const exogTail = exog ? exog.slice(exog.length - tM) : null;
+  const firstStage = proxyTail.map((v, i) => [1, v, ...(exogTail ? exogTail[i] : [])]);
+  const phib = olsMulti(firstStage, resM);
+  if (!phib) return null;
+  const uhat1 = firstStage.map(row => row.reduce((acc, v, i) => acc + v * phib[i][0], 0));
+  const secondStage = uhat1.map(v => [1, v]);
+  const resRest = resM.map(row => row.slice(1));
+  const b21Fit = olsMulti(secondStage, resRest);
+  if (!b21Fit) return null;
+  const b21 = b21Fit[1].slice();
+  const sigma = covarianceMatrix(resM, denom);
+  const sig11 = sigma[0][0];
+  const sig21 = sigma.slice(1).map(row => row[0]);
+  const sig22 = sigma.slice(1).map(row => row.slice(1));
+  const zzp = sig22.map((row, i) => row.map((val, j) =>
+    val + b21[i] * sig11 * b21[j] - sig21[i] * b21[j] - b21[i] * sig21[j]
+  ));
+  const v = sig21.map((val, i) => val - b21[i] * sig11);
+  const solved = solveLinearStable(zzp, v);
+  if (!solved) return null;
+  const b12b12p = v.reduce((acc, val, i) => acc + val * solved[i], 0);
+  const b11sq = sig11 - b12b12p;
+  if (!finite(b11sq) || b11sq <= EPS) return null;
+  const b11 = Math.sqrt(b11sq);
+  const impact = [b11, ...b21.map(vv => vv * b11)];
+
+  const irs = Array.from({length: p + horizon + 1}, () => Array(n).fill(0));
+  irs[p] = impact;
+  for (let h = 1; h <= horizon; h++) {
+    const row = [];
+    for (let lag = 1; lag <= p; lag++) row.push(...irs[p + h - lag]);
+    if (fit.kExog) row.push(...Array(fit.kExog).fill(0));
+    const next = Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      for (let a = 0; a < row.length; a++) next[j] += row[a] * fit.beta[a][j];
+    }
+    irs[p + h] = next;
+  }
+
+  return {
+    irfs: irs.slice(p, p + horizon + 1),
+    fit,
+    n: varsData.length,
+    t: t,
+    tM,
+    p,
+    firstStageControls: firstStage[0].length - 2,
+    rawImpact: impact[0]
+  };
+}
+
+function seededRandom(seed = 1234) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function quantile(values, q) {
+  const clean = values.filter(finite).sort((a, b) => a - b);
+  if (!clean.length) return null;
+  const pos = (clean.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return clean[lo];
+  return clean[lo] + (clean[hi] - clean[lo]) * (pos - lo);
+}
+
+function simulateVarx(varsData, fit, resb, exog) {
+  const p = fit.p;
+  const t = fit.t;
+  const n = fit.n;
+  const out = Array.from({length: p + t}, () => Array(n).fill(0));
+  for (let i = 0; i < p; i++) out[i] = varsData[i].slice();
+  for (let j = p; j < p + t; j++) {
+    const row = [];
+    for (let lag = 1; lag <= p; lag++) row.push(...out[j - lag]);
+    if (fit.kExog) row.push(...exog[j]);
+    const next = Array(n).fill(0);
+    for (let col = 0; col < n; col++) {
+      for (let a = 0; a < row.length; a++) next[col] += row[a] * fit.beta[a][col];
+      next[col] += fit.beta[row.length][col] + resb[j - p][col];
+    }
+    out[j] = next;
+  }
+  return out;
+}
+
+function proxyVarxBootstrap(varsData, proxy, exog, p, horizon, draws, scaleTarget) {
+  const base = proxyVarxIrfs(varsData, proxy, exog, p, horizon);
+  if (!base) return null;
+  const y2Impact = base.irfs[0][0];
+  if (!finite(y2Impact) || Math.abs(y2Impact) < EPS) return null;
+  const baseScale = scaleTarget / y2Impact;
+  const scaled = base.irfs.map(row => row.map(v => finite(v) ? cleanZero(v * baseScale) : null));
+
+  const res = base.fit.res;
+  const t = base.fit.t;
+  const n = base.fit.n;
+  const tM = base.tM;
+  const means = Array(n).fill(0);
+  for (const row of res) {
+    for (let j = 0; j < n; j++) means[j] += row[j] / t;
+  }
+  const resDemeaned = res.map(row => row.map((v, j) => v - means[j]));
+  const rng = seededRandom(1234);
+  const boot = [];
+
+  for (let b = 0; b < draws; b++) {
+    const signs = Array.from({length: t}, () => rng() > 0.5 ? -1 : 1);
+    const resb = resDemeaned.map((row, i) => row.map(v => v * signs[i]));
+    const varsb = simulateVarx(varsData, base.fit, resb, exog);
+    const proxyTail = proxy.slice(proxy.length - tM);
+    const signsTail = signs.slice(t - tM);
+    const proxyB = proxyTail.map((v, i) => v * signsTail[i]);
+    const fitB = proxyVarxIrfs(varsb, proxyB, exog, p, horizon);
+    if (!fitB || !fitB.irfs.length) continue;
+    const impact = fitB.irfs[0][0];
+    if (!finite(impact) || Math.abs(impact) < EPS) continue;
+    const scale = scaleTarget / impact;
+    boot.push(fitB.irfs.map(row => row.map(v => v * scale)));
+  }
+
+  if (boot.length < Math.max(20, Math.ceil(draws * 0.2))) return null;
+  const qLow = (1 - VAR_BAND_LEVEL) / 2;
+  const qHigh = 1 - qLow;
+  const lo = [];
+  const hi = [];
+  for (let h = 0; h <= horizon; h++) {
+    const loRow = [];
+    const hiRow = [];
+    for (let j = 0; j < n; j++) {
+      const vals = boot.map(draw => draw[h][j]);
+      loRow.push(cleanZero(quantile(vals, qLow)));
+      hiRow.push(cleanZero(quantile(vals, qHigh)));
+    }
+    lo.push(loRow);
+    hi.push(hiRow);
+  }
+  return {
+    ...base,
+    scaled,
+    lo,
+    hi,
+    scale: baseScale,
+    draws,
+    validDraws: boot.length,
+    level: VAR_BAND_LEVEL
+  };
+}
+
+function solveLinear(a, b) {
+  const n = b.length;
+  const m = a.map((row, i) => row.slice().concat([b[i]]));
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(m[r][col]) > Math.abs(m[pivot][col])) pivot = r;
+    }
+    if (Math.abs(m[pivot][col]) < EPS) return null;
+    if (pivot !== col) [m[pivot], m[col]] = [m[col], m[pivot]];
+    const div = m[col][col];
+    for (let c = col; c <= n; c++) m[col][c] /= div;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const factor = m[r][col];
+      for (let c = col; c <= n; c++) m[r][c] -= factor * m[col][c];
+    }
+  }
+  return m.map(row => row[n]);
+}
+
+function solveLinearStable(a, b) {
+  const direct = solveLinear(a, b);
+  if (direct) return direct;
+  const n = b.length;
+  const diag = a.reduce((acc, row, i) => acc + Math.abs(row[i] || 0), 0) / Math.max(1, n);
+  const scale = diag > EPS ? diag : 1;
+  for (const lambda of [1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1]) {
+    const adjusted = a.map((row, i) => row.map((v, j) => v + (i === j ? lambda * scale : 0)));
+    const sol = solveLinear(adjusted, b);
+    if (sol) return sol;
+  }
+  return null;
+}
+
+function residualize(v, z) {
+  const n = v.length;
+  if (!z.length || !z[0].length) {
+    const mean = v.reduce((a, b) => a + b, 0) / n;
+    return v.map(x => x - mean);
+  }
+  const k = z[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      xty[a] += z[i][a] * v[i];
+      for (let b = 0; b < k; b++) xtx[a][b] += z[i][a] * z[i][b];
+    }
+  }
+  const beta = solveLinear(xtx, xty);
+  if (!beta) return null;
+  return v.map((val, i) => {
+    let fit = 0;
+    for (let j = 0; j < k; j++) fit += z[i][j] * beta[j];
+    return val - fit;
+  });
+}
+
+function residualizeThrough(v, z) {
+  const n = v.length;
+  if (!z.length || !z[0].length) return v.slice();
+  const k = z[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      xty[a] += z[i][a] * v[i];
+      for (let b = 0; b < k; b++) xtx[a][b] += z[i][a] * z[i][b];
+    }
+  }
+  const beta = solveLinear(xtx, xty);
+  if (!beta) return null;
+  return v.map((val, i) => {
+    let fit = 0;
+    for (let j = 0; j < k; j++) fit += z[i][j] * beta[j];
+    return val - fit;
+  });
+}
+
+function cleanColumns(matrix) {
+  if (!matrix.length || !matrix[0]?.length) return {z: matrix.map(() => []), k: 0};
+  const n = matrix.length;
+  const rawK = matrix[0].length;
+  const keep = [];
+  for (let j = 0; j < rawK; j++) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < n; i++) {
+      min = Math.min(min, matrix[i][j]);
+      max = Math.max(max, matrix[i][j]);
+    }
+    if (max - min > EPS) keep.push(j);
+  }
+  return {z: matrix.map(row => keep.map(j => row[j])), k: keep.length};
+}
+
+function designRowsWithIntercept(z, n) {
+  if (!z.length || !z[0]?.length) return Array.from({length: n}, () => [1]);
+  return z;
+}
+
+function olsResiduals(y, design) {
+  const n = y.length;
+  if (!n || !design.length || !design[0]?.length) return null;
+  const k = design[0].length;
+  const xtx = Array.from({length: k}, () => Array(k).fill(0));
+  const xty = Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      xty[a] += design[i][a] * y[i];
+      for (let b = 0; b < k; b++) xtx[a][b] += design[i][a] * design[i][b];
+    }
+  }
+  const beta = solveLinear(xtx, xty);
+  if (!beta) return null;
+  return y.map((val, i) => {
+    let fit = 0;
+    for (let j = 0; j < k; j++) fit += design[i][j] * beta[j];
+    return val - fit;
+  });
+}
+
+function cleanZ(controls) {
+  if (!controls.length) return {z: [], k: 1};
+  const n = controls.length;
+  const rawK = controls[0].length;
+  const keep = [];
+  for (let j = 0; j < rawK; j++) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < n; i++) {
+      min = Math.min(min, controls[i][j]);
+      max = Math.max(max, controls[i][j]);
+    }
+    if (max - min > EPS) keep.push(j);
+  }
+  const z = controls.map(row => [1, ...keep.map(j => row[j])]);
+  return {z, k: 1 + keep.length};
+}
+
+function sampleSd(values) {
+  const clean = values.filter(finite);
+  const n = clean.length;
+  if (n < 2) return null;
+  const mean = clean.reduce((acc, v) => acc + v, 0) / n;
+  const ss = clean.reduce((acc, v) => acc + (v - mean) * (v - mean), 0);
+  return Math.sqrt(ss / (n - 1));
+}
+
+function isMatrixX(x) {
+  return Array.isArray(x?.[0]);
+}
+
+function residualizeMatrix(x, z) {
+  if (!x.length || !Array.isArray(x[0])) return null;
+  const q = x[0].length;
+  const cols = [];
+  for (let j = 0; j < q; j++) {
+    const col = x.map(row => row[j]);
+    const resid = residualize(col, z);
+    if (!resid) return null;
+    cols.push(resid);
+  }
+  return x.map((_, i) => cols.map(col => col[i]));
+}
+
+function invertMatrix(a) {
+  const n = a.length;
+  const inv = Array.from({length: n}, () => Array(n).fill(0));
+  for (let j = 0; j < n; j++) {
+    const basis = Array.from({length: n}, (_, i) => i === j ? 1 : 0);
+    const sol = solveLinear(a, basis);
+    if (!sol) return null;
+    for (let i = 0; i < n; i++) inv[i][j] = sol[i];
+  }
+  return inv;
+}
+
+function quadraticForm(v, m) {
+  let total = 0;
+  for (let i = 0; i < v.length; i++) {
+    for (let j = 0; j < v.length; j++) total += v[i] * m[i][j] * v[j];
+  }
+  return total;
+}
+
+function partialOlsMulti(y, x, controls) {
+  const n = y.length;
+  if (n < 8 || !x.length || !Array.isArray(x[0])) return null;
+  const q = x[0].length;
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualizeMatrix(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+
+  const xtx = Array.from({length: q}, () => Array(q).fill(0));
+  const xty = Array(q).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < q; a++) {
+      xty[a] += rx[i][a] * ry[i];
+      for (let b = 0; b < q; b++) xtx[a][b] += rx[i][a] * rx[i][b];
+    }
+  }
+  const betaVector = solveLinear(xtx, xty);
+  const inv = invertMatrix(xtx);
+  if (!betaVector || !inv) return null;
+
+  const residuals = ry.map((v, i) => v - betaVector.reduce((acc, b, j) => acc + b * rx[i][j], 0));
+  const p = k + q;
+  if (n <= p) return null;
+  const meat = Array.from({length: q}, () => Array(q).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < q; a++) {
+      for (let b = 0; b < q; b++) meat[a][b] += rx[i][a] * rx[i][b] * residuals[i] * residuals[i];
+    }
+  }
+  const cov = Array.from({length: q}, () => Array(q).fill(0));
+  for (let a = 0; a < q; a++) {
+    for (let b = 0; b < q; b++) {
+      let val = 0;
+      for (let r = 0; r < q; r++) {
+        for (let s = 0; s < q; s++) val += inv[a][r] * meat[r][s] * inv[s][b];
+      }
+      cov[a][b] = (n / (n - p)) * val;
+    }
+  }
+
+  const weights = Array.from({length: q}, (_, j) => sampleSd(rx.map(row => row[j])) || 0);
+  if (!weights.some(w => Math.abs(w) > EPS)) return null;
+  const beta = betaVector.reduce((acc, b, j) => acc + weights[j] * b, 0);
+  const variance = quadraticForm(weights, cov);
+  return {
+    beta,
+    se: Math.sqrt(Math.max(0, variance)),
+    betaVector,
+    combinationWeights: weights,
+    xResidualSd: 1,
+    n,
+    p,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
+  };
+}
+
+function partialOls(y, x, controls) {
+  if (isMatrixX(x)) return partialOlsMulti(y, x, controls);
+  const n = y.length;
+  if (n < 8) return null;
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualize(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const denom = rx.reduce((acc, v) => acc + v * v, 0);
+  if (denom < EPS) return null;
+  const beta = rx.reduce((acc, v, i) => acc + v * ry[i], 0) / denom;
+  const resid = ry.map((v, i) => v - beta * rx[i]);
+  const p = k + 1;
+  if (n <= p) return null;
+  let meat = 0;
+  for (let i = 0; i < n; i++) meat += rx[i] * rx[i] * resid[i] * resid[i];
+  const variance = (n / (n - p)) * meat / (denom * denom);
+  return {
+    beta,
+    se: Math.sqrt(Math.max(0, variance)),
+    xResidualSd: sampleSd(rx),
+    n,
+    p,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
+  };
+}
+
+function fullRegressionStats(y, x, controls) {
+  const n = y.length;
+  if (n < 3) return null;
+  let {z} = cleanZ(controls);
+  while (true) {
+    const zRows = designRowsWithIntercept(z, n);
+    const design = y.map((_, i) => {
+      const xs = Array.isArray(x[i]) ? x[i] : [x[i]];
+      return [...xs, ...zRows[i]];
+    });
+    const residuals = olsResiduals(y, design);
+    if (residuals) {
+      const mean = y.reduce((acc, v) => acc + v, 0) / n;
+      const tss = y.reduce((acc, v) => acc + (v - mean) * (v - mean), 0);
+      if (tss < EPS) return null;
+      const rss = residuals.reduce((acc, v) => acc + v * v, 0);
+      const p = design[0]?.length || 0;
+      const r2 = 1 - rss / tss;
+      const adjR2 = n > p ? 1 - (rss / (n - p)) / (tss / (n - 1)) : null;
+      return {
+        r2: Math.max(0, Math.min(1, r2)),
+        adjR2: finite(adjR2) ? Math.min(1, adjR2) : null,
+        p
+      };
+    }
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+  }
+}
+
+function buildWhitenedShock(x, controls, lags) {
+  const n = x.length;
+  if (n < 8) return null;
+  let {z, k} = cleanZ(controls);
+  let xTilde = null;
+  while (true) {
+    xTilde = residualize(x, z);
+    if (xTilde) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+
+  const p = Math.max(0, lags);
+  const wRowsAll = designRowsWithIntercept(z, n);
+  const indices = [];
+  const tilde = [];
+  const wRows = [];
+  const lagRows = [];
+  for (let i = p; i < n; i++) {
+    const lagRow = [];
+    let ok = true;
+    for (let lag = 1; lag <= p; lag++) {
+      const v = xTilde[i - lag];
+      if (!finite(v)) { ok = false; break; }
+      lagRow.push(v);
+    }
+    if (!ok) continue;
+    indices.push(i);
+    tilde.push(xTilde[i]);
+    wRows.push(wRowsAll[i]);
+    lagRows.push(lagRow);
+  }
+  if (tilde.length < 8) return null;
+
+  let {z: lRows, k: lK} = cleanColumns(lagRows);
+  let r = null;
+  while (true) {
+    r = residualizeThrough(tilde, lRows);
+    if (r) break;
+    if (!lRows.length || !lRows[0].length) return null;
+    lRows = lRows.map(row => row.slice(0, -1));
+    lK -= 1;
+  }
+
+  const denom = r.reduce((acc, v) => acc + v * v, 0);
+  if (denom < EPS) return null;
+  return {
+    r,
+    indices,
+    wRows,
+    lRows,
+    n: r.length,
+    wK: wRows[0]?.length || 0,
+    lK,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0,
+    droppedWhiteningLags: Math.max(0, p - lK)
+  };
+}
+
+function whitenedOls(y, x, controls, lags) {
+  const model = buildWhitenedShock(x, controls, lags);
+  if (!model) return null;
+  const y2 = model.indices.map(i => y[i]);
+  const x2 = model.indices.map(i => x[i]);
+  const denom = model.r.reduce((acc, v) => acc + v * v, 0);
+  const beta = model.r.reduce((acc, v, i) => acc + v * y2[i], 0) / denom;
+  const fullDesign = y2.map((_, i) => [x2[i], ...model.wRows[i], ...model.lRows[i]]);
+  const fullResid = olsResiduals(y2, fullDesign);
+  const resid = fullResid || y2.map((v, i) => v - beta * model.r[i]);
+  const p = 1 + model.wK + model.lK;
+  if (model.n <= p) return null;
+  let meat = 0;
+  for (let i = 0; i < model.n; i++) meat += model.r[i] * model.r[i] * resid[i] * resid[i];
+  const variance = (model.n / (model.n - p)) * meat / (denom * denom);
+  return {
+    beta,
+    se: Math.sqrt(Math.max(0, variance)),
+    xResidualSd: sampleSd(model.r),
+    n: model.n,
+    p,
+    indices: model.indices,
+    droppedControls: model.droppedControls,
+    droppedWhiteningLags: model.droppedWhiteningLags
+  };
+}
+
+function fitShockResponse(y, x, controls, settings) {
+  if (isMatrixX(x)) return partialOlsMulti(y, x, controls);
+  if (settings.useWhitening) return whitenedOls(y, x, controls, settings.whiteningLags);
+  return partialOls(y, x, controls);
+}
+
+function standardDecompParts(y, x, controls) {
+  if (isMatrixX(x)) return standardDecompPartsMulti(y, x, controls);
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualize(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const denom = rx.reduce((acc, v) => acc + v * v, 0);
+  if (denom < EPS) return null;
+  const beta = rx.reduce((acc, v, i) => acc + v * ry[i], 0) / denom;
+  return {rx, yResidual: ry, denom, beta, n: y.length, p: k + 1};
+}
+
+function standardDecompPartsMulti(y, x, controls) {
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  let ry = null;
+  while (true) {
+    rx = residualizeMatrix(x, z);
+    ry = residualize(y, z);
+    if (rx && ry) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const q = x[0].length;
+  const xtx = Array.from({length: q}, () => Array(q).fill(0));
+  const xty = Array(q).fill(0);
+  for (let i = 0; i < y.length; i++) {
+    for (let a = 0; a < q; a++) {
+      xty[a] += rx[i][a] * ry[i];
+      for (let b = 0; b < q; b++) xtx[a][b] += rx[i][a] * rx[i][b];
+    }
+  }
+  const betaVector = solveLinear(xtx, xty);
+  const inv = invertMatrix(xtx);
+  if (!betaVector || !inv) return null;
+  const weights = Array.from({length: q}, (_, j) => sampleSd(rx.map(row => row[j])) || 0);
+  if (!weights.some(w => Math.abs(w) > EPS)) return null;
+  const beta = betaVector.reduce((acc, b, j) => acc + weights[j] * b, 0);
+  const obsWeights = rx.map(row => {
+    let total = 0;
+    for (let a = 0; a < q; a++) {
+      for (let b = 0; b < q; b++) total += row[a] * inv[a][b] * weights[b];
+    }
+    return total;
+  });
+  return {rx: obsWeights, yResidual: ry, denom: 1, beta, n: y.length, p: k + q};
+}
+
+function buildDecompLine(settings, rows, outcomeKey, h, scale) {
+  const reg = buildRegressionData(settings, rows, outcomeKey, h, {includeShockLags: !settings.useWhitening});
+  if (reg.y.length < 8) return null;
+  let dates = reg.rowDates;
+  let weights = null;
+  let yForContribution = reg.y;
+  let beta = null;
+  let n = reg.y.length;
+  let p = 0;
+
+  if (settings.useWhitening && !isMatrixX(reg.x)) {
+    const model = buildWhitenedShock(reg.x, reg.controls, settings.whiteningLags);
+    if (!model) return null;
+    const denom = model.r.reduce((acc, v) => acc + v * v, 0);
+    if (denom < EPS) return null;
+    dates = model.indices.map(i => reg.rowDates[i]);
+    yForContribution = model.indices.map(i => reg.y[i]);
+    weights = model.r.map(v => v / denom);
+    beta = model.r.reduce((acc, v, i) => acc + v * yForContribution[i], 0) / denom;
+    n = model.n;
+    p = 1 + model.wK + model.lK;
+  } else {
+    const parts = standardDecompParts(reg.y, reg.x, reg.controls);
+    if (!parts) return null;
+    weights = parts.rx.map(v => v / parts.denom);
+    yForContribution = parts.yResidual;
+    beta = parts.beta;
+    n = parts.n;
+    p = parts.p;
+  }
+
+  let cumulative = 0;
+  const values = [];
+  for (let i = 0; i < yForContribution.length; i++) {
+    cumulative += weights[i] * yForContribution[i] * scale;
+    values.push(cleanZero(cumulative));
+  }
+  return {
+    h,
+    dates,
+    values,
+    betaScaled: cleanZero(beta * scale),
+    n,
+    p
+  };
+}
+
+function decompPlotLine(line, label) {
+  const dates = [];
+  const values = [];
+  const hover = [];
+  for (let i = 0; i < line.dates.length; i++) {
+    dates.push(line.dates[i]);
+    values.push(line.values[i]);
+    hover.push(
+      `${label}<br>${line.dates[i]}<br>h=${line.h}<br>contribution=${fmt(line.values[i], 4)}<br>end=${fmt(line.betaScaled, 4)}<br>n=${line.n}<extra></extra>`
+    );
+  }
+  return {dates, values, hover};
+}
+
+function shockResidualRmse(x, controls) {
+  const n = x.length;
+  if (n < 8) return null;
+  if (isMatrixX(x)) {
+    const fit = partialOlsMulti(Array.from({length: n}, () => 0), x, controls);
+    if (!fit) return null;
+    return {
+      rmse: 1,
+      n: fit.n,
+      p: fit.p,
+      droppedControls: fit.droppedControls
+    };
+  }
+  let {z, k} = cleanZ(controls);
+  let rx = null;
+  while (true) {
+    rx = residualize(x, z);
+    if (rx) break;
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+    k -= 1;
+  }
+  const rss = rx.reduce((acc, v) => acc + v * v, 0);
+  if (n <= k) return null;
+  return {
+    rmse: Math.sqrt(rss / (n - k)),
+    n,
+    p: k,
+    droppedControls: controls[0]?.length ? controls[0].length - (k - 1) : 0
+  };
+}
+
+function whitenedShockResidualRmse(x, controls, lags) {
+  const model = buildWhitenedShock(x, controls, lags);
+  if (!model) return null;
+  const rss = model.r.reduce((acc, v) => acc + v * v, 0);
+  const p = model.wK + model.lK;
+  if (model.n <= p) return null;
+  return {
+    rmse: Math.sqrt(rss / (model.n - p)),
+    n: model.n,
+    p,
+    droppedControls: model.droppedControls,
+    droppedWhiteningLags: model.droppedWhiteningLags
+  };
+}
+
+function runOutcome(settings, rows, outcomeKey, maxH, options = {}) {
+  const results = [];
+  for (let h = 0; h <= maxH; h++) {
+    const reg = buildRegressionData(settings, rows, outcomeKey, h, {
+      includeShockLags: !settings.useWhitening,
+      ...options
+    });
+    const fit = fitShockResponse(reg.y, reg.x, reg.controls, settings);
+    results.push({
+      h,
+      beta: fit ? fit.beta : null,
+      se: fit ? fit.se : null,
+      n: fit ? fit.n : 0,
+      p: fit ? fit.p : 0,
+      dates: reg.rowDates
+    });
+  }
+  return results;
+}
+
+function marketResponseRows(settings, rows) {
+  return MARKET_RESPONSE_SPECS.map(spec => {
+    const reg = buildMarketResponseRegressionData(settings, rows, spec.key, {
+      includeShockLags: true,
+      outcomeLagKeys: settings.tableOutcomeLags || []
+    });
+    const fit = partialOls(reg.y, reg.x, reg.controls);
+    const startDate = fit && reg.rowDates.length ? reg.rowDates[0] : null;
+    const residualSd = fit?.xResidualSd ?? null;
+    const beta = fit && finite(fit.beta) && finite(residualSd) ? fit.beta * residualSd : null;
+    const se = fit && finite(fit.se) && finite(residualSd) ? fit.se * residualSd : null;
+    return {
+      ...spec,
+      beta,
+      se,
+      residualSd,
+      n: fit?.n ?? 0,
+      startYear: startDate ? startDate.slice(0, 4) : "NA"
+    };
+  });
+}
+
+function termStructureRows(settings, rows) {
+  return TERM_STRUCTURE_SPECS.map(spec => {
+    const reg = buildTermStructureRegressionData(settings, rows, spec.key, {
+      includeShockLags: true,
+      outcomeLagKeys: settings.tableOutcomeLags || []
+    });
+    const fit = partialOls(reg.y, reg.x, reg.controls);
+    const stats = fit ? fullRegressionStats(reg.y, reg.x, reg.controls) : null;
+    const hasControls = !!reg.controls[0]?.length;
+    const residualSd = fit?.xResidualSd ?? null;
+    const scale = hasControls && finite(residualSd) ? residualSd : 1;
+    const beta = fit && finite(fit.beta) ? fit.beta * scale : null;
+    const se = fit && finite(fit.se) ? fit.se * scale : null;
+    return {
+      ...spec,
+      beta,
+      se,
+      r2: stats?.r2 ?? null,
+      adjR2: stats?.adjR2 ?? null,
+      residualSd,
+      normalized: hasControls,
+      n: fit?.n ?? 0
+    };
+  });
+}
+
+function runVarSpec(settings) {
+  if (isMultiSeries(settings.shock, settings)) {
+    showError("Proxy VARX requires a scalar proxy. Switch GSS to PC1 only for the VAR tab.");
+    return;
+  }
+  const p = settings.varLags;
+  const varData = buildVarData(settings, settings.shock);
+  if (varData.rows.length <= p + VAR_OUTCOME_ORDER.length * p + 8) {
+    showError("The selected sample has too few usable monthly VAR observations.");
+    return;
+  }
+  const target = settings.varScaleTarget / 100;
+  const result = proxyVarxBootstrap(
+    varData.vars,
+    varData.proxy,
+    varData.exog,
+    p,
+    settings.horizon,
+    settings.varBootstrapDraws,
+    target
+  );
+  if (!result || !result.irfs.length) {
+    showError("Proxy VARX estimation or bootstrap failed for this series and control set.");
+    return;
+  }
+  renderVarPlot(settings, varData, result);
+}
+
+function runSpec() {
+  const settings = getSettings();
+  syncBsControls();
+  if (settings.includedYearsError) {
+    showError(`Invalid included years: ${settings.includedYearsError}. Use entries like 1993-2007, 2010, 2024+.`);
+    return;
+  }
+  if (settings.viewMode === "var") {
+    runVarSpec(settings);
+    return;
+  }
+  if (settings.useWhitening && isMultiSeries(settings.shock, settings)) {
+    showError("GSS PC1+PC2 does not support whitening. Switch to PC1 only or uncheck whitening.");
+    return;
+  }
+  const rows = buildAnalysisRows(settings, settings.shock);
+  const unscheduledSupportRows = countUnscheduledSupportRows(settings, settings.shock);
+  if (rows.length < 12) {
+    showError("The selected sample has too few usable series observations.");
+    return;
+  }
+
+  const maxH = Math.max(settings.horizon, 1);
+  const rateKey = rateOutcomeKey(settings);
+  const rateLabel = rateOutcomeLabel(settings);
+  let scaleDisplay = "1.000";
+  let rateH0Display = "NA";
+  const rawByOutcome = {};
+  for (const outcome of NON_FFR_OUTCOMES) {
+    rawByOutcome[outcome] = runOutcome(settings, rows, outcome, maxH);
+  }
+  const rawRateByLag = {};
+  for (const outcome of NON_FFR_OUTCOMES) {
+    rawRateByLag[outcome] = runOutcome(settings, rows, rateKey, maxH, {outcomeLagKeys: [outcome]});
+  }
+  const rateH0Values = NON_FFR_OUTCOMES
+    .map(outcome => rawRateByLag[outcome][0]?.beta)
+    .filter(finite);
+  if (rateH0Values.length) {
+    const minH0 = Math.min(...rateH0Values);
+    const maxH0 = Math.max(...rateH0Values);
+    rateH0Display = Math.abs(maxH0 - minH0) < 1e-8
+      ? fmt(minH0, 4)
+      : `${fmt(minH0, 4)}-${fmt(maxH0, 4)}`;
+  }
+  const scaleByOutcome = Object.fromEntries(NON_FFR_OUTCOMES.map(outcome => [outcome, 1]));
+  if (settings.scaleMode === "ust2y-impact") {
+    const target = settings.scaleTarget / 100;
+    const coefs = [];
+    for (const outcome of NON_FFR_OUTCOMES) {
+      const scaleData = buildImpactScaleData(settings, rows, outcome, {includeShockLags: !settings.useWhitening});
+      const fit = fitShockResponse(scaleData.y, scaleData.x, scaleData.controls, settings);
+      if (!fit || !finite(fit.beta)) {
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the scaling regression could not be estimated. Choose a different scaling method.`);
+        return;
+      }
+      if (fit.beta < 0) {
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the series coefficient is negative (${fmt(fit.beta, 4)}). Choose a different scaling method.`);
+        return;
+      }
+      if (Math.abs(fit.beta) < EPS) {
+        showError(`UST2Y impact scaling failed for ${outcomeLabel(outcome)} because the series coefficient is effectively zero. Choose a different scaling method.`);
+        return;
+      }
+      scaleByOutcome[outcome] = target / fit.beta;
+      coefs.push(fit.beta);
+    }
+    const minCoef = Math.min(...coefs);
+    const maxCoef = Math.max(...coefs);
+    const coefDisplay = Math.abs(maxCoef - minCoef) < 1e-8
+      ? fmt(minCoef, 4)
+      : `${fmt(minCoef, 4)}-${fmt(maxCoef, 4)}`;
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)}bp UST2Y; coef ${coefDisplay}`;
+  } else if (settings.scaleMode === "ffr-h0") {
+    const target = settings.scaleTarget / 100;
+    const h0s = [];
+    for (const outcome of NON_FFR_OUTCOMES) {
+      const rateH0 = rawRateByLag[outcome][0]?.beta;
+      if (!finite(rateH0) || Math.abs(rateH0) < EPS) {
+        showError(`Scaling failed because the ${rateLabel} h=0 coefficient for the ${outcomeLabel(outcome)} lag set is unavailable or effectively zero.`);
+        return;
+      }
+      scaleByOutcome[outcome] = target / rateH0;
+      h0s.push(rateH0);
+    }
+    const minH0 = Math.min(...h0s);
+    const maxH0 = Math.max(...h0s);
+    const h0Display = Math.abs(maxH0 - minH0) < 1e-8
+      ? fmt(minH0, 4)
+      : `${fmt(minH0, 4)}-${fmt(maxH0, 4)}`;
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)}bp ${rateLabel}; h0 ${h0Display}`;
+  } else if (settings.scaleMode === "shock-rmse") {
+    const rmseByOutcome = [];
+    for (const outcome of NON_FFR_OUTCOMES) {
+      const scaleData = buildShockScaleData(settings, rows, outcome, {includeShockLags: !settings.useWhitening});
+      const fit = settings.useWhitening
+        ? whitenedShockResidualRmse(scaleData.x, scaleData.controls, settings.whiteningLags)
+        : shockResidualRmse(scaleData.x, scaleData.controls);
+      if (!fit || !finite(fit.rmse)) {
+        showError(`Series residual SD scaling failed for ${outcomeLabel(outcome)}.`);
+        return;
+      }
+      scaleByOutcome[outcome] = settings.scaleTarget * fit.rmse;
+      rmseByOutcome.push(fit.rmse);
+    }
+    const minScale = Math.min(...rmseByOutcome);
+    const maxScale = Math.max(...rmseByOutcome);
+    const rmseDisplay = Math.abs(maxScale - minScale) < 1e-8
+      ? fmt(minScale, 3)
+      : `${fmt(minScale, 3)}-${fmt(maxScale, 3)}`;
+    scaleDisplay = `${fmtTarget(settings.scaleTarget)} SD; rmse ${rmseDisplay}`;
+  } else if (settings.scaleMode === "none") {
+    for (const outcome of NON_FFR_OUTCOMES) scaleByOutcome[outcome] = settings.scaleTarget;
+    scaleDisplay = `raw x ${fmtTarget(settings.scaleTarget)}`;
+  }
+
+  const resultsByOutcome = {};
+  for (const outcome of NON_FFR_OUTCOMES) {
+    const scale = scaleByOutcome[outcome];
+    resultsByOutcome[outcome] = rawByOutcome[outcome].slice(0, settings.horizon + 1).map(r => {
+      const mid = finite(r.beta) ? r.beta * scale : null;
+      const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * scale : null;
+      const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * scale : null;
+      return {
+        ...r,
+        betaScaled: finite(mid) ? cleanZero(mid) : null,
+        lo: finite(a) && finite(b) ? cleanZero(Math.min(a, b)) : null,
+        hi: finite(a) && finite(b) ? cleanZero(Math.max(a, b)) : null
+      };
+    });
+  }
+  resultsByOutcome.ffrVariants = Object.fromEntries(NON_FFR_OUTCOMES.map(outcome => {
+    const scale = scaleByOutcome[outcome] ?? 1;
+    return [outcome, rawRateByLag[outcome].slice(0, settings.horizon + 1).map(r => {
+      const mid = finite(r.beta) ? r.beta * scale : null;
+      return {
+        ...r,
+        betaScaled: finite(mid) ? cleanZero(mid) : null,
+        lagOutcome: outcome
+      };
+    })];
+  }));
+  const primaryFfrLagOutcome = "ebp";
+  const primaryFfrScale = scaleByOutcome[primaryFfrLagOutcome] ?? 1;
+  resultsByOutcome.ffrPrimary = rawRateByLag[primaryFfrLagOutcome].slice(0, settings.horizon + 1).map(r => {
+    const mid = finite(r.beta) ? r.beta * primaryFfrScale : null;
+    const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * primaryFfrScale : null;
+    const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * primaryFfrScale : null;
+    return {
+      ...r,
+      betaScaled: finite(mid) ? cleanZero(mid) : null,
+      lo: finite(a) && finite(b) ? cleanZero(Math.min(a, b)) : null,
+      hi: finite(a) && finite(b) ? cleanZero(Math.max(a, b)) : null,
+      lagOutcome: primaryFfrLagOutcome
+    };
+  });
+  render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, rateH0Display, unscheduledSupportRows);
+}
+
+function axisRef(i, axis) {
+  return i === 0 ? axis : `${axis}${i + 1}`;
+}
+
+function axisLayoutName(i, axis) {
+  return i === 0 ? `${axis}axis` : `${axis}axis${i + 1}`;
+}
+
+function renderDecompPlot(settings, rows, scaleByOutcome) {
+  const shockLabel = seriesSpec(settings.shock).label;
+  document.getElementById("chart-title").textContent = `LP decomposition: responses to ${shockLabel}`;
+  document.getElementById("chart-subtitle").textContent = "Cumulative FWL contributions by selected horizon";
+  const horizons = settings.decompHorizons.filter(h => h <= settings.horizon);
+  const traces = [];
+  const annotations = [];
+
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 74, r: 24, t: 30, b: 66},
+    hovermode: "closest",
+    showlegend: true,
+    legend: {orientation: "h", x: 0, y: 1.09, xanchor: "left", yanchor: "bottom"},
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
+  };
+
+  const xGap = 0.085;
+  const yGap = 0.26;
+  const yPadBottom = 0.075;
+  const yPadTop = 0.05;
+  const colW = (1 - 2 * xGap) / 3;
+  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
+  const legendShown = new Set();
+  OUTCOME_ORDER.forEach((outcome, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
+    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
+    const xName = axisLayoutName(i, "x");
+    const yName = axisLayoutName(i, "y");
+    const xRef = axisRef(i, "x");
+    const yRef = axisRef(i, "y");
+    layout[xName] = {
+      domain: xDomain,
+      anchor: yRef,
+      title: col === 1 ? {text: "Estimation date", standoff: 8, font: {size: 11}} : "",
+      showticklabels: true,
+      type: "date",
+      tickfont: {size: 10},
+      tickformat: "%Y",
+      dtick: "M48",
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    layout[yName] = {
+      domain: yDomain,
+      anchor: xRef,
+      title: col === 0 ? {text: "Cumulative contribution", standoff: 8, font: {size: 11}} : "",
+      tickfont: {size: 10},
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    annotations.push({
+      text: `<b>${panelOutcomeLabel(outcome, settings)}</b>`,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: yDomain[1] + 0.035,
+      xref: "paper",
+      yref: "paper",
+      showarrow: false,
+      font: {size: 13, color: "#17201b"}
+    });
+
+    traces.push({
+      x: rows.map(row => row.date),
+      y: rows.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+
+    const plotOutcome = outcome === "ffr" ? rateOutcomeKey(settings) : outcome;
+    const scale = outcome === "ffr" ? (scaleByOutcome.ebp ?? 1) : (scaleByOutcome[outcome] ?? 1);
+    horizons.forEach((h, hIndex) => {
+      const line = buildDecompLine(settings, rows, plotOutcome, h, scale);
+      if (!line || !line.dates.length) return;
+      const plotLine = decompPlotLine(line, panelOutcomeLabel(outcome, settings));
+      const color = DECOMP_COLORS[hIndex % DECOMP_COLORS.length];
+      const showLegend = !legendShown.has(h);
+      if (showLegend) legendShown.add(h);
+      traces.push({
+        x: plotLine.dates,
+        y: plotLine.values,
+        type: "scatter",
+        mode: "lines",
+        line: {color, width: 2.1},
+        name: `h=${line.h}`,
+        legendgroup: `h${line.h}`,
+        showlegend: showLegend,
+        connectgaps: true,
+        hovertemplate: plotLine.hover,
+        xaxis: xRef,
+        yaxis: yRef
+      });
+    });
+  });
+  layout.annotations = annotations;
+  Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+}
+
+function renderVarPlot(settings, varData, result) {
+  document.getElementById("error").classList.add("hidden");
+  document.getElementById("lp-response-table").classList.add("hidden");
+  const shockLabel = seriesSpec(settings.shock).label;
+  document.getElementById("chart-title").textContent = `Proxy VARX: ${shockLabel}`;
+  document.getElementById("chart-subtitle").textContent = `${Math.round(VAR_BAND_LEVEL * 100)}% wild-bootstrap percentile band, normalized to ${fmtTarget(settings.varScaleTarget)}bp 2Y impact`;
+
+  const traces = [];
+  const annotations = [];
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 74, r: 24, t: 30, b: 66},
+    hovermode: "closest",
+    showlegend: false,
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
+  };
+
+  const xGap = 0.11;
+  const yGap = 0.24;
+  const yPadBottom = 0.075;
+  const yPadTop = 0.055;
+  const colW = (1 - xGap) / 2;
+  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
+  const horizons = result.scaled.map((_, h) => h);
+
+  VAR_OUTCOME_ORDER.forEach((outcome, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
+    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
+    const xName = axisLayoutName(i, "x");
+    const yName = axisLayoutName(i, "y");
+    const xRef = axisRef(i, "x");
+    const yRef = axisRef(i, "y");
+    layout[xName] = {
+      domain: xDomain,
+      anchor: yRef,
+      title: row === 1 ? {text: "Horizon", standoff: 8, font: {size: 11}} : "",
+      showticklabels: true,
+      tickfont: {size: 10},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      dtick: Math.max(1, Math.ceil(settings.horizon / 12)),
+      automargin: true,
+      range: [0, settings.horizon]
+    };
+    layout[yName] = {
+      domain: yDomain,
+      anchor: xRef,
+      title: col === 0 ? {text: "Response", standoff: 8, font: {size: 11}} : "",
+      tickfont: {size: 10},
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    annotations.push({
+      text: `<b>${VAR_OUTCOMES[outcome].label}</b>`,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: yDomain[1] + 0.035,
+      xref: "paper",
+      yref: "paper",
+      showarrow: false,
+      font: {size: 13, color: "#17201b"}
+    });
+
+    traces.push({
+      x: horizons,
+      y: horizons.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+    const bandX = horizons.concat(horizons.slice().reverse());
+    const bandY = result.hi.map(row => row[i]).concat(result.lo.map(row => row[i]).reverse());
+    traces.push({
+      x: bandX,
+      y: bandY,
+      type: "scatter",
+      mode: "lines",
+      fill: "toself",
+      fillcolor: "rgba(22, 124, 128, 0.16)",
+      line: {color: "rgba(22, 124, 128, 0)"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+    traces.push({
+      x: horizons,
+      y: result.scaled.map(row => row[i]),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#167c80", width: 2.4},
+      marker: {color: "#17201b", size: 4},
+      hovertemplate: horizons.map((h, idx) =>
+        `${VAR_OUTCOMES[outcome].label}<br>h=${h}<br>response=${fmt(result.scaled[idx][i], 4)}<br>${Math.round(VAR_BAND_LEVEL * 100)}% band=[${fmt(result.lo[idx][i], 4)}, ${fmt(result.hi[idx][i], 4)}]<br>n=${result.n}<extra></extra>`
+      ),
+      showlegend: false,
+      xaxis: xRef,
+      yaxis: yRef
+    });
+  });
+
+  layout.annotations = annotations;
+  Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+
+  const minDate = varData.rows.length ? varData.rows[0].date : "NA";
+  const maxDate = varData.rows.length ? varData.rows[varData.rows.length - 1].date : "NA";
+  const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
+  const covidText = settings.includeCovid ? "COVID included" : "COVID rows excluded";
+  const excludedYearsText = settings.excludeLeadYears.length
+    ? `excluded years ${settings.excludeLeadYears.join(", ")}`
+    : "no extra years excluded";
+  const monthlySeries = isMonthlySeries(settings.shock);
+  const unscheduledSupportRows = countUnscheduledSupportRows(settings, settings.shock);
+  const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
+    ? `unscheduled excluded (${unscheduledSupportRows})`
+    : `unscheduled included (${unscheduledSupportRows})`);
+
+  document.getElementById("status-pills").innerHTML = [
+    `<span class="pill">VARX proxy</span>`,
+    `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
+    `<span class="pill">p=${result.p}</span>`,
+    `<span class="pill">${fmtTarget(settings.varScaleTarget)}bp 2Y impact</span>`,
+    `<span class="pill">${result.validDraws}/${result.draws} bootstrap</span>`,
+    `<span class="pill">${zlbText}</span>`,
+    `<span class="pill">${covidText}</span>`,
+    `<span class="pill">${excludedYearsText}</span>`,
+    `<span class="pill">${unscheduledText}</span>`,
+    settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
+  ].join("");
+
+  document.getElementById("diagnostics").innerHTML = [
+    metric("Rows", varData.rows.length),
+    metric("View", "Proxy VARX"),
+    metric("Date range", `${minDate} to ${maxDate}`),
+    metric("Unscheduled rows", monthlySeries ? "n/a" : (settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`)),
+    metric("VAR lags", result.p),
+    metric("Outcomes", "2Y, CPI, IP, EBP"),
+    metric("Controls", varData.controlCount),
+    metric("First-stage controls", result.firstStageControls),
+    metric("Proxy obs", result.tM),
+    metric("Bootstrap", `${result.validDraws} of ${result.draws}`),
+    metric("Scale", `${fmtTarget(settings.varScaleTarget)}bp 2Y impact`),
+    metric("Raw 2Y impact", fmt(result.irfs[0][0], 4)),
+    metric("Scale factor", fmt(result.scale, 3)),
+    metric("Max horizon", settings.horizon)
+  ].join("");
+}
+
+function renderMarketResponseTable(settings, tableRows, termRows) {
+  const el = document.getElementById("lp-response-table");
+  if (!tableRows.length) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  const body = tableRows.map(row => `
+    <tr title="n=${row.n}">
+      <td>
+        <span class="response-name">${row.label}</span>
+        <span class="response-sub">(starts ${row.startYear})</span>
+      </td>
+      <td>
+        <span class="response-estimate">${fmt(row.beta, 4)}${significanceStars(row.beta, row.se)}</span>
+        <span class="response-sub">(${fmt(row.se, 4)})</span>
+      </td>
+    </tr>
+  `).join("");
+  el.innerHTML = `
+    <div class="response-table-head">
+      <div class="table-title">Financial Response Regressions (normalized to 1 residual-SD increase)</div>
+      <div class="table-lag-control">
+        <label>Outcome lags</label>
+        <details class="top-dropdown" id="table-lag-dropdown">
+          <summary id="table-lag-summary">None</summary>
+          <div class="dropdown-panel">
+            <div class="horizon-list" id="table-lag-options"></div>
+          </div>
+        </details>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Estimate</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <div class="table-note">Estimates are scaled by the sample SD of the series residualized on the included controls. Parentheses report HC1 standard errors. *, **, and *** denote two-sided significance at the 10%, 5%, and 1% levels.</div>
+    <div class="term-structure-block">
+      <div class="table-title">Eurodollar Response Regressions</div>
+      <div class="term-structure-plot" id="term-structure-plot"></div>
+      <div class="table-note">Each point is the coefficient on the selected series in a regression of the listed ED contract from jk_source_old on the selected series and included table controls. When controls are included, coefficients use the table's residual-SD standardization. Bands are 95% HC1 standard-error bands; the maroon line is adjusted R<sup>2</sup>.</div>
+    </div>
+  `;
+  renderTableLagOptions(settings.tableOutcomeLags || []);
+  el.classList.remove("hidden");
+  renderTermStructurePlot(settings, termRows || []);
+}
+
+function renderTermStructurePlot(settings, rows) {
+  const el = document.getElementById("term-structure-plot");
+  if (!el) return;
+  const valid = rows.filter(row => finite(row.beta) && finite(row.se) && finite(row.adjR2));
+  if (!valid.length) {
+    el.innerHTML = "<div class=\"table-note\">No usable ED2-ED8 regression sample for the current settings.</div>";
+    return;
+  }
+
+  const x = valid.map(row => row.quarter);
+  const labels = valid.map(row => row.label);
+  const lo = valid.map(row => cleanZero(row.beta - Z95 * row.se));
+  const hi = valid.map(row => cleanZero(row.beta + Z95 * row.se));
+  const beta = valid.map(row => cleanZero(row.beta));
+  const adjR2 = valid.map(row => cleanZero(row.adjR2));
+  const minAdjR2 = Math.min(...adjR2.filter(finite));
+  const bandX = x.concat(x.slice().reverse());
+  const bandY = hi.concat(lo.slice().reverse());
+  const shockLabel = seriesSpec(settings.shock).label;
+  const traces = [
+    {
+      x: bandX,
+      y: bandY,
+      type: "scatter",
+      mode: "lines",
+      fill: "toself",
+      fillcolor: "rgba(22, 59, 108, 0.18)",
+      line: {color: "rgba(22, 59, 108, 0)"},
+      hoverinfo: "skip",
+      showlegend: false
+    },
+    {
+      x,
+      y: beta,
+      customdata: valid.map(row => [row.label, row.n, row.se, row.adjR2]),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#173b6c", width: 2.4},
+      marker: {color: "#173b6c", size: 7, symbol: "circle"},
+      name: "Change",
+      hovertemplate: "%{customdata[0]}<br>coef=%{y:.4f}<br>se=%{customdata[2]:.4f}<br>adj. R²=%{customdata[3]:.3f}<br>n=%{customdata[1]}<extra></extra>"
+    },
+    {
+      x,
+      y: adjR2,
+      customdata: valid.map(row => [row.label, row.n]),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#8b2f3c", width: 2.2},
+      marker: {color: "#8b2f3c", size: 7, symbol: "square"},
+      name: "Adj. R²",
+      yaxis: "y2",
+      hovertemplate: "%{customdata[0]}<br>adj. R²=%{y:.3f}<br>n=%{customdata[1]}<extra></extra>"
+    }
+  ];
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 62, r: 58, t: 54, b: 52},
+    title: {text: `ED2-ED8 following ${shockLabel}`, font: {size: 13, color: "#17201b"}},
+    hovermode: "closest",
+    showlegend: true,
+    legend: {orientation: "h", x: 0.5, y: -0.22, xanchor: "center", yanchor: "top"},
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"},
+    xaxis: {
+      title: {text: "Quarters Ahead", standoff: 8, font: {size: 11}},
+      tickmode: "array",
+      tickvals: x,
+      ticktext: labels,
+      gridcolor: "#eef2ef",
+      zeroline: false
+    },
+    yaxis: {
+      title: {text: "Change", standoff: 8, font: {size: 11}},
+      tickfont: {size: 10},
+      tickformat: ".3~f",
+      zeroline: true,
+      zerolinecolor: "#9aa49d",
+      zerolinewidth: 1,
+      gridcolor: "#eef2ef",
+      automargin: true
+    },
+    yaxis2: {
+      title: {text: "Adj. R²", standoff: 8, font: {size: 11}},
+      overlaying: "y",
+      side: "right",
+      range: [Math.min(0, minAdjR2), 1],
+      tickfont: {size: 10},
+      tickformat: ".1f",
+      gridcolor: "rgba(0,0,0,0)",
+      automargin: true
+    }
+  };
+  Plotly.react(el, traces, layout, {responsive: true, displayModeBar: false});
+}
+
+function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, rateH0Display, unscheduledSupportRows) {
+  document.getElementById("error").classList.add("hidden");
+  const shockLabel = seriesSpec(settings.shock).label;
+  document.getElementById("chart-title").textContent = `Responses to ${shockLabel}`;
+  document.getElementById("chart-subtitle").textContent = settings.viewMode === "decomp"
+    ? "Cumulative FWL contributions by selected horizon"
+    : (settings.showTreatmentPaths
+      ? `90% HC1 robust confidence bands; ${rateOutcomeLabel(settings)} shows treatment paths by outcome-lag set without bands`
+      : `90% HC1 robust confidence bands; ${rateOutcomeLabel(settings)} uses EBP outcome lags`);
+
+  if (settings.viewMode === "decomp") {
+    renderDecompPlot(settings, rows, scaleByOutcome);
+  } else {
+  const traces = [];
+  const annotations = [];
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 74, r: 24, t: 30, b: 66},
+    hovermode: "closest",
+    showlegend: true,
+    legend: {orientation: "h", x: 0, y: 1.09, xanchor: "left", yanchor: "bottom"},
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"}
+  };
+
+  const xGap = 0.085;
+  const yGap = 0.26;
+  const yPadBottom = 0.075;
+  const yPadTop = 0.05;
+  const colW = (1 - 2 * xGap) / 3;
+  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
+  OUTCOME_ORDER.forEach((outcome, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
+    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
+    const xName = axisLayoutName(i, "x");
+    const yName = axisLayoutName(i, "y");
+    const xRef = axisRef(i, "x");
+    const yRef = axisRef(i, "y");
+    layout[xName] = {
+      domain: xDomain,
+      anchor: yRef,
+      title: col === 1 ? {text: "Horizon", standoff: 8, font: {size: 11}} : "",
+      showticklabels: true,
+      tickfont: {size: 10},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      dtick: Math.max(1, Math.ceil(settings.horizon / 12)),
+      automargin: true,
+      range: [0, settings.horizon]
+    };
+    layout[yName] = {
+      domain: yDomain,
+      anchor: xRef,
+      title: col === 0 ? {text: "Response", standoff: 8, font: {size: 11}} : "",
+      tickfont: {size: 10},
+      tickformat: ".4~f",
+      labelalias: {"-0": "0", "-0.0000": "0", "−0": "0", "−0.0000": "0"},
+      zeroline: false,
+      gridcolor: "#eef2ef",
+      automargin: true
+    };
+    annotations.push({
+      text: `<b>${panelOutcomeLabel(outcome, settings)}</b>`,
+      x: (xDomain[0] + xDomain[1]) / 2,
+      y: yDomain[1] + 0.035,
+      xref: "paper",
+      yref: "paper",
+      showarrow: false,
+      font: {size: 13, color: "#17201b"}
+    });
+
+    const panelResults = outcome === "ffr"
+      ? (settings.showTreatmentPaths
+        ? (resultsByOutcome.ffrVariants?.[NON_FFR_OUTCOMES[0]] || [])
+        : (resultsByOutcome.ffrPrimary || []))
+      : (resultsByOutcome[outcome] || []);
+    const valid = panelResults.filter(r => finite(r.betaScaled) && finite(r.lo) && finite(r.hi));
+    const x = panelResults.length
+      ? panelResults.map(r => r.h)
+      : Array.from({length: settings.horizon + 1}, (_, h) => h);
+    const zeroTrace = {
+      x,
+      y: x.map(() => 0),
+      type: "scatter",
+      mode: "lines",
+      line: {color: "#9aa49d", width: 1, dash: "dot"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: axisRef(i, "x"),
+      yaxis: axisRef(i, "y")
+    };
+    traces.push(zeroTrace);
+    if (outcome === "ffr" && settings.showTreatmentPaths) {
+      NON_FFR_OUTCOMES.forEach((lagOutcome, lagIndex) => {
+        const results = resultsByOutcome.ffrVariants?.[lagOutcome] || [];
+        const valid = results.filter(r => finite(r.betaScaled));
+        if (!valid.length) return;
+        traces.push({
+          x: valid.map(r => r.h),
+          y: valid.map(r => r.betaScaled),
+          type: "scatter",
+          mode: "lines+markers",
+          line: {color: DECOMP_COLORS[lagIndex % DECOMP_COLORS.length], width: 2.1},
+          marker: {color: DECOMP_COLORS[lagIndex % DECOMP_COLORS.length], size: 4},
+          name: `${PANEL_LABELS[lagOutcome] || DATA.outcomes[lagOutcome].label} lags`,
+          showlegend: true,
+          hovertemplate: valid.map(r =>
+            `${rateOutcomeLabel(settings)}<br>${PANEL_LABELS[lagOutcome] || DATA.outcomes[lagOutcome].label} lags<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>n=${r.n}<extra></extra>`
+          ),
+          xaxis: axisRef(i, "x"),
+          yaxis: axisRef(i, "y")
+        });
+      });
+      return;
+    }
+    if (!valid.length) return;
+    const vx = valid.map(r => r.h);
+    const bandX = vx.concat(vx.slice().reverse());
+    const bandY = valid.map(r => r.hi).concat(valid.map(r => r.lo).reverse());
+    traces.push({
+      x: bandX,
+      y: bandY,
+      type: "scatter",
+      mode: "lines",
+      fill: "toself",
+      fillcolor: "rgba(22, 124, 128, 0.16)",
+      line: {color: "rgba(22, 124, 128, 0)"},
+      hoverinfo: "skip",
+      showlegend: false,
+      xaxis: axisRef(i, "x"),
+      yaxis: axisRef(i, "y")
+    });
+    traces.push({
+      x: vx,
+      y: valid.map(r => r.betaScaled),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#167c80", width: 2.4},
+      marker: {color: "#17201b", size: 4},
+      hovertemplate: valid.map(r =>
+        `${panelOutcomeLabel(outcome, settings)}${outcome === "ffr" ? "<br>EBP lags" : ""}<br>h=${r.h}<br>coef=${fmt(r.betaScaled, 4)}<br>90% CI=[${fmt(r.lo, 4)}, ${fmt(r.hi, 4)}]<br>n=${r.n}<extra></extra>`
+      ),
+      showlegend: false,
+      xaxis: axisRef(i, "x"),
+      yaxis: axisRef(i, "y")
+    });
+  });
+  layout.annotations = annotations;
+
+  Plotly.react("plot", traces, layout, {responsive: true, displayModeBar: false});
+  }
+
+  const minDate = rows.length ? rows[0].date : "NA";
+  const maxDate = rows.length ? rows[rows.length - 1].date : "NA";
+  const displayedFfrResults = settings.showTreatmentPaths
+    ? NON_FFR_OUTCOMES.flatMap(outcome => resultsByOutcome.ffrVariants?.[outcome] || [])
+    : (resultsByOutcome.ffrPrimary || []);
+  const allResults = [
+    ...NON_FFR_OUTCOMES.flatMap(outcome => resultsByOutcome[outcome] || []),
+    ...displayedFfrResults
+  ];
+  const validH = allResults.filter(r => r.n > 0);
+  const h0n = Math.min(...[
+    ...NON_FFR_OUTCOMES.map(outcome => resultsByOutcome[outcome]?.[0]?.n || 0),
+    ...(settings.showTreatmentPaths
+      ? NON_FFR_OUTCOMES.map(outcome => resultsByOutcome.ffrVariants?.[outcome]?.[0]?.n || 0)
+      : [resultsByOutcome.ffrPrimary?.[0]?.n || 0])
+  ]);
+  const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
+  const monthlySeries = isMonthlySeries(settings.shock);
+  const seriesLagCols = settings.shockLags * seriesLagComponentIndexes(settings).length;
+  const shockControlCount = settings.useWhitening ? settings.whiteningLags : seriesLagCols;
+  const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
+  const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
+  const covidText = settings.includeCovid ? "COVID included" : "COVID leads excluded";
+  const excludedYearsText = settings.excludeLeadYears.length
+    ? `excluded leads ${settings.excludeLeadYears.join(", ")}`
+    : "no extra lead years excluded";
+  const imputeText = monthlySeries ? "monthly rows" : (settings.imputeZeros ? "zero-imputed" : "event rows");
+  const estimatorText = settings.useWhitening ? `whitened p=${settings.whiteningLags}` : "standard FWL";
+  const outcomeFormText = settings.lpLogLevels ? "log levels" : "changes from t-1";
+  const viewText = settings.viewMode === "decomp"
+    ? `LP decomp h=${settings.decompHorizons.join(",")}`
+    : "IRF panel";
+  const unscheduledText = monthlySeries ? "unscheduled n/a" : (settings.excludeUnscheduled
+    ? `unscheduled excluded (${unscheduledSupportRows})`
+    : `unscheduled included (${unscheduledSupportRows})`);
+
+  document.getElementById("status-pills").innerHTML = [
+    `<span class="pill">${monthlySeries ? "monthly series" : settings.aggregation}</span>`,
+    `<span class="pill">years ${settings.includedYearsDisplay}</span>`,
+    `<span class="pill">${viewText}</span>`,
+    `<span class="pill">${outcomeFormText}</span>`,
+    `<span class="pill">${estimatorText}</span>`,
+    `<span class="pill">${zlbText}</span>`,
+    `<span class="pill">${covidText}</span>`,
+    `<span class="pill">${excludedYearsText}</span>`,
+    `<span class="pill">${unscheduledText}</span>`,
+    `<span class="pill">${imputeText}</span>`,
+    settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
+  ].join("");
+
+  renderMarketResponseTable(settings, marketResponseRows(settings, rows), termStructureRows(settings, rows));
+
+  document.getElementById("diagnostics").innerHTML = [
+    metric("Rows", rows.length),
+    metric("View", settings.viewMode === "decomp" ? "LP decomp" : "IRF panel"),
+    metric("Unscheduled rows", monthlySeries ? "n/a" : (settings.excludeUnscheduled ? `0 of ${unscheduledSupportRows}` : `${unscheduledSupportRows} of ${unscheduledSupportRows}`)),
+    metric("Years", settings.includedYearsDisplay),
+    metric("Date range", `${minDate} to ${maxDate}`),
+    metric("COVID", settings.includeCovid ? "included" : "leads excluded"),
+    metric("Excluded leads", settings.excludeLeadYears.length ? settings.excludeLeadYears.join(", ") : "none"),
+    metric("h=0 n", h0n),
+    metric("Min n", minN),
+    metric("Controls", controlsCount),
+    metric("Outcome form", settings.lpLogLevels ? "levels y(t+h)" : "y(t+h)-y(t-1)"),
+    metric("Scale", scaleDisplay),
+    metric(`${rateOutcomeLabel(settings)} h=0 raw`, rateH0Display),
+    metric("Series lags", settings.useWhitening ? "replaced" : settings.shockLags),
+    metric("Whitening", settings.useWhitening ? settings.whiteningLags : "off"),
+    metric("Outcome lags", settings.depLags),
+    metric("Macro lags", settings.macroLags),
+    metric("Max horizon", settings.horizon)
+  ].join("");
+}
+
+function metric(name, value) {
+  return `<div class="metric"><div class="name">${name}</div><div class="value" title="${value}">${value}</div></div>`;
+}
+
+function showError(message) {
+  const el = document.getElementById("error");
+  el.textContent = message;
+  el.classList.remove("hidden");
+  Plotly.purge("plot");
+  document.getElementById("lp-response-table").classList.add("hidden");
+  document.getElementById("diagnostics").innerHTML = "";
+  document.getElementById("status-pills").innerHTML = `<span class="pill warn">No result</span>`;
+}
+
+function renderOptions() {
+  activeViewMode = "irf";
+  document.querySelectorAll(".view-tab").forEach(el => {
+    const active = el.dataset.view === "irf";
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  const shockSel = document.getElementById("shock");
+  shockSel.innerHTML = Object.entries(allSeries())
+    .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
+    .join("");
+  const rateSel = document.getElementById("rate-outcome");
+  rateSel.innerHTML = Object.entries(DATA.rate_outcomes || {})
+    .map(([key, spec]) => `<option value="${key}">${spec.label}</option>`)
+    .join("");
+
+  document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
+  setGssPcMode("both");
+  document.getElementById("gss-both-lags").checked = false;
+  document.getElementById("ff2-use-ff3-no-next").checked = false;
+  syncSeriesControls();
+  document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
+  document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
+  document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
+  document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
+  document.getElementById("use-whitening").checked = DATA.meta.defaults.use_whitening ?? false;
+  document.getElementById("whitening-lags").value = DATA.meta.defaults.whitening_lags ?? 8;
+  syncWhiteningControls();
+  document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
+  document.getElementById("lp-log-levels").checked = DATA.meta.defaults.lp_log_levels ?? false;
+  document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
+  document.getElementById("horizon").value = DATA.meta.defaults.horizon;
+  document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
+  configureScaleTarget(true);
+  document.getElementById("show-treatment-paths").checked = DATA.meta.defaults.show_treatment_paths ?? false;
+  setTableOutcomeLags([]);
+  document.getElementById("var-lags").value = 12;
+  document.getElementById("var-scale-bp").value = VAR_Y2_TARGET_BP;
+  document.getElementById("var-bootstrap-draws").value = VAR_BOOTSTRAP_DEFAULT;
+  document.getElementById("include-zlb").checked = DATA.meta.defaults.include_zlb;
+  document.getElementById("include-covid").checked = DATA.meta.defaults.include_covid ?? false;
+  const defaultExcludeYears = new Set(DATA.meta.defaults.exclude_lead_years || []);
+  document.querySelectorAll(".exclude-year-check").forEach(el => {
+    el.checked = defaultExcludeYears.has(Number.parseInt(el.value, 10));
+  });
+  syncExcludeYearControls();
+  document.getElementById("impute-zeros").checked = DATA.meta.defaults.impute_zeros;
+  document.getElementById("exclude-unscheduled").checked = DATA.meta.defaults.exclude_unscheduled;
+  renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
+
+  renderControlChecks("controls-market", DATA.controls.market, "regular", "market");
+  renderControlChecks("controls-greenbook", DATA.controls.greenbook, "regular", "greenbook");
+  renderControlChecks("controls-fred-macro", DATA.controls.fred_macro, "macro", "fred_macro");
+  syncBsControls();
+  syncViewControls();
+  VIEW_STATE.lp = capturePanelState();
+  VIEW_STATE.var = null;
+  document.querySelectorAll(".control-check").forEach(el => el.addEventListener("change", runSpec));
+}
+
+function renderControlChecks(containerId, controls, kind, group) {
+  document.getElementById(containerId).innerHTML = controls.map(c => {
+    const label = CONTROL_LABELS[c] || c;
+    return `<label class="check-row"><input class="control-check" type="checkbox" value="${c}" data-kind="${kind}" data-group="${group}" data-control="${c}"><span>${label}</span></label>`;
+  }).join("");
+}
+
+function setControlGroup(group, checked) {
+  for (const el of document.querySelectorAll(`.control-check[data-group='${group}']`)) {
+    if (!el.disabled) el.checked = checked;
+  }
+  syncBsControls();
+  updateGroupToggles();
+  runSpec();
+}
+
+function updateGroupToggles() {
+  for (const group of ["market", "greenbook"]) {
+    const toggle = document.querySelector(`[data-group-toggle='${group}']`);
+    const controls = Array.from(document.querySelectorAll(`.control-check[data-group='${group}']`));
+    if (!toggle || !controls.length) continue;
+    const checked = controls.filter(el => el.checked).length;
+    toggle.checked = checked === controls.length;
+    toggle.indeterminate = checked > 0 && checked < controls.length;
+  }
+}
+
+function syncBsControls() {
+  const shock = document.getElementById("shock").value;
+  const forced = new Set(DATA?.controls?.bs_mandatory || []);
+  for (const el of document.querySelectorAll(".control-check")) {
+    if (forced.has(el.value)) {
+      if (shock === "bs") {
+        el.checked = true;
+        el.disabled = true;
+        el.closest(".check-row").style.color = "#b66d12";
+      } else {
+        el.disabled = false;
+        el.closest(".check-row").style.color = "";
+      }
+    }
+  }
+  updateGroupToggles();
+}
+
+function setGssPcMode(mode) {
+  const pc1 = mode === "pc1";
+  document.getElementById("gss-both").classList.toggle("active", !pc1);
+  document.getElementById("gss-pc1").classList.toggle("active", pc1);
+  syncGssControls();
+}
+
+function syncGssControls() {
+  const isGss = document.getElementById("shock").value === "gss";
+  const bothMode = !document.getElementById("gss-pc1").classList.contains("active");
+  document.getElementById("gss-pc-wrap").classList.toggle("hidden", !isGss);
+  document.getElementById("gss-both-lags-wrap").classList.toggle("hidden", !isGss || !bothMode);
+}
+
+function syncFf2Controls() {
+  const isFf2 = document.getElementById("shock").value === "ff2";
+  document.getElementById("ff2-options-wrap").classList.toggle("hidden", !isFf2);
+}
+
+function syncSeriesControls() {
+  syncGssControls();
+  syncFf2Controls();
+}
+
+function syncWhiteningControls() {
+  const enabled = document.getElementById("use-whitening").checked;
+  const wrap = document.getElementById("whitening-lag-wrap");
+  wrap.classList.toggle("hidden", !enabled);
+  if (enabled && !document.getElementById("whitening-lags").value) {
+    document.getElementById("whitening-lags").value = DATA?.meta?.defaults?.whitening_lags ?? 8;
+  }
+}
+
+function resetDefaults() {
+  renderOptions();
+  runSpec();
+}
+
+async function init() {
+  DATA = await fetch(DATA_URL, {cache: "no-store"}).then(r => {
+    if (!r.ok) throw new Error(`Failed to load ${DATA_URL}`);
+    return r.json();
+  });
+  months = DATA.macro.map(row => row.month);
+  macroByMonth = new Map(DATA.macro.map(row => [row.month, row]));
+  monthIndex = new Map(months.map((m, i) => [m, i]));
+  buildDailyRatePrefixes();
+  document.getElementById("data-stamp").textContent = `Snapshot ${DATA.meta.built_at.slice(0, 10)} - ${DATA.events.length} events`;
+  renderOptions();
+  document.getElementById("run-btn").addEventListener("click", runSpec);
+  document.getElementById("reset-btn").addEventListener("click", resetDefaults);
+  document.getElementById("toggle-market-controls").addEventListener("change", event => setControlGroup("market", event.target.checked));
+  document.getElementById("toggle-greenbook-controls").addEventListener("change", event => setControlGroup("greenbook", event.target.checked));
+  document.querySelectorAll(".view-tab").forEach(button => {
+    button.addEventListener("click", () => activateView(button.dataset.view));
+  });
+  document.getElementById("decomp-default-horizons").addEventListener("click", () => {
+    setDecompHorizons(defaultDecompHorizons(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10))));
+    runSpec();
+  });
+  document.getElementById("decomp-all-horizons").addEventListener("click", () => {
+    const maxH = Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10));
+    setDecompHorizons(Array.from({length: maxH + 1}, (_, h) => h));
+    runSpec();
+  });
+  document.getElementById("shock").addEventListener("change", () => {
+    syncSeriesControls();
+    syncBsControls();
+    runSpec();
+  });
+  document.getElementById("gss-both").addEventListener("click", () => {
+    setGssPcMode("both");
+    runSpec();
+  });
+  document.getElementById("gss-pc1").addEventListener("click", () => {
+    setGssPcMode("pc1");
+    runSpec();
+  });
+  document.getElementById("gss-both-lags").addEventListener("change", runSpec);
+  document.getElementById("ff2-use-ff3-no-next").addEventListener("change", runSpec);
+  document.getElementById("rate-outcome").addEventListener("change", () => {
+    configureScaleTarget(false);
+    runSpec();
+  });
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "show-treatment-paths"]) {
+    document.getElementById(id).addEventListener("change", runSpec);
+  }
+  document.querySelectorAll(".exclude-year-check").forEach(el => el.addEventListener("change", runSpec));
+  document.getElementById("use-whitening").addEventListener("change", () => {
+    syncWhiteningControls();
+    runSpec();
+  });
+  document.getElementById("scale-mode").addEventListener("change", () => {
+    configureScaleTarget(true);
+    runSpec();
+  });
+  document.getElementById("horizon").addEventListener("change", () => {
+    syncExcludeYearControls();
+    renderDecompHorizonOptions(Math.max(1, Number.parseInt(document.getElementById("horizon").value || "24", 10)));
+    runSpec();
+  });
+  for (const id of ["included-years", "shock-lags", "whitening-lags", "dep-lags", "macro-lags", "scale-bp", "var-lags", "var-scale-bp", "var-bootstrap-draws"]) {
+    document.getElementById(id).addEventListener("change", runSpec);
+  }
+  if (window.lucide) window.lucide.createIcons();
+  runSpec();
+}
+
+init().catch(err => showError(err.message || String(err)));
+</script>
+</body>
+</html>
