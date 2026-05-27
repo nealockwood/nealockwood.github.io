@@ -614,6 +614,10 @@
           <button id="gss-both" class="active" type="button">PC1+PC2</button>
           <button id="gss-pc1" type="button">PC1 only</button>
         </div>
+        <label class="check-row" id="gss-both-lags-wrap" style="margin-top: 8px;">
+          <input id="gss-both-lags" type="checkbox">
+          <span>Use both PCs for series lags</span>
+        </label>
       </div>
       <div style="margin-top: 10px;">
         <label for="aggregation">Aggregation</label>
@@ -791,7 +795,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=gss-pca-20260526";
+const DATA_URL = "irfs-data.json?v=gss-pca-lags-20260527";
 const Z90 = 1.6448536269514722;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
@@ -985,6 +989,14 @@ function seriesComponentKeys(key, settings = null) {
 
 function isMultiSeries(key, settings = null) {
   return seriesComponentKeys(key, settings).length > 1;
+}
+
+function seriesLagComponentIndexes(settings) {
+  const components = seriesComponentKeys(settings.shock, settings);
+  if (settings.shock === "gss" && settings.gssPcMode !== "pc1" && !settings.gssBothLagPcs) {
+    return [0];
+  }
+  return components.map((_, i) => i);
 }
 
 function sourceValue(row, key) {
@@ -1467,6 +1479,7 @@ function capturePanelState() {
     excludeUnscheduled: document.getElementById("exclude-unscheduled").checked,
     imputeZeros: document.getElementById("impute-zeros").checked,
     gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
+    gssBothLagPcs: document.getElementById("gss-both-lags").checked,
     rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: document.getElementById("shock-lags").value,
     depLags: document.getElementById("dep-lags").value,
@@ -1491,6 +1504,7 @@ function applyPanelState(state) {
   if (!state) return;
   if (state.shock && allSeries()[state.shock]) document.getElementById("shock").value = state.shock;
   setGssPcMode(state.gssPcMode || "both");
+  document.getElementById("gss-both-lags").checked = !!state.gssBothLagPcs;
   document.getElementById("aggregation").value = state.aggregation ?? "main";
   document.getElementById("included-years").value = state.includedYears ?? "1993-2025";
   document.getElementById("include-zlb").checked = !!state.includeZlb;
@@ -1613,6 +1627,7 @@ function getSettings() {
     includedYearsDisplay: includedYears.display || "all",
     includedYearsError: includedYears.error,
     gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
+    gssBothLagPcs: document.getElementById("gss-both-lags").checked,
     rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
@@ -1755,12 +1770,12 @@ function attachSeriesHistory(rows, settings, shockKey) {
 }
 
 function shockLagControls(row, settings) {
-  const q = seriesComponentKeys(settings.shock, settings).length;
+  const indexes = seriesLagComponentIndexes(settings);
   const out = [];
   for (let i = 0; i < settings.shockLags; i++) {
-    const lagVec = row._shockLagVectors?.[i] || (q === 1 ? [row._shockLags?.[i]] : null);
-    if (!lagVec || lagVec.length < q) return null;
-    for (let j = 0; j < q; j++) {
+    const lagVec = row._shockLagVectors?.[i] || (indexes.length === 1 ? [row._shockLags?.[i]] : null);
+    if (!lagVec) return null;
+    for (const j of indexes) {
       if (!finite(lagVec[j])) return null;
       out.push(lagVec[j]);
     }
@@ -3560,7 +3575,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   ]);
   const minN = validH.length ? Math.min(...validH.map(r => r.n)) : 0;
   const monthlySeries = isMonthlySeries(settings.shock);
-  const seriesLagCols = settings.shockLags * seriesComponentKeys(settings.shock, settings).length;
+  const seriesLagCols = settings.shockLags * seriesLagComponentIndexes(settings).length;
   const shockControlCount = settings.useWhitening ? settings.whiteningLags : seriesLagCols;
   const controlsCount = settings.controls.length + settings.macroControls.length * settings.macroLags + shockControlCount + settings.depLags;
   const zlbText = settings.includeZlb ? "ZLB included" : "ZLB current excluded";
@@ -3648,6 +3663,7 @@ function renderOptions() {
 
   document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
   setGssPcMode("both");
+  document.getElementById("gss-both-lags").checked = false;
   syncGssControls();
   document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
@@ -3737,11 +3753,14 @@ function setGssPcMode(mode) {
   const pc1 = mode === "pc1";
   document.getElementById("gss-both").classList.toggle("active", !pc1);
   document.getElementById("gss-pc1").classList.toggle("active", pc1);
+  syncGssControls();
 }
 
 function syncGssControls() {
   const isGss = document.getElementById("shock").value === "gss";
+  const bothMode = !document.getElementById("gss-pc1").classList.contains("active");
   document.getElementById("gss-pc-wrap").classList.toggle("hidden", !isGss);
+  document.getElementById("gss-both-lags-wrap").classList.toggle("hidden", !isGss || !bothMode);
 }
 
 function syncWhiteningControls() {
@@ -3798,6 +3817,7 @@ async function init() {
     setGssPcMode("pc1");
     runSpec();
   });
+  document.getElementById("gss-both-lags").addEventListener("change", runSpec);
   document.getElementById("rate-outcome").addEventListener("change", () => {
     configureScaleTarget(false);
     runSpec();
