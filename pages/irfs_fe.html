@@ -674,22 +674,22 @@
       <div class="grid-2">
         <div>
           <label for="shock-lags">Series lags</label>
-          <input id="shock-lags" type="number" min="0" max="60" step="1" value="8">
+          <input id="shock-lags" type="number" min="0" max="60" step="1" value="0">
         </div>
         <div>
           <label for="dep-lags">Outcome lags</label>
-          <input id="dep-lags" type="number" min="0" max="60" step="1" value="12">
+          <input id="dep-lags" type="number" min="0" max="60" step="1" value="0">
         </div>
       </div>
       <div class="lp-control" style="margin-top: 10px;">
         <label for="rate-outcome">Interest-rate outcome</label>
         <select id="rate-outcome"></select>
       </div>
-      <div class="lp-control" style="margin-top: 9px;">
+      <div class="lp-control" style="display: none;">
         <label class="check-row"><input id="lp-log-levels" type="checkbox"><span>Use log levels</span></label>
         <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
       </div>
-      <div id="whitening-lag-wrap" class="lp-control hidden" style="margin-top: 10px;">
+      <div id="whitening-lag-wrap" class="lp-control hidden" style="display: none;">
         <label for="whitening-lags">Whitening lags</label>
         <input id="whitening-lags" type="number" min="0" max="60" step="1" value="8">
       </div>
@@ -768,7 +768,6 @@
         <div class="view-tabs" role="tablist" aria-label="Plot view">
           <button class="view-tab active" type="button" data-view="irf" role="tab" aria-selected="true">IRF panel</button>
           <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
-          <button class="view-tab" type="button" data-view="var" role="tab" aria-selected="false">VAR</button>
         </div>
         <label class="check-row graph-toggle lp-graph-control"><input id="show-treatment-paths" type="checkbox"><span>Show all treatment paths</span></label>
         <div class="decomp-control hidden">
@@ -3986,12 +3985,12 @@ function renderOptions() {
   document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
   document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
-  document.getElementById("shock-lags").value = DATA.meta.defaults.shock_lags;
-  document.getElementById("use-whitening").checked = DATA.meta.defaults.use_whitening ?? false;
+  document.getElementById("shock-lags").value = 0;
+  document.getElementById("use-whitening").checked = false;
   document.getElementById("whitening-lags").value = DATA.meta.defaults.whitening_lags ?? 8;
   syncWhiteningControls();
-  document.getElementById("dep-lags").value = DATA.meta.defaults.dependent_lags;
-  document.getElementById("lp-log-levels").checked = DATA.meta.defaults.lp_log_levels ?? false;
+  document.getElementById("dep-lags").value = 0;
+  document.getElementById("lp-log-levels").checked = false;
   document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
   document.getElementById("horizon").value = DATA.meta.defaults.horizon;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
