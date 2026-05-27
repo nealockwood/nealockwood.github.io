@@ -116,6 +116,7 @@ GSS_COMPONENT_COLUMNS = ["gss_pc1", "gss_pc2"]
 GSS_COLUMNS = ["gss", *GSS_COMPONENT_COLUMNS]
 JK_SOURCE_OLD_URL = "https://raw.githubusercontent.com/paulbousquet/GBMPSurprise/main/jk_source_old.csv"
 TERM_STRUCTURE_COLUMNS = [f"jk_ed{i}" for i in range(2, 9)]
+FF2_FALLBACK_COLUMNS = ["jk_ff2", "jk_ff3", "ff2_next_month_row"]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
 GSW_YIELD_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
 FRED_GRAPH_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
@@ -272,21 +273,30 @@ def read_jk_source_old_terms() -> pd.DataFrame:
             text = response.read().decode("utf-8-sig")
         raw = pd.read_csv(io.StringIO(text))
     except Exception:
-        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS])
+        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS, *FF2_FALLBACK_COLUMNS])
 
     if "Date" not in raw.columns:
-        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS])
+        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS, *FF2_FALLBACK_COLUMNS])
     raw["date"] = pd.to_datetime(raw["Date"], errors="coerce").dt.normalize()
-    keep = ["date"]
+    raw = raw.dropna(subset=["date"]).copy()
+    if raw.empty:
+        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS, *FF2_FALLBACK_COLUMNS])
+    raw["month_period"] = raw["date"].dt.to_period("M")
+    source_months = set(raw["month_period"].dropna())
+
+    keep = ["date", "ff2_next_month_row"]
+    raw["ff2_next_month_row"] = raw["month_period"].map(lambda m: int((m + 1) in source_months))
+    for src, dest in [("FF2", "jk_ff2"), ("FF3", "jk_ff3")]:
+        if src in raw.columns:
+            raw[dest] = pd.to_numeric(raw[src], errors="coerce")
+            keep.append(dest)
     for i in range(2, 9):
         src = f"ED{i}"
         dest = f"jk_ed{i}"
         if src in raw.columns:
             raw[dest] = pd.to_numeric(raw[src], errors="coerce")
             keep.append(dest)
-    if len(keep) == 1:
-        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS])
-    return raw[keep].dropna(subset=["date"]).drop_duplicates(subset=["date"], keep="last")
+    return raw[keep].drop_duplicates(subset=["date"], keep="last")
 
 
 def read_macro() -> pd.DataFrame:
@@ -604,6 +614,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
             + GREENBOOK_CONTROLS
             + GSS_COLUMNS
             + TERM_STRUCTURE_COLUMNS
+            + FF2_FALLBACK_COLUMNS
             + ["unscheduled", "main", "nzlb", "possible", "scheduled", "ff4_mr", "brw", "ns"]
         )
     )
@@ -646,6 +657,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         "brw",
         *GSS_COLUMNS,
         *TERM_STRUCTURE_COLUMNS,
+        *FF2_FALLBACK_COLUMNS,
     ]
 
     for _, row in events.iterrows():
@@ -777,6 +789,7 @@ def main() -> None:
         "rate_outcomes": RATE_OUTCOMES,
         "series": {
             "mp1": {"label": "MP1", "source": "prep.csv"},
+            "ff2": {"label": "FF2", "source": "jk_source_old FF2"},
             "ff4": {"label": "FF4", "source": "prep.csv"},
             "ed4": {"label": "ED4", "source": "prep.csv"},
             "mps": {"label": "MPS", "source": "PCA(ed1, ed2, ed3, ed4), normalized by ED4"},

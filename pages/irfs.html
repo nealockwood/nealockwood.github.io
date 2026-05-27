@@ -631,6 +631,12 @@
           <span>Use both PCs for series lags</span>
         </label>
       </div>
+      <div id="ff2-options-wrap" class="hidden" style="margin-top: 10px;">
+        <label class="check-row">
+          <input id="ff2-use-ff3-no-next" type="checkbox">
+          <span>Use FF3 when no next-month row</span>
+        </label>
+      </div>
       <div style="margin-top: 10px;">
         <label for="aggregation">Aggregation</label>
         <select id="aggregation">
@@ -807,7 +813,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=term-structure-20260527";
+const DATA_URL = "irfs-data.json?v=ff2-fallback-20260527";
 const Z90 = 1.6448536269514722;
 const Z95 = 1.959963984540054;
 const EPS = 1e-10;
@@ -1024,8 +1030,29 @@ function sourceValue(row, key) {
   return null;
 }
 
-function seriesValue(row, key) {
-  const components = seriesComponentKeys(key);
+function ff2RawValue(row) {
+  if (row && finite(row.ff2_lag)) return row.ff2_lag;
+  const jk = sourceValue(row, "jk_ff2");
+  return finite(jk) ? jk : sourceValue(row, "ff2");
+}
+
+function ff3RawValue(row) {
+  const jk = sourceValue(row, "jk_ff3");
+  return finite(jk) ? jk : sourceValue(row, "ff3");
+}
+
+function ff2CurrentValue(row, settings = null) {
+  if (row && finite(row.ff2_current)) return row.ff2_current;
+  if (settings?.shock === "ff2" && settings.ff2UseFf3NoNextMonth && !truthyFlag(row?.ff2_next_month_row)) {
+    const ff3 = ff3RawValue(row);
+    if (finite(ff3)) return ff3;
+  }
+  return ff2RawValue(row);
+}
+
+function seriesValue(row, key, settings = null) {
+  if (key === "ff2") return ff2CurrentValue(row, settings);
+  const components = seriesComponentKeys(key, settings);
   if (components.length > 1) {
     const vals = components.map(component => sourceValue(row, component));
     return vals.every(finite) ? vals[0] : null;
@@ -1036,8 +1063,20 @@ function seriesValue(row, key) {
 }
 
 function seriesVectorValue(row, key, settings = null) {
+  if (key === "ff2") {
+    const v = ff2CurrentValue(row, settings);
+    return finite(v) ? [v] : null;
+  }
   const vals = seriesComponentKeys(key, settings).map(component => sourceValue(row, component));
   return vals.every(finite) ? vals : null;
+}
+
+function seriesLagVectorValue(row, key, settings = null) {
+  if (key === "ff2") {
+    const v = ff2RawValue(row);
+    return finite(v) ? [v] : [null];
+  }
+  return seriesVectorValue(row, key, settings);
 }
 
 function rowHasSeries(row, key, settings = null) {
@@ -1498,6 +1537,7 @@ function capturePanelState() {
     imputeZeros: document.getElementById("impute-zeros").checked,
     gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
     gssBothLagPcs: document.getElementById("gss-both-lags").checked,
+    ff2UseFf3NoNextMonth: document.getElementById("ff2-use-ff3-no-next").checked,
     rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: document.getElementById("shock-lags").value,
     depLags: document.getElementById("dep-lags").value,
@@ -1523,6 +1563,8 @@ function applyPanelState(state) {
   if (state.shock && allSeries()[state.shock]) document.getElementById("shock").value = state.shock;
   setGssPcMode(state.gssPcMode || "both");
   document.getElementById("gss-both-lags").checked = !!state.gssBothLagPcs;
+  document.getElementById("ff2-use-ff3-no-next").checked = !!state.ff2UseFf3NoNextMonth;
+  syncSeriesControls();
   document.getElementById("aggregation").value = state.aggregation ?? "main";
   document.getElementById("included-years").value = state.includedYears ?? "1993-2025";
   document.getElementById("include-zlb").checked = !!state.includeZlb;
@@ -1578,6 +1620,9 @@ function defaultVarState() {
     excludeYears: [],
     excludeUnscheduled: false,
     imputeZeros: false,
+    gssPcMode: "both",
+    gssBothLagPcs: false,
+    ff2UseFf3NoNextMonth: false,
     rateOutcome: DATA.meta.defaults.rate_outcome ?? "ffr",
     shockLags: 0,
     depLags: 0,
@@ -1646,6 +1691,7 @@ function getSettings() {
     includedYearsError: includedYears.error,
     gssPcMode: document.getElementById("gss-pc1").classList.contains("active") ? "pc1" : "both",
     gssBothLagPcs: document.getElementById("gss-both-lags").checked,
+    ff2UseFf3NoNextMonth: document.getElementById("ff2-use-ff3-no-next").checked,
     rateOutcome: document.getElementById("rate-outcome").value,
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
@@ -1679,7 +1725,7 @@ function rowPassesYearFilter(row, settings) {
   return yearIsIncluded(rowYear(row), settings.includedYearRules);
 }
 
-function aggregateMonth(items, mode, shockKey) {
+function aggregateMonth(items, mode, shockKey, settings) {
   const sorted = items.slice().sort((a, b) => a.date.localeCompare(b.date));
   const base = mode === "month-first" ? sorted[0] : sorted[sorted.length - 1];
   const rec = {...base};
@@ -1689,9 +1735,31 @@ function aggregateMonth(items, mode, shockKey) {
   rec.first_obs_date = sorted[0].date;
   const shockComponents = seriesSpec(shockKey).components || [shockKey];
   if (mode === "month-sum") {
-    rec[shockKey] = sumFiniteRows(sorted, shockKey);
-    for (const component of shockComponents) {
-      rec[component] = sumFiniteRows(sorted, component);
+    if (shockKey === "ff2") {
+      let rawTotal = 0;
+      let rawFound = false;
+      let currentTotal = 0;
+      let currentFound = false;
+      for (const item of sorted) {
+        const raw = ff2RawValue(item);
+        if (finite(raw)) {
+          rawTotal += raw;
+          rawFound = true;
+        }
+        const v = ff2CurrentValue(item, settings);
+        if (finite(v)) {
+          currentTotal += v;
+          currentFound = true;
+        }
+      }
+      rec.ff2_lag = rawFound ? rawTotal : null;
+      rec.ff2_current = currentFound ? currentTotal : null;
+      rec.ff2 = rec.ff2_lag;
+    } else {
+      rec[shockKey] = sumFiniteRows(sorted, shockKey);
+      for (const component of shockComponents) {
+        rec[component] = sumFiniteRows(sorted, component);
+      }
     }
     for (const key of MONTH_SUM_SCALE_COLUMNS) {
       rec[key] = sumFiniteRows(sorted, key);
@@ -1700,9 +1768,15 @@ function aggregateMonth(items, mode, shockKey) {
       rec[spec.key] = sumFiniteRows(sorted, spec.key);
     }
   } else {
-    rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
-    for (const component of shockComponents) {
-      rec[component] = finite(base[component]) ? base[component] : null;
+    if (shockKey === "ff2") {
+      rec.ff2_lag = ff2RawValue(base);
+      rec.ff2_current = ff2CurrentValue(base, settings);
+      rec.ff2 = rec.ff2_lag;
+    } else {
+      rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
+      for (const component of shockComponents) {
+        rec[component] = finite(base[component]) ? base[component] : null;
+      }
     }
     for (const spec of TERM_STRUCTURE_SPECS) {
       rec[spec.key] = finite(base[spec.key]) ? base[spec.key] : null;
@@ -1730,7 +1804,7 @@ function filteredEventRows(settings, shockKey) {
       if (!groups.has(row.month)) groups.set(row.month, []);
       groups.get(row.month).push(row);
     }
-    rows = Array.from(groups.values()).map(items => aggregateMonth(items, settings.aggregation, shockKey));
+    rows = Array.from(groups.values()).map(items => aggregateMonth(items, settings.aggregation, shockKey, settings));
   }
   return rows.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -1779,6 +1853,7 @@ function attachSeriesHistory(rows, settings, shockKey) {
   const history = [];
   for (const row of rows) {
     const vals = seriesVectorValue(row, shockKey, settings);
+    const lagVals = seriesLagVectorValue(row, shockKey, settings);
     row._xVec = vals ? vals.slice() : seriesComponentKeys(shockKey, settings).map(() => 0);
     row._x = row._xVec[0];
     row._shockLags = [];
@@ -1788,7 +1863,7 @@ function attachSeriesHistory(rows, settings, shockKey) {
       row._shockLagVectors.push(lagVec ? lagVec.slice() : row._xVec.map(() => null));
     }
     row._shockLags = row._shockLagVectors.flat();
-    history.push(row._xVec.slice());
+    history.push(lagVals ? lagVals.slice() : row._xVec.map(() => null));
   }
   return rows;
 }
@@ -1847,9 +1922,31 @@ function buildAnalysisRows(settings, shockKey) {
           }
         }
         rec[shockKey] = found ? total : 0;
-        for (const component of seriesSpec(shockKey).components || [shockKey]) {
-          const componentSum = sumFiniteRows(items, component);
-          rec[component] = finite(componentSum) ? componentSum : 0;
+        if (shockKey === "ff2") {
+          let rawTotal = 0;
+          let rawFound = false;
+          let currentTotal = 0;
+          let currentFound = false;
+          for (const item of items) {
+            const raw = ff2RawValue(item);
+            if (finite(raw)) {
+              rawTotal += raw;
+              rawFound = true;
+            }
+            const current = ff2CurrentValue(item, settings);
+            if (finite(current)) {
+              currentTotal += current;
+              currentFound = true;
+            }
+          }
+          rec.ff2_lag = rawFound ? rawTotal : 0;
+          rec.ff2_current = currentFound ? currentTotal : 0;
+          rec.ff2 = rec.ff2_lag;
+        } else {
+          for (const component of seriesSpec(shockKey).components || [shockKey]) {
+            const componentSum = sumFiniteRows(items, component);
+            rec[component] = finite(componentSum) ? componentSum : 0;
+          }
         }
         for (const key of MONTH_SUM_SCALE_COLUMNS) {
           const responseSum = sumFiniteRows(items, key);
@@ -2078,15 +2175,27 @@ function buildVarControlRow(settings, row) {
   return controls;
 }
 
-function groupedProxyValue(items, mode, shockKey) {
+function groupedProxyValue(items, mode, shockKey, settings) {
   const sorted = items.slice().sort((a, b) => a.date.localeCompare(b.date));
   if (mode === "month-first") {
-    const row = sorted.find(r => finite(seriesValue(r, shockKey)));
-    return row ? seriesValue(row, shockKey) : null;
+    const row = sorted.find(r => finite(seriesValue(r, shockKey, settings)));
+    return row ? seriesValue(row, shockKey, settings) : null;
   }
   if (mode === "month-last") {
-    const row = sorted.slice().reverse().find(r => finite(seriesValue(r, shockKey)));
-    return row ? seriesValue(row, shockKey) : null;
+    const row = sorted.slice().reverse().find(r => finite(seriesValue(r, shockKey, settings)));
+    return row ? seriesValue(row, shockKey, settings) : null;
+  }
+  if (shockKey === "ff2") {
+    let total = 0;
+    let found = false;
+    for (const row of sorted) {
+      const value = seriesValue(row, shockKey, settings);
+      if (finite(value)) {
+        total += value;
+        found = true;
+      }
+    }
+    return found ? total : null;
   }
   return sumFiniteRows(sorted, shockKey);
 }
@@ -2108,7 +2217,7 @@ function buildVarProxyLookup(settings, shockKey) {
   }
   const monthlyValues = new Map();
   for (const [month, items] of grouped.entries()) {
-    monthlyValues.set(month, groupedProxyValue(items, settings.aggregation, shockKey));
+    monthlyValues.set(month, groupedProxyValue(items, settings.aggregation, shockKey, settings));
   }
   return row => {
     if (row.month < firstMonth || row.month > lastMonth) return null;
@@ -3872,7 +3981,8 @@ function renderOptions() {
   document.getElementById("shock").value = DATA.meta.defaults.series ?? DATA.meta.defaults.shock;
   setGssPcMode("both");
   document.getElementById("gss-both-lags").checked = false;
-  syncGssControls();
+  document.getElementById("ff2-use-ff3-no-next").checked = false;
+  syncSeriesControls();
   document.getElementById("rate-outcome").value = DATA.meta.defaults.rate_outcome ?? "ffr";
   document.getElementById("aggregation").value = DATA.meta.defaults.aggregation;
   document.getElementById("included-years").value = DATA.meta.defaults.included_years ?? "1993-2025";
@@ -3971,6 +4081,16 @@ function syncGssControls() {
   document.getElementById("gss-both-lags-wrap").classList.toggle("hidden", !isGss || !bothMode);
 }
 
+function syncFf2Controls() {
+  const isFf2 = document.getElementById("shock").value === "ff2";
+  document.getElementById("ff2-options-wrap").classList.toggle("hidden", !isFf2);
+}
+
+function syncSeriesControls() {
+  syncGssControls();
+  syncFf2Controls();
+}
+
 function syncWhiteningControls() {
   const enabled = document.getElementById("use-whitening").checked;
   const wrap = document.getElementById("whitening-lag-wrap");
@@ -4013,7 +4133,7 @@ async function init() {
     runSpec();
   });
   document.getElementById("shock").addEventListener("change", () => {
-    syncGssControls();
+    syncSeriesControls();
     syncBsControls();
     runSpec();
   });
@@ -4026,6 +4146,7 @@ async function init() {
     runSpec();
   });
   document.getElementById("gss-both-lags").addEventListener("change", runSpec);
+  document.getElementById("ff2-use-ff3-no-next").addEventListener("change", runSpec);
   document.getElementById("rate-outcome").addEventListener("change", () => {
     configureScaleTarget(false);
     runSpec();
