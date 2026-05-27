@@ -96,6 +96,8 @@ RAW_SHOCK_COLUMNS = [
 ]
 
 EVENT_SCALE_COLUMNS = ["ust2y"]
+TIPS_REAL_YIELD_COLUMNS = ["tips5y", "tips10y", "tips30y"]
+BREAKEVEN_COLUMNS = ["bei5y", "bei10y", "bei30y"]
 EVENT_RESPONSE_COLUMNS = [
     "ust3m",
     "ust6m",
@@ -104,12 +106,10 @@ EVENT_RESPONSE_COLUMNS = [
     "ust10y",
     "ust30y",
     "sp500",
-    "tips5y",
-    "tips10y",
-    "tips30y",
+    *BREAKEVEN_COLUMNS,
     "usdjpy",
 ]
-EVENT_VALUE_COLUMNS = list(dict.fromkeys(EVENT_SCALE_COLUMNS + EVENT_RESPONSE_COLUMNS))
+EVENT_VALUE_COLUMNS = list(dict.fromkeys(EVENT_SCALE_COLUMNS + EVENT_RESPONSE_COLUMNS + TIPS_REAL_YIELD_COLUMNS))
 TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 GSS_HORIZONS = ["FF2", "ED2", "ED3", "ED4", "ED5", "ED6", "ED7", "ED8"]
 GSS_COMPONENT_COLUMNS = ["gss_pc1", "gss_pc2"]
@@ -622,6 +622,13 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         if col in events:
             events[col] = pd.to_numeric(events[col], errors="coerce")
 
+    for maturity in ("5y", "10y", "30y"):
+        nominal = f"ust{maturity}"
+        real = f"tips{maturity}"
+        breakeven = f"bei{maturity}"
+        if nominal in events and real in events:
+            events[breakeven] = events[nominal] - events[real]
+
     if "scheduled" not in events:
         unscheduled = events.get("unscheduled", pd.Series(0, index=events.index)).fillna(0)
         events["scheduled"] = 1 - unscheduled
@@ -658,6 +665,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         *GSS_COLUMNS,
         *TERM_STRUCTURE_COLUMNS,
         *FF2_FALLBACK_COLUMNS,
+        *TIPS_REAL_YIELD_COLUMNS,
     ]
 
     for _, row in events.iterrows():

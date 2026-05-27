@@ -813,7 +813,7 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=ff2-fallback-20260527";
+const DATA_URL = "irfs-data.json?v=breakeven-fix-20260527";
 const Z90 = 1.6448536269514722;
 const Z95 = 1.959963984540054;
 const EPS = 1e-10;
@@ -867,9 +867,9 @@ const MARKET_RESPONSE_SPECS = [
   {key: "ust10y", label: "10-Year Treasury Yield"},
   {key: "ust30y", label: "30-Year Treasury Yield"},
   {key: "sp500", label: "S&P 500 Index"},
-  {key: "tips5y", label: "5-Year Breakeven Inflation"},
-  {key: "tips10y", label: "10-Year Breakeven Inflation"},
-  {key: "tips30y", label: "30-Year Breakeven Inflation"},
+  {key: "bei5y", label: "5-Year Breakeven Inflation"},
+  {key: "bei10y", label: "10-Year Breakeven Inflation"},
+  {key: "bei30y", label: "30-Year Breakeven Inflation"},
   {key: "usdjpy", label: "U.S. Dollar / Japanese Yen Exchange Rate"}
 ];
 const MONTH_SUM_SCALE_COLUMNS = MARKET_RESPONSE_SPECS.map(spec => spec.key);
