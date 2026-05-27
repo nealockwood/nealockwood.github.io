@@ -2060,6 +2060,7 @@ function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
   const rowDates = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if ((settings.excludeLeadYears || []).includes(Number.parseInt(row.date.slice(0,4), 10))) continue;
     const yi = responseValue(outcomeKey, row.month, h, settings, row);
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
@@ -2081,6 +2082,7 @@ function buildShockScaleData(settings, rows, outcomeKey, options = {}) {
   const controls = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if ((settings.excludeLeadYears || []).includes(Number.parseInt(row.date.slice(0,4), 10))) continue;
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
     if (Array.isArray(xi) ? xi.every(v => v === 0) : xi === 0) continue;
@@ -2100,6 +2102,7 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
   const controls = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if ((settings.excludeLeadYears || []).includes(Number.parseInt(row.date.slice(0,4), 10))) continue;
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
     if (Array.isArray(xi) ? xi.every(v => v === 0) : xi === 0) continue;
@@ -2158,6 +2161,7 @@ function buildMarketResponseRegressionData(settings, rows, responseKey, options 
   const rowDates = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if ((settings.excludeLeadYears || []).includes(Number.parseInt(row.date.slice(0,4), 10))) continue;
     const yi = sourceValue(row, responseKey);
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
@@ -2180,6 +2184,7 @@ function buildTermStructureRegressionData(settings, rows, responseKey, options =
   const rowDates = [];
   for (const row of rows) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if ((settings.excludeLeadYears || []).includes(Number.parseInt(row.date.slice(0,4), 10))) continue;
     const yi = sourceValue(row, responseKey);
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
@@ -2278,6 +2283,7 @@ function buildVarData(settings, shockKey) {
   for (const row of DATA.macro) {
     if (!rowPassesYearFilter(row, settings)) continue;
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    if ((settings.excludeLeadYears || []).includes(Number.parseInt(row.date.slice(0,4), 10))) continue;
     if (isSuppressedLeadMonth(row.month, settings)) continue;
     const y = VAR_OUTCOME_ORDER.map(key => row[VAR_OUTCOMES[key].source]);
     if (!y.every(finite)) continue;
