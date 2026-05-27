@@ -519,6 +519,17 @@
     font-weight: 700;
   }
 
+  .term-structure-block {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .term-structure-plot {
+    width: 100%;
+    height: 360px;
+  }
+
   .metric {
     background: #f8faf8;
     border: 1px solid #e8ede8;
@@ -795,8 +806,9 @@
 </div>
 
 <script>
-const DATA_URL = "irfs-data.json?v=gss-pca-lags-20260527";
+const DATA_URL = "irfs-data.json?v=term-structure-20260527";
 const Z90 = 1.6448536269514722;
+const Z95 = 1.959963984540054;
 const EPS = 1e-10;
 const DISPLAY_ZERO_TOL = 1e-10;
 
@@ -854,6 +866,11 @@ const MARKET_RESPONSE_SPECS = [
   {key: "usdjpy", label: "U.S. Dollar / Japanese Yen Exchange Rate"}
 ];
 const MONTH_SUM_SCALE_COLUMNS = MARKET_RESPONSE_SPECS.map(spec => spec.key);
+const TERM_STRUCTURE_SPECS = Array.from({length: 7}, (_, i) => ({
+  key: `jk_ed${i + 2}`,
+  label: `ED${i + 2}`,
+  quarter: i
+}));
 const DEFAULT_UST2Y_TARGET_BP = 10;
 
 const CONTROL_LABELS = {
@@ -1678,10 +1695,16 @@ function aggregateMonth(items, mode, shockKey) {
     for (const key of MONTH_SUM_SCALE_COLUMNS) {
       rec[key] = sumFiniteRows(sorted, key);
     }
+    for (const spec of TERM_STRUCTURE_SPECS) {
+      rec[spec.key] = sumFiniteRows(sorted, spec.key);
+    }
   } else {
     rec[shockKey] = finite(base[shockKey]) ? base[shockKey] : null;
     for (const component of shockComponents) {
       rec[component] = finite(base[component]) ? base[component] : null;
+    }
+    for (const spec of TERM_STRUCTURE_SPECS) {
+      rec[spec.key] = finite(base[spec.key]) ? base[spec.key] : null;
     }
   }
   const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
@@ -1830,6 +1853,10 @@ function buildAnalysisRows(settings, shockKey) {
         for (const key of MONTH_SUM_SCALE_COLUMNS) {
           const responseSum = sumFiniteRows(items, key);
           rec[key] = finite(responseSum) ? responseSum : (items.length ? null : 0);
+        }
+        for (const spec of TERM_STRUCTURE_SPECS) {
+          const termSum = sumFiniteRows(items, spec.key);
+          rec[spec.key] = finite(termSum) ? termSum : (items.length ? null : 0);
         }
         const allControls = [...DATA.controls.market, ...DATA.controls.greenbook];
         for (const key of allControls) {
@@ -1984,6 +2011,28 @@ function buildSeriesOnlyControls(settings, row, options = {}) {
 }
 
 function buildMarketResponseRegressionData(settings, rows, responseKey, options = {}) {
+  const y = [];
+  const x = [];
+  const controls = [];
+  const rowDates = [];
+  for (const row of rows) {
+    if (!settings.includeZlb && isZlbMonth(row.month)) continue;
+    const yi = sourceValue(row, responseKey);
+    const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
+    if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
+
+    const zi = buildSeriesOnlyControls(settings, row, options);
+    if (!zi) continue;
+
+    y.push(yi);
+    x.push(Array.isArray(xi) ? xi.slice() : xi);
+    controls.push(zi);
+    rowDates.push(row.date);
+  }
+  return {y, x, controls, rowDates};
+}
+
+function buildTermStructureRegressionData(settings, rows, responseKey, options = {}) {
   const y = [];
   const x = [];
   const controls = [];
@@ -2601,6 +2650,29 @@ function partialOls(y, x, controls) {
   };
 }
 
+function fullRegressionR2(y, x, controls) {
+  const n = y.length;
+  if (n < 3) return null;
+  let {z} = cleanZ(controls);
+  while (true) {
+    const zRows = designRowsWithIntercept(z, n);
+    const design = y.map((_, i) => {
+      const xs = Array.isArray(x[i]) ? x[i] : [x[i]];
+      return [...xs, ...zRows[i]];
+    });
+    const residuals = olsResiduals(y, design);
+    if (residuals) {
+      const mean = y.reduce((acc, v) => acc + v, 0) / n;
+      const tss = y.reduce((acc, v) => acc + (v - mean) * (v - mean), 0);
+      if (tss < EPS) return null;
+      const rss = residuals.reduce((acc, v) => acc + v * v, 0);
+      return Math.max(0, Math.min(1, 1 - rss / tss));
+    }
+    if (!z.length || z[0].length <= 1) return null;
+    z = z.map(row => row.slice(0, -1));
+  }
+}
+
 function buildWhitenedShock(x, controls, lags) {
   const n = x.length;
   if (n < 8) return null;
@@ -2896,6 +2968,24 @@ function marketResponseRows(settings, rows) {
       residualSd,
       n: fit?.n ?? 0,
       startYear: startDate ? startDate.slice(0, 4) : "NA"
+    };
+  });
+}
+
+function termStructureRows(settings, rows) {
+  return TERM_STRUCTURE_SPECS.map(spec => {
+    const reg = buildTermStructureRegressionData(settings, rows, spec.key, {
+      includeShockLags: true,
+      outcomeLagKeys: settings.tableOutcomeLags || []
+    });
+    const fit = partialOls(reg.y, reg.x, reg.controls);
+    const r2 = fit ? fullRegressionR2(reg.y, reg.x, reg.controls) : null;
+    return {
+      ...spec,
+      beta: fit?.beta ?? null,
+      se: fit?.se ?? null,
+      r2,
+      n: fit?.n ?? 0
     };
   });
 }
@@ -3361,7 +3451,7 @@ function renderVarPlot(settings, varData, result) {
   ].join("");
 }
 
-function renderMarketResponseTable(settings, tableRows) {
+function renderMarketResponseTable(settings, tableRows, termRows) {
   const el = document.getElementById("lp-response-table");
   if (!tableRows.length) {
     el.classList.add("hidden");
@@ -3398,9 +3488,110 @@ function renderMarketResponseTable(settings, tableRows) {
       <tbody>${body}</tbody>
     </table>
     <div class="table-note">Estimates are scaled by the sample SD of the series residualized on the included controls. Parentheses report HC1 standard errors. *, **, and *** denote two-sided significance at the 10%, 5%, and 1% levels.</div>
+    <div class="term-structure-block">
+      <div class="table-title">Eurodollar Response Regressions</div>
+      <div class="term-structure-plot" id="term-structure-plot"></div>
+      <div class="table-note">Each point is the coefficient on the selected series in a regression of the listed ED contract from jk_source_old on the selected series and included table controls. For GSS PC1+PC2, the coefficient uses the same residual-SD PC combination as the IRFs. Bands are 95% HC1 standard-error bands; the maroon line is the regression R<sup>2</sup>.</div>
+    </div>
   `;
   renderTableLagOptions(settings.tableOutcomeLags || []);
   el.classList.remove("hidden");
+  renderTermStructurePlot(settings, termRows || []);
+}
+
+function renderTermStructurePlot(settings, rows) {
+  const el = document.getElementById("term-structure-plot");
+  if (!el) return;
+  const valid = rows.filter(row => finite(row.beta) && finite(row.se) && finite(row.r2));
+  if (!valid.length) {
+    el.innerHTML = "<div class=\"table-note\">No usable ED2-ED8 regression sample for the current settings.</div>";
+    return;
+  }
+
+  const x = valid.map(row => row.quarter);
+  const labels = valid.map(row => row.label);
+  const lo = valid.map(row => cleanZero(row.beta - Z95 * row.se));
+  const hi = valid.map(row => cleanZero(row.beta + Z95 * row.se));
+  const beta = valid.map(row => cleanZero(row.beta));
+  const r2 = valid.map(row => finite(row.r2) ? cleanZero(row.r2) : null);
+  const bandX = x.concat(x.slice().reverse());
+  const bandY = hi.concat(lo.slice().reverse());
+  const shockLabel = seriesSpec(settings.shock).label;
+  const traces = [
+    {
+      x: bandX,
+      y: bandY,
+      type: "scatter",
+      mode: "lines",
+      fill: "toself",
+      fillcolor: "rgba(22, 59, 108, 0.18)",
+      line: {color: "rgba(22, 59, 108, 0)"},
+      hoverinfo: "skip",
+      showlegend: false
+    },
+    {
+      x,
+      y: beta,
+      customdata: valid.map(row => [row.label, row.n, row.se, row.r2]),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#173b6c", width: 2.4},
+      marker: {color: "#173b6c", size: 7, symbol: "circle"},
+      name: "Change",
+      hovertemplate: "%{customdata[0]}<br>coef=%{y:.4f}<br>se=%{customdata[2]:.4f}<br>R²=%{customdata[3]:.3f}<br>n=%{customdata[1]}<extra></extra>"
+    },
+    {
+      x,
+      y: r2,
+      customdata: valid.map(row => [row.label, row.n]),
+      type: "scatter",
+      mode: "lines+markers",
+      line: {color: "#8b2f3c", width: 2.2},
+      marker: {color: "#8b2f3c", size: 7, symbol: "square"},
+      name: "R²",
+      yaxis: "y2",
+      hovertemplate: "%{customdata[0]}<br>R²=%{y:.3f}<br>n=%{customdata[1]}<extra></extra>"
+    }
+  ];
+  const layout = {
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    margin: {l: 62, r: 58, t: 54, b: 52},
+    title: {text: `ED2-ED8 following ${shockLabel}`, font: {size: 13, color: "#17201b"}},
+    hovermode: "closest",
+    showlegend: true,
+    legend: {orientation: "h", x: 0.5, y: -0.22, xanchor: "center", yanchor: "top"},
+    font: {family: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif", color: "#17201b"},
+    xaxis: {
+      title: {text: "Quarters Ahead", standoff: 8, font: {size: 11}},
+      tickmode: "array",
+      tickvals: x,
+      ticktext: labels,
+      gridcolor: "#eef2ef",
+      zeroline: false
+    },
+    yaxis: {
+      title: {text: "Change", standoff: 8, font: {size: 11}},
+      tickfont: {size: 10},
+      tickformat: ".3~f",
+      zeroline: true,
+      zerolinecolor: "#9aa49d",
+      zerolinewidth: 1,
+      gridcolor: "#eef2ef",
+      automargin: true
+    },
+    yaxis2: {
+      title: {text: "R²", standoff: 8, font: {size: 11}},
+      overlaying: "y",
+      side: "right",
+      range: [0, 1],
+      tickfont: {size: 10},
+      tickformat: ".1f",
+      gridcolor: "rgba(0,0,0,0)",
+      automargin: true
+    }
+  };
+  Plotly.react(el, traces, layout, {responsive: true, displayModeBar: false});
 }
 
 function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, rateH0Display, unscheduledSupportRows) {
@@ -3607,7 +3798,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     settings.shock === "bs" ? `<span class="pill warn">BS controls forced</span>` : ""
   ].join("");
 
-  renderMarketResponseTable(settings, marketResponseRows(settings, rows));
+  renderMarketResponseTable(settings, marketResponseRows(settings, rows), termStructureRows(settings, rows));
 
   document.getElementById("diagnostics").innerHTML = [
     metric("Rows", rows.length),

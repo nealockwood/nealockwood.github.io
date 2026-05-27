@@ -114,6 +114,8 @@ TARGET_FFR_COLUMNS = ["tffr", "dtffr"]
 GSS_HORIZONS = ["FF2", "ED2", "ED3", "ED4", "ED5", "ED6", "ED7", "ED8"]
 GSS_COMPONENT_COLUMNS = ["gss_pc1", "gss_pc2"]
 GSS_COLUMNS = ["gss", *GSS_COMPONENT_COLUMNS]
+JK_SOURCE_OLD_URL = "https://raw.githubusercontent.com/paulbousquet/GBMPSurprise/main/jk_source_old.csv"
+TERM_STRUCTURE_COLUMNS = [f"jk_ed{i}" for i in range(2, 9)]
 VAR_OUTCOME_COLUMNS = ["var_y2", "var_logcpi", "var_logip", "var_ebp"]
 GSW_YIELD_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
 FRED_GRAPH_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
@@ -261,6 +263,30 @@ def compute_gss_pcs() -> pd.DataFrame:
     out["gss"] = out["gss_pc1"]
     out = out.reset_index().rename(columns={"index": "date"})
     return out[["date", *GSS_COLUMNS]]
+
+
+def read_jk_source_old_terms() -> pd.DataFrame:
+    try:
+        request = urllib.request.Request(JK_SOURCE_OLD_URL, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            text = response.read().decode("utf-8-sig")
+        raw = pd.read_csv(io.StringIO(text))
+    except Exception:
+        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS])
+
+    if "Date" not in raw.columns:
+        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS])
+    raw["date"] = pd.to_datetime(raw["Date"], errors="coerce").dt.normalize()
+    keep = ["date"]
+    for i in range(2, 9):
+        src = f"ED{i}"
+        dest = f"jk_ed{i}"
+        if src in raw.columns:
+            raw[dest] = pd.to_numeric(raw[src], errors="coerce")
+            keep.append(dest)
+    if len(keep) == 1:
+        return pd.DataFrame(columns=["date", *TERM_STRUCTURE_COLUMNS])
+    return raw[keep].dropna(subset=["date"]).drop_duplicates(subset=["date"], keep="last")
 
 
 def read_macro() -> pd.DataFrame:
@@ -564,9 +590,11 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
 
     brw, ns = read_external_shocks()
     gss = compute_gss_pcs()
+    terms = read_jk_source_old_terms()
     events = prep.merge(brw[["date", "brw"]], on="date", how="left")
     events = events.merge(ns[["date", "ns"]], on="date", how="left")
     events = events.merge(gss, on="date", how="left")
+    events = events.merge(terms, on="date", how="left")
 
     numeric_cols = sorted(
         set(
@@ -575,6 +603,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
             + MARKET_CONTROLS
             + GREENBOOK_CONTROLS
             + GSS_COLUMNS
+            + TERM_STRUCTURE_COLUMNS
             + ["unscheduled", "main", "nzlb", "possible", "scheduled", "ff4_mr", "brw", "ns"]
         )
     )
@@ -616,6 +645,7 @@ def prep_events(macro: pd.DataFrame) -> list[dict]:
         "ns",
         "brw",
         *GSS_COLUMNS,
+        *TERM_STRUCTURE_COLUMNS,
     ]
 
     for _, row in events.iterrows():
@@ -714,6 +744,7 @@ def main() -> None:
                 "BJMW-BRW-shocks-updated-1.xlsx",
                 "BJMW-2025-monetary-policy-shocks-series.xlsx",
                 "../termprop/ed_quadratic_fits.csv",
+                "GBMPSurprise/main/jk_source_old.csv",
                 "FRED DFF or test/intermediates/FFRfred.dta + NY Fed EFFR",
                 "FRED DGS3MO or Eco3min mirror of FRED DTB3",
                 "Federal Reserve GSW feds200628 SVENY01/SVENY02",
