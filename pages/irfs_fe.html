@@ -696,7 +696,7 @@
       <div class="grid-2" style="margin-top: 10px;">
         <div>
           <label for="horizon">Horizon</label>
-          <input id="horizon" type="number" min="1" max="120" step="1" value="24">
+          <input id="horizon" type="number" min="1" max="5" step="1" value="5">
         </div>
         <div class="lp-control">
           <label id="scale-target-label" for="scale-bp">UST2Y target</label>
@@ -770,6 +770,7 @@
           <button class="view-tab" type="button" data-view="decomp" role="tab" aria-selected="false">LP decomp</button>
         </div>
         <label class="check-row graph-toggle lp-graph-control"><input id="show-treatment-paths" type="checkbox"><span>Show all treatment paths</span></label>
+        <label class="check-row graph-toggle lp-graph-control"><input id="show-extra-outcomes" type="checkbox"><span>Show GDP price &amp; housing starts</span></label>
         <div class="decomp-control hidden">
           <label>Horizon lines</label>
           <details class="top-dropdown" id="decomp-horizon-dropdown">
@@ -813,6 +814,22 @@
 
 <script>
 const DATA_URL = "irfs-data.json?v=breakeven-fix-20260527";
+const FE_DATA_URL = "irfs-fe-outcomes.json?v=1";
+let FE_LOOKUP = null;
+const FE_OUTCOMES_LIST = ["fedfunds","cpi","real_gdp","unrate","industrial_production","pce","gdp_price","housing_starts"];
+const FE_OUTCOMES_SET = new Set(FE_OUTCOMES_LIST);
+const FE_HIDDEN_BY_DEFAULT = new Set(["gdp_price","housing_starts"]);
+const FE_MAX_H = 5;
+const FE_PANEL_LABELS = {
+  fedfunds: "Fed funds",
+  cpi: "CPI",
+  real_gdp: "Real GDP",
+  unrate: "Unemployment",
+  industrial_production: "Industrial production",
+  pce: "PCE",
+  gdp_price: "GDP price",
+  housing_starts: "Housing starts"
+};
 const Z90 = 1.6448536269514722;
 const Z95 = 1.959963984540054;
 const EPS = 1e-10;
@@ -827,8 +844,8 @@ let dailyRatePrefix = {};
 let activeViewMode = "irf";
 let tableOutcomeLagSelection = [];
 const VIEW_STATE = {lp: null, var: null};
-const OUTCOME_ORDER = ["ffr", "unrate", "cpi", "pce", "ip", "ebp"];
-const NON_FFR_OUTCOMES = OUTCOME_ORDER.filter(key => key !== "ffr");
+const OUTCOME_ORDER = FE_OUTCOMES_LIST.slice();
+const NON_FFR_OUTCOMES = OUTCOME_ORDER.slice();
 const VAR_OUTCOME_ORDER = ["y2", "cpi", "ip", "ebp"];
 const VAR_OUTCOMES = {
   y2: {label: "2Y Treasury", source: "var_y2"},
@@ -856,7 +873,12 @@ const PANEL_LABELS = {
   cpi: "CPI",
   pce: "PCE",
   ip: "Industrial Production",
-  ebp: "EBP"
+  ebp: "EBP",
+  fedfunds: "Fed funds",
+  real_gdp: "Real GDP",
+  industrial_production: "Industrial production",
+  gdp_price: "GDP price",
+  housing_starts: "Housing starts"
 };
 const MARKET_RESPONSE_SPECS = [
   {key: "ust3m", label: "3-Month Treasury Yield"},
@@ -1222,6 +1244,15 @@ function macroLagValue(controlKey, baseMonth, lag) {
 }
 
 function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
+  if (FE_OUTCOMES_SET.has(outcomeKey)) {
+    if (!FE_LOOKUP || !row || h < 0 || h > FE_MAX_H) return null;
+    const rec = FE_LOOKUP[row.date];
+    if (!rec) return null;
+    const vals = rec[outcomeKey];
+    if (!Array.isArray(vals) || h >= vals.length) return null;
+    const v = vals[h];
+    return finite(v) ? v : null;
+  }
   if (isRateOutcome(outcomeKey)) {
     const lead = rateWindowLevel(outcomeKey, baseMonth, h, settings, row);
     if (!finite(lead)) return null;
@@ -2022,6 +2053,7 @@ function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
     const yi = responseValue(outcomeKey, row.month, h, settings, row);
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
+    if (Array.isArray(xi) ? xi.every(v => v === 0) : xi === 0) continue;
 
     const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
@@ -2041,6 +2073,7 @@ function buildShockScaleData(settings, rows, outcomeKey, options = {}) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
+    if (Array.isArray(xi) ? xi.every(v => v === 0) : xi === 0) continue;
 
     const zi = buildUsedControls(settings, row, outcomeKey, options);
     if (!zi) continue;
@@ -2059,6 +2092,7 @@ function buildImpactScaleData(settings, rows, outcomeKey, options = {}) {
     if (!settings.includeZlb && isZlbMonth(row.month)) continue;
     const xi = isMultiSeries(settings.shock, settings) ? row._xVec : row._x;
     if (Array.isArray(xi) ? !xi.every(finite) : !finite(xi)) continue;
+    if (Array.isArray(xi) ? xi.every(v => v === 0) : xi === 0) continue;
     if (!finite(responseValue(outcomeKey, row.month, 0, settings, row))) continue;
     const ust2y = sourceValue(row, "ust2y");
     if (!finite(ust2y)) continue;
@@ -3456,12 +3490,12 @@ function renderVarPlot(settings, varData, result) {
     layout[xName] = {
       domain: xDomain,
       anchor: yRef,
-      title: row === 1 ? {text: "Horizon", standoff: 8, font: {size: 11}} : "",
+      title: row === (nRows - 1) ? {text: "Quarters ahead", standoff: 8, font: {size: 11}} : "",
       showticklabels: true,
       tickfont: {size: 10},
       zeroline: false,
       gridcolor: "#eef2ef",
-      dtick: Math.max(1, Math.ceil(settings.horizon / 12)),
+      dtick: 1,
       automargin: true,
       range: [0, settings.horizon]
     };
@@ -3745,16 +3779,21 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
   };
 
   const xGap = 0.085;
-  const yGap = 0.26;
   const yPadBottom = 0.075;
   const yPadTop = 0.05;
-  const colW = (1 - 2 * xGap) / 3;
-  const rowH = (1 - yGap - yPadBottom - yPadTop) / 2;
-  OUTCOME_ORDER.forEach((outcome, i) => {
-    const col = i % 3;
-    const row = Math.floor(i / 3);
+  const showExtra = !!document.getElementById("show-extra-outcomes")?.checked;
+  const visibleOutcomes = OUTCOME_ORDER.filter(o => showExtra || !FE_HIDDEN_BY_DEFAULT.has(o));
+  const nCols = 3;
+  const nRows = Math.max(1, Math.ceil(visibleOutcomes.length / nCols));
+  const yGap = nRows === 1 ? 0 : (nRows === 2 ? 0.26 : 0.18);
+  const colW = (1 - 2 * xGap) / nCols;
+  const rowH = (1 - (nRows - 1) * yGap - yPadBottom - yPadTop) / nRows;
+  visibleOutcomes.forEach((outcome, i) => {
+    const col = i % nCols;
+    const row = Math.floor(i / nCols);
     const xDomain = [col * (colW + xGap), col * (colW + xGap) + colW];
-    const yDomain = row === 0 ? [yPadBottom + rowH + yGap, 1 - yPadTop] : [yPadBottom, yPadBottom + rowH];
+    const top = 1 - yPadTop - row * (rowH + yGap);
+    const yDomain = [top - rowH, top];
     const xName = axisLayoutName(i, "x");
     const yName = axisLayoutName(i, "y");
     const xRef = axisRef(i, "x");
@@ -3762,7 +3801,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     layout[xName] = {
       domain: xDomain,
       anchor: yRef,
-      title: col === 1 ? {text: "Horizon", standoff: 8, font: {size: 11}} : "",
+      title: col === 1 ? {text: "Quarters ahead", standoff: 8, font: {size: 11}} : "",
       showticklabels: true,
       tickfont: {size: 10},
       zeroline: false,
@@ -4105,10 +4144,18 @@ function resetDefaults() {
 }
 
 async function init() {
-  DATA = await fetch(DATA_URL, {cache: "no-store"}).then(r => {
-    if (!r.ok) throw new Error(`Failed to load ${DATA_URL}`);
-    return r.json();
-  });
+  const [data, feData] = await Promise.all([
+    fetch(DATA_URL, {cache: "no-store"}).then(r => {
+      if (!r.ok) throw new Error(`Failed to load ${DATA_URL}`);
+      return r.json();
+    }),
+    fetch(FE_DATA_URL, {cache: "no-store"}).then(r => {
+      if (!r.ok) throw new Error(`Failed to load ${FE_DATA_URL}`);
+      return r.json();
+    })
+  ]);
+  DATA = data;
+  FE_LOOKUP = feData.events;
   months = DATA.macro.map(row => row.month);
   macroByMonth = new Map(DATA.macro.map(row => [row.month, row]));
   monthIndex = new Map(months.map((m, i) => [m, i]));
@@ -4150,7 +4197,7 @@ async function init() {
     configureScaleTarget(false);
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "show-treatment-paths"]) {
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "show-treatment-paths", "show-extra-outcomes"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   document.querySelectorAll(".exclude-year-check").forEach(el => el.addEventListener("change", runSpec));
