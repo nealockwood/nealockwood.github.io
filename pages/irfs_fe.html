@@ -3309,7 +3309,7 @@ function runSpec() {
   }
   resultsByOutcome.ffrVariants = Object.fromEntries(NON_FFR_OUTCOMES.map(outcome => {
     const scale = scaleByOutcome[outcome] ?? 1;
-    return [outcome, rawRateByLag[outcome].slice(0, settings.horizon + 1).map(r => {
+    return [outcome, (rawRateByLag[outcome] || []).slice(0, settings.horizon + 1).map(r => {
       const mid = finite(r.beta) ? r.beta * scale : null;
       return {
         ...r,
@@ -4030,8 +4030,8 @@ function renderOptions() {
   syncWhiteningControls();
   document.getElementById("dep-lags").value = 0;
   document.getElementById("lp-log-levels").checked = false;
-  document.getElementById("macro-lags").value = DATA.meta.defaults.macro_lags;
-  document.getElementById("horizon").value = DATA.meta.defaults.horizon;
+  document.getElementById("macro-lags").value = 0;
+  document.getElementById("horizon").value = FE_MAX_H;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
   configureScaleTarget(true);
   document.getElementById("show-treatment-paths").checked = DATA.meta.defaults.show_treatment_paths ?? false;
