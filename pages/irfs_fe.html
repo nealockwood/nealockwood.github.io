@@ -3318,9 +3318,9 @@ function runSpec() {
       };
     })];
   }));
-  const primaryFfrLagOutcome = "ebp";
+  const primaryFfrLagOutcome = NON_FFR_OUTCOMES[0];
   const primaryFfrScale = scaleByOutcome[primaryFfrLagOutcome] ?? 1;
-  resultsByOutcome.ffrPrimary = rawRateByLag[primaryFfrLagOutcome].slice(0, settings.horizon + 1).map(r => {
+  resultsByOutcome.ffrPrimary = (rawRateByLag[primaryFfrLagOutcome] || []).slice(0, settings.horizon + 1).map(r => {
     const mid = finite(r.beta) ? r.beta * primaryFfrScale : null;
     const a = finite(r.beta) && finite(r.se) ? (r.beta - Z90 * r.se) * primaryFfrScale : null;
     const b = finite(r.beta) && finite(r.se) ? (r.beta + Z90 * r.se) * primaryFfrScale : null;
