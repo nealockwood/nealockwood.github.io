@@ -689,6 +689,9 @@
         <label class="check-row"><input id="lp-log-levels" type="checkbox"><span>Use log levels</span></label>
         <label class="check-row"><input id="use-whitening" type="checkbox"><span>Whiten series residual</span></label>
       </div>
+      <div class="lp-control" style="margin-top: 10px;">
+        <label class="check-row"><input id="fe-forecast-rhs" type="checkbox"><span>Forecast on RHS (LHS = realized outcome)</span></label>
+      </div>
       <div id="whitening-lag-wrap" class="lp-control hidden" style="display: none;">
         <label for="whitening-lags">Whitening lags</label>
         <input id="whitening-lags" type="number" min="0" max="60" step="1" value="8">
@@ -814,7 +817,7 @@
 
 <script>
 const DATA_URL = "irfs-data.json?v=breakeven-fix-20260527";
-const FE_DATA_URL = "irfs-fe-outcomes.json?v=1";
+const FE_DATA_URL = "irfs-fe-outcomes.json?v=2";
 let FE_LOOKUP = null;
 const FE_OUTCOMES_LIST = ["fedfunds","cpi","real_gdp","unrate","industrial_production","pce","gdp_price","housing_starts"];
 const FE_OUTCOMES_SET = new Set(FE_OUTCOMES_LIST);
@@ -1258,7 +1261,9 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
     if ((settings.excludeLeadYears || []).includes(tY)) return null;
     const rec = FE_LOOKUP[row.date];
     if (!rec) return null;
-    const vals = rec[outcomeKey];
+    // Forecast-RHS mode: LHS is the realized outcome (the forecast moves to the
+    // RHS as a control). Default mode: LHS is the forecast error (forecast - realized).
+    const vals = settings.forecastRhs ? (rec._rz && rec._rz[outcomeKey]) : rec[outcomeKey];
     if (!Array.isArray(vals) || h >= vals.length) return null;
     const v = vals[h];
     return finite(v) ? v : null;
@@ -1289,6 +1294,21 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
     return 100 * (Math.log(lead) - Math.log(prev));
   }
   return lead - prev;
+}
+
+// Forecast value for a forecast-error outcome at horizon h (used as an RHS
+// control when forecast-RHS mode is on). Returns null when the forecast is
+// missing (e.g. no Blue Chip fed funds / housing starts), so the observation
+// is dropped and LHS (realized) stays aligned with the RHS forecast.
+function feForecastValue(outcomeKey, h, row) {
+  if (!FE_LOOKUP || !row || h < 0 || h > FE_MAX_H) return null;
+  if (!FE_OUTCOMES_SET.has(outcomeKey)) return null;
+  const rec = FE_LOOKUP[row.date];
+  if (!rec || !rec._fc) return null;
+  const vals = rec._fc[outcomeKey];
+  if (!Array.isArray(vals) || h >= vals.length) return null;
+  const v = vals[h];
+  return finite(v) ? v : null;
 }
 
 function dependentDelta(outcomeKey, baseMonth, lag, settings = {}, row = null) {
@@ -1582,6 +1602,7 @@ function capturePanelState() {
     shockLags: document.getElementById("shock-lags").value,
     depLags: document.getElementById("dep-lags").value,
     lpLogLevels: document.getElementById("lp-log-levels").checked,
+    forecastRhs: document.getElementById("fe-forecast-rhs")?.checked || false,
     macroLags: document.getElementById("macro-lags").value,
     useWhitening: document.getElementById("use-whitening").checked,
     whiteningLags: document.getElementById("whitening-lags").value,
@@ -1623,6 +1644,7 @@ function applyPanelState(state) {
   document.getElementById("shock-lags").value = state.shockLags ?? (DATA.meta.defaults.shock_lags ?? 8);
   document.getElementById("dep-lags").value = state.depLags ?? 12;
   document.getElementById("lp-log-levels").checked = !!state.lpLogLevels;
+  document.getElementById("fe-forecast-rhs").checked = !!state.forecastRhs;
   document.getElementById("macro-lags").value = state.macroLags ?? 12;
   document.getElementById("use-whitening").checked = !!state.useWhitening;
   document.getElementById("whitening-lags").value = state.whiteningLags ?? 8;
@@ -1736,6 +1758,7 @@ function getSettings() {
     shockLags: Math.max(0, Number.parseInt(document.getElementById("shock-lags").value || "0", 10)),
     depLags: Math.max(0, Number.parseInt(document.getElementById("dep-lags").value || "0", 10)),
     lpLogLevels: document.getElementById("lp-log-levels").checked,
+    forecastRhs: document.getElementById("fe-forecast-rhs")?.checked || false,
     macroLags: Math.max(0, Number.parseInt(document.getElementById("macro-lags").value || "0", 10)),
     useWhitening: document.getElementById("use-whitening").checked,
     whiteningLags: Math.max(0, Number.parseInt(document.getElementById("whitening-lags").value || "8", 10)),
@@ -2023,6 +2046,13 @@ function buildUsedControls(settings, row, outcomeKey, options = {}) {
   const includeShockLags = options.includeShockLags !== false;
   const outcomeLagKeys = options.outcomeLagKeys || [outcomeKey];
   const zi = [];
+  // Forecast-RHS mode: include this outcome's horizon-h forecast as a control,
+  // so the shock coefficient is identified holding the forecast fixed.
+  if (settings.forecastRhs && options.forecastH != null && FE_OUTCOMES_SET.has(outcomeKey)) {
+    const fc = feForecastValue(outcomeKey, options.forecastH, row);
+    if (!finite(fc)) return null;
+    zi.push(fc);
+  }
   if (includeShockLags) {
     const lags = shockLagControls(row, settings);
     if (!lags) return null;
@@ -2065,7 +2095,7 @@ function buildRegressionData(settings, rows, outcomeKey, h, options = {}) {
     if (!finite(yi) || (Array.isArray(xi) ? !xi.every(finite) : !finite(xi))) continue;
     if (Array.isArray(xi) ? xi.every(v => v === 0) : xi === 0) continue;
 
-    const zi = buildUsedControls(settings, row, outcomeKey, options);
+    const zi = buildUsedControls(settings, row, outcomeKey, {...options, forecastH: h});
     if (!zi) continue;
 
     y.push(yi);
@@ -3987,6 +4017,7 @@ function render(settings, rows, resultsByOutcome, scaleByOutcome, scaleDisplay, 
     metric("Min n", minN),
     metric("Controls", controlsCount),
     metric("Outcome form", settings.lpLogLevels ? "levels y(t+h)" : "y(t+h)-y(t-1)"),
+    metric("Regression LHS", settings.forecastRhs ? "realized (forecast on RHS)" : "forecast error"),
     metric("Scale", scaleDisplay),
     metric(`${rateOutcomeLabel(settings)} h=0 raw`, rateH0Display),
     metric("Series lags", settings.useWhitening ? "replaced" : settings.shockLags),
@@ -4041,6 +4072,7 @@ function renderOptions() {
   syncWhiteningControls();
   document.getElementById("dep-lags").value = 0;
   document.getElementById("lp-log-levels").checked = false;
+  document.getElementById("fe-forecast-rhs").checked = false;
   document.getElementById("macro-lags").value = 0;
   document.getElementById("horizon").value = FE_MAX_H;
   document.getElementById("scale-mode").value = DATA.meta.defaults.scale_mode ?? "shock-rmse";
@@ -4208,7 +4240,7 @@ async function init() {
     configureScaleTarget(false);
     runSpec();
   });
-  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "show-treatment-paths", "show-extra-outcomes"]) {
+  for (const id of ["aggregation", "include-zlb", "include-covid", "exclude-unscheduled", "impute-zeros", "lp-log-levels", "fe-forecast-rhs", "show-treatment-paths", "show-extra-outcomes"]) {
     document.getElementById(id).addEventListener("change", runSpec);
   }
   document.querySelectorAll(".exclude-year-check").forEach(el => el.addEventListener("change", runSpec));
