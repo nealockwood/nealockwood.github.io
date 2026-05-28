@@ -817,7 +817,7 @@
 
 <script>
 const DATA_URL = "irfs-data.json?v=breakeven-fix-20260527";
-const FE_DATA_URL = "irfs-fe-outcomes.json?v=3";
+const FE_DATA_URL = "irfs-fe-outcomes.json?v=4";
 let FE_LOOKUP = null;
 const FE_OUTCOMES_LIST = ["fedfunds","cpi","real_gdp","unrate","industrial_production","pce","gdp_price","housing_starts"];
 const FE_OUTCOMES_SET = new Set(FE_OUTCOMES_LIST);
@@ -1262,7 +1262,7 @@ function responseValue(outcomeKey, baseMonth, h, settings = {}, row = null) {
     const rec = FE_LOOKUP[row.date];
     if (!rec) return null;
     // Forecast-RHS mode: LHS is the realized outcome (the forecast moves to the
-    // RHS as a control). Default mode: LHS is the forecast error (forecast - realized).
+    // RHS as a control). Default mode: LHS is the forecast error (realized - forecast).
     const vals = settings.forecastRhs ? (rec._rz && rec._rz[outcomeKey]) : rec[outcomeKey];
     if (!Array.isArray(vals) || h >= vals.length) return null;
     const v = vals[h];
