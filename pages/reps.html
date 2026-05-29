@@ -80,6 +80,7 @@
           <label><input type="radio" name="ex1lvl" value="ts" checked><span>Time series</span></label>
           <label><input type="radio" name="ex1lvl" value="panel"><span>Panel</span></label></div></div>
       <div class="group"><h3>Blue Chip forecast series</h3><div class="seg" id="ex1-series"></div></div>
+      <div class="group"><h3>Aggregation (events → month)</h3><select id="ex1-agg"></select></div>
       <div class="group"><h3>RHS: RTN — response to news</h3>
         <div class="cg"><label class="check-row"><input type="checkbox" id="rtn-market-all" checked><span><b>Market / Bauer–Swanson</b></span></label>
           <details class="control-picker"><summary>individual market controls</summary><div class="control-list" id="rtn-market-list"></div></details></div>
@@ -104,6 +105,7 @@
           <label><input type="radio" name="ex2lvl" value="ts" checked><span>Time series</span></label>
           <label><input type="radio" name="ex2lvl" value="panel"><span>Panel</span></label></div></div>
       <div class="group"><h3>Blue Chip forecast series</h3><div class="seg" id="ex2-series"></div></div>
+      <div class="group"><h3>Aggregation (events → month)</h3><select id="ex2-agg"></select></div>
       <div class="group"><h3>Disagreement horizon h&nbsp;&nbsp;(E<sup>F</sup>−E<sup>M</sup> of i<sub>t+h</sub>)</h3><div class="hchips" id="ex2-horizon"></div></div>
       <div class="group"><h3>IRF shock (1 SD, standshock)</h3>
         <select id="ex2-irf-shock"></select>
@@ -196,16 +198,29 @@ const starT=t=>(t=Math.abs(t))>2.576?"***":t>1.96?"**":t>1.645?"*":"";
 function standshock(arr){const v=arr.filter(x=>x!=null&&isFinite(x)&&x!==0);const n=v.length;if(n<2)return arr.slice();
   const mu=v.reduce((s,x)=>s+x,0)/n;const sd=Math.sqrt(v.reduce((s,x)=>s+(x-mu)**2,0)/(n-1));
   return arr.map(x=>x==null||!isFinite(x)?null:x===0?0:(x-mu)/sd);}
-function lpcum(ddis,x,H){const out=[];
-  for(let h=0;h<=H;h++){const xv=[],cv=[];
-    for(let t=0;t+h<ddis.length;t++){if(x[t]==null||!isFinite(x[t]))continue;
-      let s=0,ok=true;for(let j=0;j<=h;j++){const v=ddis[t+j];if(v==null||!isFinite(v)){ok=false;break;}s+=v;}if(!ok)continue;xv.push(x[t]);cv.push(s);}
-    const n=xv.length;if(n<5){out.push({h,b:null,lo:null,hi:null,n});continue;}
-    const xb=xv.reduce((a,b)=>a+b,0)/n,cb=cv.reduce((a,b)=>a+b,0)/n;
-    let sxx=0,sxc=0;for(let i=0;i<n;i++){sxx+=(xv[i]-xb)**2;sxc+=(xv[i]-xb)*(cv[i]-cb);}
-    if(sxx<EPS){out.push({h,b:null,lo:null,hi:null,n});continue;}
-    const b=sxc/sxx,a0=cb-b*xb;let meat=0;for(let i=0;i<n;i++){const u=cv[i]-a0-b*xv[i];meat+=((xv[i]-xb)**2)*u*u;}
-    const se=Math.sqrt(meat)/sxx;out.push({h,b,lo:b-1.645*se,hi:b+1.645*se,n});}
+/* lpdecomp (paulbousquet/lpdecomp): power-1 B-spline basis on knots 0..H is the identity,
+   so the smooth LP reduces to per-horizon OLS where x is residualized on the constant ONCE
+   over the full kept sample (x present), each cumulant is demeaned over its own subset, and
+   the slope is a no-intercept fit on those residuals. HC0 SE (sescl=1 with no controls). */
+function lpcum(ddis,x,H){
+  const n=ddis.length;
+  const keptX=[]; for(let t=0;t<n;t++) if(x[t]!=null&&isFinite(x[t])) keptX.push(x[t]);
+  const xbar=keptX.length?keptX.reduce((a,b)=>a+b,0)/keptX.length:0;
+  const out=[];
+  for(let h=0;h<=H;h++){
+    const xd=[],cv=[];
+    for(let t=0;t+h<n;t++){
+      if(x[t]==null||!isFinite(x[t]))continue;
+      let s=0,ok=true;for(let j=0;j<=h;j++){const v=ddis[t+j];if(v==null||!isFinite(v)){ok=false;break;}s+=v;}
+      if(!ok)continue; xd.push(x[t]-xbar); cv.push(s);
+    }
+    const m=xd.length;if(m<5){out.push({h,b:null,lo:null,hi:null,n:m});continue;}
+    const cb=cv.reduce((a,b)=>a+b,0)/m;                     // demean cumulant over its subset
+    let sxx=0,sxc=0;for(let i=0;i<m;i++){sxx+=xd[i]*xd[i];sxc+=xd[i]*(cv[i]-cb);}
+    if(sxx<EPS){out.push({h,b:null,lo:null,hi:null,n:m});continue;}
+    const b=sxc/sxx;let meat=0;for(let i=0;i<m;i++){const u=(cv[i]-cb)-b*xd[i];meat+=xd[i]*xd[i]*u*u;}
+    const se=Math.sqrt(meat)/sxx;out.push({h,b,lo:b-1.645*se,hi:b+1.645*se,n:m});
+  }
   return out;}
 function lpcumPanel(seqById,H){const out=[];
   for(let h=0;h<=H;h++){const X=[],Y=[],ID=[];
@@ -229,11 +244,35 @@ const fmt=(x,d=3)=>(x==null||!isFinite(x))?"—":x.toFixed(d);
 const el=id=>document.getElementById(id);
 const shockLabel=k=>DATA.shocks[k]?.label||({dum:"DUM (sign agree)"}[k])||k;
 const seriesLabel=k=>DATA.forecast_series[k]?.label||k;
-/* shocks are stored per forecast series (standshock'd over that series' Stata sample); GSS is global */
-function shockValue(r,k,series){
+/* Shocks come from jk_source_old EVENTS, aggregated to one obs per month by the chosen mode
+   (irfs.html: main / month-last / month-first / month-sum), then standshock'd over that
+   forecast series' merged sample. GSS PCs are global (monthly). */
+const _shockCache={};
+function shockByMonth(series,mode){
+  const key=series+"|"+mode; if(_shockCache[key])return _shockCache[key];
+  const byM=new Map();
+  for(const e of DATA.events){if(!byM.has(e.month))byM.set(e.month,[]);byM.get(e.month).push(e);}
+  const recs=[];
+  for(const [mo,list] of byM){
+    list.sort((a,b)=>a.date<b.date?-1:1);let pick;
+    if(mode==="main"){const m=list.filter(e=>e.main===1);if(!m.length)continue;pick=m[m.length-1];}
+    else if(mode==="month-first")pick=list[0];
+    else if(mode==="month-sum"){pick={};for(const k of["mp1","ff4","ed4","mps"]){let s=null;for(const e of list)if(e[k]!=null)s=(s||0)+e[k];pick[k]=s;}}
+    else pick=list[list.length-1];                                  // month-last
+    recs.push({month:mo,mp1:pick.mp1??null,ff4:pick.ff4??null,ed4:pick.ed4??null,mps:pick.mps??null});
+  }
+  const inS=recs.filter(r=>MByMonth.get(r.month)?.series?.[series]);  // standshock over the merged sample
+  const std={}; for(const k of["mp1","ff4","ed4","mps"])std[k]=standshock(inS.map(r=>r[k]));
+  const map=new Map();
+  inS.forEach((r,i)=>map.set(r.month,{mp1:r.mp1,ff4:r.ff4,ed4:r.ed4,mps:r.mps,
+    mp1_std:std.mp1[i],ff4_std:std.ff4[i],ed4_std:std.ed4[i],mps_std:std.mps[i]}));
+  _shockCache[key]=map; return map;
+}
+function shockValue(r,k,series,mode){
   if(k==="gss_pc1"||k==="gss_pc2")return r.shocks?.[k]??null;
-  if(k==="dum"){const a=shockValue(r,"ff4_std",series),b=shockValue(r,"ed4_std",series);if(a==null||b==null)return null;const s=0.5*(Math.sign(a)+Math.sign(b));return s===0.5?1:s===-0.5?-1:s;}
-  return r.series?.[series]?.shocks?.[k]??null;}
+  const sm=shockByMonth(series,mode||"main").get(r.month);
+  if(k==="dum"){const a=sm?.ff4_std,b=sm?.ed4_std;if(a==null||b==null)return null;const s=0.5*(Math.sign(a)+Math.sign(b));return s===0.5?1:s===-0.5?-1:s;}
+  return sm?.[k]??null;}
 
 /* term-based RHS so the same spec works for TS (consensus) and panel (forecaster) */
 function termValue(t,mRow,pRow,series){
@@ -259,6 +298,7 @@ function ex1Cfg(){return{
   cbi:CBI_VARS.filter(v=>el('ex1-cbi').querySelector(`input[value="${v.k}"]`)?.checked).map(v=>v.k),
   hs:HZ.filter(h=>el('ex1-horizons').querySelector(`input[value="${h}"]`)?.checked),
   minYear:+el('ex1-minyear').value, noZlb:el('ex1-nozlb').checked, unsched:el('ex1-unsched').checked,
+  agg:el('ex1-agg').value,
 };}
 function termsFrom(market,gbVars,fred,cbiVars,hs){
   const T=[];
@@ -278,18 +318,18 @@ function ex1TableRow(shock,cfg,colTerms,commonTerms){
   if(cfg.level==='panel')return colTerms.map(terms=>fitPanel(shock,terms,cfg,commonTerms));
   const rows=ex1SampleRows(cfg);
   const idx=[];const cache=[];
-  for(const r of rows){const yy=shockValue(r,shock,cfg.series);if(yy==null)continue;
+  for(const r of rows){const yy=shockValue(r,shock,cfg.series,cfg.agg);if(yy==null)continue;
     let ok=true;for(const t of commonTerms){const v=termValue(t,r,null,cfg.series);if(v==null){ok=false;break;}}
     if(ok)cache.push(r);}
   return colTerms.map(terms=>{if(!terms.length)return null;
-    const y=cache.map(r=>shockValue(r,shock,cfg.series));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
+    const y=cache.map(r=>shockValue(r,shock,cfg.series,cfg.agg));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
     if(y.length<terms.length+3)return null;const res=ols(y,X);if(!res)return null;res.wald=jointWald(res.beta,res.vcov,1);return res;});
 }
 /* panel fit on a common forecaster-obs sample */
 function fitPanel(shock,terms,cfg,commonTerms){
   if(!terms.length)return null;
   const y=[],X=[],ids=[];
-  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock,'bcff');if(yy==null)continue;
+  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock,'bcff',cfg.agg);if(yy==null)continue;
     if(mr.year<cfg.minYear)continue;if(cfg.noZlb&&!p.nzlb)continue;if(!cfg.unsched&&p.scheduled===false)continue;
     let ok=true;for(const t of commonTerms){if(termValue(t,mr,p,cfg.series)==null){ok=false;break;}}if(!ok)continue;
     const vec=terms.map(t=>termValue(t,mr,p,cfg.series));if(vec.some(v=>v==null))continue;
@@ -356,24 +396,24 @@ function ex2Cfg(){return{
   irfShock:el('ex2-irf-shock').value, irfH:+el('ex2-irf-h').value,
   tf:document.querySelector('input[name="ex2tf"]:checked').value,
   convMode:document.querySelector('input[name="ex2cm"]:checked').value,
-  minYear:+el('ex2-minyear').value, noZlb:el('ex2-nozlb').checked,
+  minYear:+el('ex2-minyear').value, noZlb:el('ex2-nozlb').checked, agg:el('ex2-agg').value,
 };}
 const tf=(v,t)=>t==='abs'?Math.abs(v):v;
 function ex2TsRows(cfg,h){return DATA.monthly.filter(r=>{const S=r.series[cfg.series];
   return S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[h]!=null && r.scheduled!==false && r.year>=cfg.minYear && (!cfg.noZlb||r.nzlb);})
-  .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:Object.fromEntries(SHOCKS.map(k=>[k,shockValue(r,k,cfg.series)]))}));}
+  .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:Object.fromEntries(SHOCKS.map(k=>[k,shockValue(r,k,cfg.series,cfg.agg)]))}));}
 function ex2PanelRows(cfg,h){return DATA.panel.filter(p=>p.cbi.ffr&&p.cbi.ffr[h]!=null && p.scheduled!==false && p.year>=cfg.minYear && (!cfg.noZlb||p.nzlb))
-  .map(p=>{const mr=MByMonth.get(p.month);return{id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:mr?Object.fromEntries(SHOCKS.map(k=>[k,shockValue(mr,k,'bcff')])):{}};});}
+  .map(p=>{const mr=MByMonth.get(p.month);return{id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:mr?Object.fromEntries(SHOCKS.map(k=>[k,shockValue(mr,k,'bcff',cfg.agg)])):{}};});}
 
 function renderEx2(){
   syncEx2();const cfg=ex2Cfg();const tfv=cfg.tf;const gapName=`${tfv==='abs'?'|df_':'df_'}${cfg.h}${tfv==='abs'?'|':''}`;
   el('head-title').innerHTML='Exercise 2 — Do Fed &amp; private rate expectations align?';
-  el('head-sub').innerHTML=`Dependent variable: <code>df_h = E<sup>F</sup>[i<sub>t+h</sub>] − E<sup>M</sup>[i<sub>t+h</sub>]</code> (Greenbook − Blue Chip FFR, ${seriesLabel(cfg.series)}). Scheduled meetings only; shocks from <code>jk_source_old</code> (standshock, 1 SD).`;
+  el('head-sub').innerHTML=`Dependent variable: <code>df_h = E<sup>F</sup>[i<sub>t+h</sub>] − E<sup>M</sup>[i<sub>t+h</sub>]</code> (Greenbook − Blue Chip FFR, ${seriesLabel(cfg.series)}). Shocks from <code>jk_source_old</code> aggregated to one obs per month (see Aggregation), standshock'd to 1 SD.`;
 
   // 1) IRF (top)
   let html=`<div class="card"><h4>Impulse response — change in ${gapName} (h=${cfg.h}) following a 1 SD ${shockLabel(cfg.irfShock)} surprise · ${cfg.level==='panel'?'panel':'time series'}</h4>
     <div id="ex2-irf" class="chart" role="img" aria-label="Local-projection impulse response of the rate-forecast disagreement to the selected monetary surprise, 90% band"></div>
-    <p class="sub">Cumulative local projection (flpdecomp / <code>disaglp.do</code>): D.${gapName} on the surprise, ${cfg.level==='panel'?'forecaster FE, cluster-robust':'HC0-robust'} SE, 90% band, ${cfg.irfH} meetings ahead. One shock at a time (sidebar).</p></div>`;
+    <p class="sub">Cumulative local projection (<code>lpdecomp</code> / <code>disaglp.do</code>): D.${gapName} on the surprise, ${cfg.level==='panel'?'forecaster FE, cluster-robust':'HC0-robust'} SE, 90% band, ${cfg.irfH} meetings ahead. One shock at a time (sidebar).</p></div>`;
 
   // 2) GAP ON SURPRISES (under IRF) — every surprise, one RHS each
   html+=`<div class="card"><h4>Disagreement on surprises — ${gapName} at h=${cfg.h} · ${cfg.level==='panel'?'panel (forecaster FE, clustered)':'time series (HC1)'}</h4>
@@ -395,12 +435,14 @@ function renderEx2(){
   el('view-ex2').innerHTML=html;
 
   // ---- IRF: ordered scheduled meetings; D[tf(df_h)]; shock _std as-is (dum standshocked over full series) ----
-  const ordered=DATA.monthly.filter(r=>{const S=r.series[cfg.series];return r.scheduled!==false && S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[cfg.h]!=null;}).sort((a,b)=>a.month<b.month?-1:1);
-  const lvl=ordered.map(r=>tf(r.series[cfg.series].cbi.ffr[cfg.h],tfv));
-  const ddis=lvl.map((v,i)=>i===0?null:v-lvl[i-1]);
+  // LP series = consensus months that carry the aggregated shock (= the .do merge sample);
+  // df can be missing within (gaps are spanned, matching lpdecomp's cum-window dropping).
+  const sm=shockByMonth(cfg.series,cfg.agg);
+  const ordered=DATA.monthly.filter(r=>sm.has(r.month) && r.series[cfg.series]).sort((a,b)=>a.month<b.month?-1:1);
+  const lvl=ordered.map(r=>{const v=r.series[cfg.series].cbi?.ffr?.[cfg.h];return v==null?null:tf(v,tfv);});
+  const ddis=lvl.map((v,i)=>(i===0||v==null||lvl[i-1]==null)?null:v-lvl[i-1]);
   const inSample=ordered.map(r=>r.year>=cfg.minYear&&(!cfg.noZlb||r.nzlb));
-  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock,cfg.series));
-  if(cfg.irfShock==='dum')xfull=standshock(xfull);            // _std already 1 SD; standshock dum over full series
+  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock,cfg.series,cfg.agg));
   const xs=xfull.map((v,i)=>inSample[i]?v:null);
   let irf;
   if(cfg.level==='panel'){
@@ -469,6 +511,8 @@ function buildControls(){
   el('ex2-horizon').innerHTML=HZ.map(h=>`<label><input type="radio" name="ex2h" value="${h}" ${h===4?'checked':''}>${h}</label>`).join('');
   el('ex1-detail-lhs').innerHTML=SHOCKS.map(k=>`<option value="${k}" ${k==='ff4_std'?'selected':''}>${shockLabel(k)}</option>`).join('');
   el('ex2-irf-shock').innerHTML=["mp1_std","ff4_std","ed4_std","mps_std","dum"].map(k=>`<option value="${k}" ${k==='mp1_std'?'selected':''}>${shockLabel(k)}</option>`).join('');
+  const AGG=[["main","main meeting (main==1)"],["month-last","monthly last"],["month-first","monthly first"],["month-sum","monthly sum"]];
+  for(const id of ["ex1-agg","ex2-agg"]) el(id).innerHTML=AGG.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   // master "All" toggles drive their group's individual checkboxes
   for(const [allId,listId] of [['rtn-market-all','rtn-market-list'],['rtn-gb-all','rtn-gb-list'],['rtn-fred-all','rtn-fred-list']]){
     const all=el(allId),list=el(listId);
@@ -479,7 +523,7 @@ function buildControls(){
     list.querySelectorAll('input').forEach(i=>i.checked=all.checked);
   }
   el('stamp').innerHTML=`Snapshot ${DATA.meta.built_at.slice(0,10)} · ${DATA.monthly.length} months · ${DATA.panel.length} panel obs · <code>${DATA.meta.repo}</code>`;
-  el('foot').innerHTML=`Shocks &amp; Bauer–Swanson controls from <code>jk_source_old</code> (paulbousquet/GBMPSurprise); forecasts &amp; FRED macro from <code>${DATA.meta.repo}</code>. <b>RTN</b>=response to news; <b>CBI</b>=central-bank information (Fed−private gaps); <code>df_h</code>=E<sup>F</sup>[i]−E<sup>M</sup>[i]. BCFF cpi/rgdp gaps apply the <code>monthlydisag.do</code> bcff_time shift; df is plain ffr−ff; combined aligned by construction. HC1 / cluster-robust SEs. <span class="muted">${DATA.meta.construction_note}</span>`;
+  el('foot').innerHTML=`Shocks &amp; Bauer–Swanson controls from <code>jk_source_old</code> (paulbousquet/GBMPSurprise); forecasts &amp; FRED macro from <code>${DATA.meta.repo}</code>. <b>RTN</b>=response to news; <b>CBI</b>=central-bank information (Fed−private gaps); <code>df_h</code>=E<sup>F</sup>[i]−E<sup>M</sup>[i]. BCFF cpi/rgdp gaps apply the <code>monthlydisag.do</code> bcff_time shift; df is plain ffr−ff; combined aligned by construction. IRF via <code>lpdecomp</code> (paulbousquet/lpdecomp). HC1 / cluster-robust SEs. <span class="muted">${DATA.meta.construction_note}</span>`;
 }
 let view='ex1';
 function rerender(){view==='ex1'?renderEx1():renderEx2();if(window.lucide)window.lucide.createIcons();}
