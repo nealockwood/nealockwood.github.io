@@ -229,7 +229,11 @@ const fmt=(x,d=3)=>(x==null||!isFinite(x))?"—":x.toFixed(d);
 const el=id=>document.getElementById(id);
 const shockLabel=k=>DATA.shocks[k]?.label||({dum:"DUM (sign agree)"}[k])||k;
 const seriesLabel=k=>DATA.forecast_series[k]?.label||k;
-function shockValue(r,k){if(k==="dum"){const a=r.shocks.ff4_std,b=r.shocks.ed4_std;if(a==null||b==null)return null;const s=0.5*(Math.sign(a)+Math.sign(b));return s===0.5?1:s===-0.5?-1:s;}return r.shocks[k];}
+/* shocks are stored per forecast series (standshock'd over that series' Stata sample); GSS is global */
+function shockValue(r,k,series){
+  if(k==="gss_pc1"||k==="gss_pc2")return r.shocks?.[k]??null;
+  if(k==="dum"){const a=shockValue(r,"ff4_std",series),b=shockValue(r,"ed4_std",series);if(a==null||b==null)return null;const s=0.5*(Math.sign(a)+Math.sign(b));return s===0.5?1:s===-0.5?-1:s;}
+  return r.series?.[series]?.shocks?.[k]??null;}
 
 /* term-based RHS so the same spec works for TS (consensus) and panel (forecaster) */
 function termValue(t,mRow,pRow,series){
@@ -274,18 +278,18 @@ function ex1TableRow(shock,cfg,colTerms,commonTerms){
   if(cfg.level==='panel')return colTerms.map(terms=>fitPanel(shock,terms,cfg,commonTerms));
   const rows=ex1SampleRows(cfg);
   const idx=[];const cache=[];
-  for(const r of rows){const yy=shockValue(r,shock);if(yy==null)continue;
+  for(const r of rows){const yy=shockValue(r,shock,cfg.series);if(yy==null)continue;
     let ok=true;for(const t of commonTerms){const v=termValue(t,r,null,cfg.series);if(v==null){ok=false;break;}}
     if(ok)cache.push(r);}
   return colTerms.map(terms=>{if(!terms.length)return null;
-    const y=cache.map(r=>shockValue(r,shock));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
+    const y=cache.map(r=>shockValue(r,shock,cfg.series));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
     if(y.length<terms.length+3)return null;const res=ols(y,X);if(!res)return null;res.wald=jointWald(res.beta,res.vcov,1);return res;});
 }
 /* panel fit on a common forecaster-obs sample */
 function fitPanel(shock,terms,cfg,commonTerms){
   if(!terms.length)return null;
   const y=[],X=[],ids=[];
-  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock);if(yy==null)continue;
+  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock,'bcff');if(yy==null)continue;
     if(mr.year<cfg.minYear)continue;if(cfg.noZlb&&!p.nzlb)continue;if(!cfg.unsched&&p.scheduled===false)continue;
     let ok=true;for(const t of commonTerms){if(termValue(t,mr,p,cfg.series)==null){ok=false;break;}}if(!ok)continue;
     const vec=terms.map(t=>termValue(t,mr,p,cfg.series));if(vec.some(v=>v==null))continue;
@@ -357,9 +361,9 @@ function ex2Cfg(){return{
 const tf=(v,t)=>t==='abs'?Math.abs(v):v;
 function ex2TsRows(cfg,h){return DATA.monthly.filter(r=>{const S=r.series[cfg.series];
   return S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[h]!=null && r.scheduled!==false && r.year>=cfg.minYear && (!cfg.noZlb||r.nzlb);})
-  .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:r.shocks}));}
+  .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:Object.fromEntries(SHOCKS.map(k=>[k,shockValue(r,k,cfg.series)]))}));}
 function ex2PanelRows(cfg,h){return DATA.panel.filter(p=>p.cbi.ffr&&p.cbi.ffr[h]!=null && p.scheduled!==false && p.year>=cfg.minYear && (!cfg.noZlb||p.nzlb))
-  .map(p=>({id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:(MByMonth.get(p.month)||{}).shocks||{}}));}
+  .map(p=>{const mr=MByMonth.get(p.month);return{id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:mr?Object.fromEntries(SHOCKS.map(k=>[k,shockValue(mr,k,'bcff')])):{}};});}
 
 function renderEx2(){
   syncEx2();const cfg=ex2Cfg();const tfv=cfg.tf;const gapName=`${tfv==='abs'?'|df_':'df_'}${cfg.h}${tfv==='abs'?'|':''}`;
@@ -395,7 +399,7 @@ function renderEx2(){
   const lvl=ordered.map(r=>tf(r.series[cfg.series].cbi.ffr[cfg.h],tfv));
   const ddis=lvl.map((v,i)=>i===0?null:v-lvl[i-1]);
   const inSample=ordered.map(r=>r.year>=cfg.minYear&&(!cfg.noZlb||r.nzlb));
-  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock));
+  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock,cfg.series));
   if(cfg.irfShock==='dum')xfull=standshock(xfull);            // _std already 1 SD; standshock dum over full series
   const xs=xfull.map((v,i)=>inSample[i]?v:null);
   let irf;
