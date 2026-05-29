@@ -526,7 +526,10 @@ function buildControls(){
   el('foot').innerHTML=`Shocks &amp; Bauer–Swanson controls from <code>jk_source_old</code> (paulbousquet/GBMPSurprise); forecasts &amp; FRED macro from <code>${DATA.meta.repo}</code>. <b>RTN</b>=response to news; <b>CBI</b>=central-bank information (Fed−private gaps); <code>df_h</code>=E<sup>F</sup>[i]−E<sup>M</sup>[i]. BCFF cpi/rgdp gaps apply the <code>monthlydisag.do</code> bcff_time shift; df is plain ffr−ff; combined aligned by construction. IRF via <code>lpdecomp</code> (paulbousquet/lpdecomp). HC1 / cluster-robust SEs. <span class="muted">${DATA.meta.construction_note}</span>`;
 }
 let view='ex1';
-function rerender(){view==='ex1'?renderEx1():renderEx2();if(window.lucide)window.lucide.createIcons();}
+function rerender(){
+  try{view==='ex1'?renderEx1():renderEx2();}
+  catch(e){const v=el('view-'+view);if(v)v.innerHTML=`<div class="err">Render error: ${e.message||e}<br><span class="sub">If this persists, hard-refresh the page (Cmd/Ctrl+Shift+R) to clear a stale cache.</span></div>`;console.error(e);}
+  if(window.lucide)window.lucide.createIcons();}
 function activate(v){view=v;
   document.querySelectorAll('.tab').forEach(t=>{const on=t.dataset.view===v;t.classList.toggle('active',on);t.setAttribute('aria-selected',on?'true':'false');});
   el('controls-ex1').style.display=v==='ex1'?'':'none';el('controls-ex2').style.display=v==='ex2'?'':'none';
