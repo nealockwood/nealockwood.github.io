@@ -23,9 +23,17 @@
   .tab.active{background:var(--teal-soft);border-color:var(--teal);color:var(--teal);}
   .group{border-top:1px solid var(--line);padding:13px 0;}.group:first-of-type{border-top:none;}
   .group h3{margin:0 0 9px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
-  .check-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px;cursor:pointer;}
+  .cg{margin-bottom:9px;}
+  .check-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12.5px;cursor:pointer;}
   .check-row input{accent-color:var(--teal);width:15px;height:15px;}
   .check-row input:disabled+span{opacity:.4;}
+  .control-picker{margin:2px 0 4px 22px;}
+  .control-picker summary{font-size:11px;color:var(--teal);cursor:pointer;list-style:none;padding:2px 0;}
+  .control-picker summary::-webkit-details-marker{display:none;}
+  .control-picker summary::after{content:" ▸";}.control-picker[open] summary::after{content:" ▾";}
+  .control-list{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;padding:4px 0 2px;}
+  .control-list label{font-size:11.5px;display:flex;gap:6px;align-items:center;cursor:pointer;}
+  .control-list input{accent-color:var(--teal);width:13px;height:13px;}
   .seg{display:flex;flex-wrap:wrap;gap:5px;}
   .seg label{flex:1;min-width:54px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;font-size:11.5px;cursor:pointer;color:var(--muted);}
   .seg input{display:none;}.seg input:checked+span{color:var(--teal);font-weight:700;}
@@ -37,14 +45,14 @@
   .field input[type=number]{width:78px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;}
   select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;background:#fff;}
   .muted{color:var(--muted);}.stamp{font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
-  header.head{padding:18px 22px 6px;border-bottom:1px solid var(--line);}
-  header.head h2{margin:0;font-size:18px;}header.head p{margin:6px 0 12px;color:var(--muted);font-size:13px;max-width:76ch;line-height:1.5;}
+  header.head{padding:18px 22px 10px;border-bottom:1px solid var(--line);}
+  header.head h2{margin:0;font-size:18px;}header.head p{margin:6px 0 0;color:var(--muted);font-size:12.5px;max-width:80ch;line-height:1.5;}
   .body{padding:18px 22px 26px;overflow:auto;}
   .card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:18px;background:#fff;}
   .card h4{margin:0 0 8px;font-size:13px;}.card p,.card li{font-size:12.5px;color:#2c352f;line-height:1.55;}
-  table{border-collapse:collapse;width:100%;font-size:12.5px;}
-  th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
-  th:first-child,td:first-child{text-align:left;}
+  table{border-collapse:collapse;width:auto;min-width:60%;font-size:12.5px;}
+  th,td{padding:7px 14px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;padding-left:2px;}
   thead th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:2px solid var(--line);}
   tbody tr:hover{background:#f6f9f6;}
   td.hi,th.hi{background:var(--teal-soft);font-weight:700;color:var(--teal);}
@@ -70,13 +78,15 @@
       <div class="group"><h3>Estimation level</h3>
         <div class="seg" id="ex1-level">
           <label><input type="radio" name="ex1lvl" value="ts" checked><span>Time series</span></label>
-          <label><input type="radio" name="ex1lvl" value="panel"><span>Panel</span></label></div>
-        <p class="sub" id="ex1-level-note" style="margin:6px 0 0"></p></div>
+          <label><input type="radio" name="ex1lvl" value="panel"><span>Panel</span></label></div></div>
       <div class="group"><h3>Blue Chip forecast series</h3><div class="seg" id="ex1-series"></div></div>
       <div class="group"><h3>RHS: RTN — response to news</h3>
-        <label class="check-row"><input type="checkbox" id="ex1-rtn-market" checked><span>Market / Bauer–Swanson controls (6)</span></label>
-        <label class="check-row"><input type="checkbox" id="ex1-rtn-gb"><span>Greenbook forecaster controls</span></label>
-        <label class="check-row"><input type="checkbox" id="ex1-rtn-fred"><span>FRED realized-macro data</span></label>
+        <div class="cg"><label class="check-row"><input type="checkbox" id="rtn-market-all" checked><span><b>Market / Bauer–Swanson</b></span></label>
+          <details class="control-picker"><summary>individual market controls</summary><div class="control-list" id="rtn-market-list"></div></details></div>
+        <div class="cg"><label class="check-row"><input type="checkbox" id="rtn-gb-all"><span><b>Greenbook forecaster controls</b></span></label>
+          <details class="control-picker"><summary>individual Greenbook controls (× horizons)</summary><div class="control-list" id="rtn-gb-list"></div></details></div>
+        <div class="cg"><label class="check-row"><input type="checkbox" id="rtn-fred-all"><span><b>FRED realized macro</b></span></label>
+          <details class="control-picker"><summary>individual FRED controls</summary><div class="control-list" id="rtn-fred-list"></div></details></div>
       </div>
       <div class="group"><h3>RHS: CBI — central-bank info (Fed − private)</h3><div id="ex1-cbi"></div></div>
       <div class="group"><h3>Forecast horizons (quarters)</h3><div class="hchips" id="ex1-horizons"></div></div>
@@ -92,8 +102,7 @@
       <div class="group"><h3>Estimation level</h3>
         <div class="seg" id="ex2-level">
           <label><input type="radio" name="ex2lvl" value="ts" checked><span>Time series</span></label>
-          <label><input type="radio" name="ex2lvl" value="panel"><span>Panel</span></label></div>
-        <p class="sub" style="margin:6px 0 0">Panel = individual BCFF forecasters (forecaster FE, SEs clustered by forecaster). Scheduled meetings only.</p></div>
+          <label><input type="radio" name="ex2lvl" value="panel"><span>Panel</span></label></div></div>
       <div class="group"><h3>Blue Chip forecast series</h3><div class="seg" id="ex2-series"></div></div>
       <div class="group"><h3>Disagreement horizon h&nbsp;&nbsp;(E<sup>F</sup>−E<sup>M</sup> of i<sub>t+h</sub>)</h3><div class="hchips" id="ex2-horizon"></div></div>
       <div class="group"><h3>IRF shock (1 SD, standshock)</h3>
@@ -103,9 +112,13 @@
         <div class="seg" id="ex2-transform">
           <label><input type="radio" name="ex2tf" value="signed" checked><span>signed</span></label>
           <label><input type="radio" name="ex2tf" value="abs"><span>|gap|</span></label></div></div>
+      <div class="group"><h3>Trend plot</h3>
+        <div class="seg" id="ex2-convmode">
+          <label><input type="radio" name="ex2cm" value="annual" checked><span>Annual mean</span></label>
+          <label><input type="radio" name="ex2cm" value="raw"><span>All obs</span></label></div></div>
       <div class="group"><h3>Sample (scheduled only)</h3>
-        <div class="field"><label for="ex2-minyear">Min year</label><input type="number" id="ex2-minyear" value="1993" min="1985" max="2025" aria-label="Exercise 2 minimum year"></div>
-        <label class="check-row"><input type="checkbox" id="ex2-nozlb" checked><span>Exclude ZLB / Covid windows</span></label></div>
+        <div class="field"><label for="ex2-minyear">Min year</label><input type="number" id="ex2-minyear" value="1988" min="1985" max="2025" aria-label="Exercise 2 minimum year"></div>
+        <label class="check-row"><input type="checkbox" id="ex2-nozlb"><span>Exclude ZLB / Covid windows</span></label></div>
     </div>
     <div class="stamp" id="stamp"></div>
   </aside>
@@ -170,7 +183,6 @@ function panelFE(y,Xraw,idArr,timeArr){const n=y.length,k=Xraw[0].length;
   for(let a=0;a<k;a++)for(let b=0;b<k;b++){let v=0;if(Ai)for(let u=0;u<k;u++)for(let w=0;w<k;w++)v+=Ai[a][u]*meat[u][w]*Ai[w][b];V[a][b]=v*dfc;}
   for(let j=0;j<k;j++)se.push(Math.sqrt(Math.max(0,V[j][j])));
   return{beta,se,vcov:V,withinR2,n,nG:G,k};}
-/* chi-square upper tail (joint Wald p-value) */
 function gammln(x){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];
   let y=x,t=x+5.5;t-=(x+0.5)*Math.log(t);let s=1.000000000190015;for(let j=0;j<6;j++)s+=c[j]/++y;return -t+Math.log(2.5066282746310005*s/x);}
 function gammp(a,x){if(x<=0)return 0;if(x<a+1){let ap=a,sum=1/a,del=sum;for(let i=0;i<300;i++){ap++;del*=x/ap;sum+=del;if(Math.abs(del)<Math.abs(sum)*1e-13)break;}return sum*Math.exp(-x+a*Math.log(x)-gammln(a));}
@@ -181,11 +193,9 @@ function jointWald(beta,vcov,off){const idx=[];for(let j=off;j<beta.length;j++)i
   let W=0;for(let a=0;a<b.length;a++)for(let c=0;c<b.length;c++)W+=b[a]*Vi[a][c]*b[c];return{W,df:b.length,p:chi2sf(W,b.length)};}
 const starP=p=>p<0.01?"***":p<0.05?"**":p<0.10?"*":"";
 const starT=t=>(t=Math.abs(t))>2.576?"***":t>1.96?"**":t>1.645?"*":"";
-/* standshock: standardize over non-zero values (zeros stay zero) -> ~1 SD */
 function standshock(arr){const v=arr.filter(x=>x!=null&&isFinite(x)&&x!==0);const n=v.length;if(n<2)return arr.slice();
   const mu=v.reduce((s,x)=>s+x,0)/n;const sd=Math.sqrt(v.reduce((s,x)=>s+(x-mu)**2,0)/(n-1));
   return arr.map(x=>x==null||!isFinite(x)?null:x===0?0:(x-mu)/sd);}
-/* cumulative LP IRF (flpdecomp, cum noadj): HC0 SE, 90% band */
 function lpcum(ddis,x,H){const out=[];
   for(let h=0;h<=H;h++){const xv=[],cv=[];
     for(let t=0;t+h<ddis.length;t++){if(x[t]==null||!isFinite(x[t]))continue;
@@ -197,7 +207,6 @@ function lpcum(ddis,x,H){const out=[];
     const b=sxc/sxx,a0=cb-b*xb;let meat=0;for(let i=0;i<n;i++){const u=cv[i]-a0-b*xv[i];meat+=((xv[i]-xb)**2)*u*u;}
     const se=Math.sqrt(meat)/sxx;out.push({h,b,lo:b-1.645*se,hi:b+1.645*se,n});}
   return out;}
-/* panel cumulative LP IRF: per-forecaster cumulants, forecaster FE, cluster SE by forecaster, 90% band */
 function lpcumPanel(seqById,H){const out=[];
   for(let h=0;h<=H;h++){const X=[],Y=[],ID=[];
     for(const [id,seq] of seqById){const dd=seq.ddis,xx=seq.x;
@@ -206,123 +215,134 @@ function lpcumPanel(seqById,H){const out=[];
     if(X.length<8||new Set(ID).size<2){out.push({h,b:null,lo:null,hi:null,n:X.length});continue;}
     const res=panelFE(Y,X.map(v=>[v]),ID,null);
     if(!res){out.push({h,b:null,lo:null,hi:null,n:X.length});continue;}
-    const b=res.beta[0],se=res.se[0];out.push({h,b,lo:b-1.645*se,hi:b+1.645*se,n:res.n});}
+    out.push({h,b:res.beta[0],lo:res.beta[0]-1.645*res.se[0],hi:res.beta[0]+1.645*res.se[0],n:res.n});}
   return out;}
 
 /* ===================== app ===================== */
-let DATA=null;
+let DATA=null, MByMonth=null;
 const SHOCKS=["mp1_std","ff4_std","ed4_std","mps_std","gss_pc1"];
 const HZ=[0,1,2,3,4];
 const CBI_VARS=[{k:"cpi",lbl:"CPI inflation (dp)",def:true},{k:"rgdp",lbl:"real GDP growth (dg)",def:true},
                 {k:"un",lbl:"unemployment (du)",def:false},{k:"ffr",lbl:"FFR (df)",def:false}];
+const GB_VARS=[{k:"cpi",lbl:"GB CPI"},{k:"rgdp",lbl:"GB RGDP"},{k:"un",lbl:"GB UR"}];
 const fmt=(x,d=3)=>(x==null||!isFinite(x))?"—":x.toFixed(d);
 const el=id=>document.getElementById(id);
 const shockLabel=k=>DATA.shocks[k]?.label||({dum:"DUM (sign agree)"}[k])||k;
 const seriesLabel=k=>DATA.forecast_series[k]?.label||k;
 function shockValue(r,k){if(k==="dum"){const a=r.shocks.ff4_std,b=r.shocks.ed4_std;if(a==null||b==null)return null;const s=0.5*(Math.sign(a)+Math.sign(b));return s===0.5?1:s===-0.5?-1:s;}return r.shocks[k];}
 
-function sampleRows(minYear,noZlb,inclUnsched,schedOnly){
-  return DATA.monthly.filter(r=>{
-    if(r.year<minYear)return false;
-    if(noZlb&&!r.nzlb)return false;
-    if(schedOnly&&r.scheduled===false)return false;
-    if(!schedOnly&&!inclUnsched&&r.scheduled===false)return false;
-    return true;});
+/* term-based RHS so the same spec works for TS (consensus) and panel (forecaster) */
+function termValue(t,mRow,pRow,series){
+  if(!mRow)return null;
+  if(t.kind==='market')return mRow.rtn?.[t.name];
+  if(t.kind==='fred')return (mRow.fred||{})[t.name];
+  if(t.kind==='gb')return (mRow.gbraw?.[t.v]||[])[t.h];
+  if(t.kind==='cbi'){
+    if(pRow&&t.v!=='un')return (pRow.cbi?.[t.v]||[])[t.h];           // forecaster-level gap
+    return (mRow.series?.[series]?.cbi?.[t.v]||[])[t.h];             // consensus / meeting-level (un)
+  }
+  return null;
 }
 
 /* ============================ EXERCISE 1 ============================ */
+function selected(listId){return [...el(listId).querySelectorAll('input:checked')].map(i=>i.value);}
 function ex1Cfg(){return{
   level:document.querySelector('input[name="ex1lvl"]:checked').value,
   series:document.querySelector('input[name="ex1series"]:checked').value,
-  market:el('ex1-rtn-market').checked, gb:el('ex1-rtn-gb').checked, fred:el('ex1-rtn-fred').checked,
+  market:el('rtn-market-all').checked?DATA.rtn_controls:selected('rtn-market-list'),
+  gb:el('rtn-gb-all').checked?GB_VARS.map(v=>v.k):selected('rtn-gb-list'),
+  fred:el('rtn-fred-all').checked?DATA.fred_controls:selected('rtn-fred-list'),
   cbi:CBI_VARS.filter(v=>el('ex1-cbi').querySelector(`input[value="${v.k}"]`)?.checked).map(v=>v.k),
   hs:HZ.filter(h=>el('ex1-horizons').querySelector(`input[value="${h}"]`)?.checked),
   minYear:+el('ex1-minyear').value, noZlb:el('ex1-nozlb').checked, unsched:el('ex1-unsched').checked,
 };}
-function ex1Blocks(cfg){const b=[];
-  if(cfg.market)b.push({t:'market'});
-  if(cfg.gb)b.push({t:'gb',hs:cfg.hs});
-  if(cfg.fred)b.push({t:'fred'});
-  for(const v of cfg.cbi)b.push({t:'cbi',v,hs:cfg.hs});
-  return b;}
-function ex1Vec(row,series,blocks){const x=[],names=[];const S=row.series[series]||{};
-  for(const b of blocks){
-    if(b.t==='market'){for(const c of DATA.rtn_controls){const v=row.rtn[c];if(v==null)return null;x.push(v);names.push(c);}}
-    else if(b.t==='fred'){for(const c of DATA.fred_controls){const v=(row.fred||{})[c];if(v==null)return null;x.push(v);names.push(c);}}
-    else if(b.t==='gb'){for(const vv of ['cpi','rgdp','un']){const arr=(row.gbraw||{})[vv];if(!arr)return null;for(const h of b.hs){const v=arr[h];if(v==null)return null;x.push(v);names.push(`gb_${vv}_${h}`);}}}
-    else if(b.t==='cbi'){const arr=(S.cbi||{})[b.v];if(!arr)return null;for(const h of b.hs){const v=arr[h];if(v==null)return null;x.push(v);names.push(`${b.v}_${h}`);}}
-  }
-  return {x,names};
+function termsFrom(market,gbVars,fred,cbiVars,hs){
+  const T=[];
+  for(const c of market)T.push({kind:'market',name:c});
+  for(const v of gbVars)for(const h of hs)T.push({kind:'gb',v,h});
+  for(const c of fred)T.push({kind:'fred',name:c});
+  for(const v of cbiVars)for(const h of hs)T.push({kind:'cbi',v,h});
+  return T;
 }
-function fitEx1TS(shock,blocks,cfg){
-  const rows=sampleRows(cfg.minYear,cfg.noZlb,cfg.unsched,false);
-  const y=[],X=[];let names=null;
-  for(const r of rows){const yy=shockValue(r,shock);if(yy==null)continue;const v=ex1Vec(r,cfg.series,blocks);if(!v||v.names.length===0)continue;y.push(yy);X.push(v.x);names=v.names;}
-  if(!names||names.length===0||y.length<names.length+3)return null;
-  const res=ols(y,X);if(!res)return null;res.names=names;res.wald=jointWald(res.beta,res.vcov,1);return res;
+function ex1Terms(cfg){return termsFrom(cfg.market,cfg.gb,cfg.fred,cfg.cbi,cfg.hs);}
+function ex1SampleRows(cfg){return DATA.monthly.filter(r=>{
+  if(r.year<cfg.minYear)return false;if(cfg.noZlb&&!r.nzlb)return false;
+  if(!cfg.unsched&&r.scheduled===false)return false;return true;});}
+
+/* run a list of column-specs on a COMMON listwise sample so adj-R² are comparable */
+function ex1TableRow(shock,cfg,colTerms,commonTerms){
+  if(cfg.level==='panel')return colTerms.map(terms=>fitPanel(shock,terms,cfg,commonTerms));
+  const rows=ex1SampleRows(cfg);
+  const idx=[];const cache=[];
+  for(const r of rows){const yy=shockValue(r,shock);if(yy==null)continue;
+    let ok=true;for(const t of commonTerms){const v=termValue(t,r,null,cfg.series);if(v==null){ok=false;break;}}
+    if(ok)cache.push(r);}
+  return colTerms.map(terms=>{if(!terms.length)return null;
+    const y=cache.map(r=>shockValue(r,shock));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
+    if(y.length<terms.length+3)return null;const res=ols(y,X);if(!res)return null;res.wald=jointWald(res.beta,res.vcov,1);return res;});
 }
-/* Panel (matches romer reghdfe ... absorb(idn) vce(cluster idn)): surprise on forecaster CBI gaps (+ meeting-level market RTN), forecaster FE */
-function fitEx1Panel(shock,cfg){
-  const cbiVars=cfg.cbi.filter(v=>v!=='un');   // panel forecasters have cpi/rgdp/ffr, no UR
-  if(!cfg.market&&cbiVars.length===0)return null;
-  const ms=new Map(DATA.monthly.map(r=>[r.month,r]));
-  const y=[],X=[],ids=[];let names=null;
-  for(const p of DATA.panel){
-    const mr=ms.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock);if(yy==null)continue;
+/* panel fit on a common forecaster-obs sample */
+function fitPanel(shock,terms,cfg,commonTerms){
+  if(!terms.length)return null;
+  const y=[],X=[],ids=[];
+  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock);if(yy==null)continue;
     if(mr.year<cfg.minYear)continue;if(cfg.noZlb&&!p.nzlb)continue;if(!cfg.unsched&&p.scheduled===false)continue;
-    const vec=[],nm=[];let ok=true;
-    if(cfg.market){for(const c of DATA.rtn_controls){const v=mr.rtn[c];if(v==null){ok=false;break;}vec.push(v);nm.push(c);}}
-    if(ok)for(const v of cbiVars){const arr=p.cbi[v];if(!arr){ok=false;break;}for(const h of cfg.hs){const val=arr[h];if(val==null){ok=false;break;}vec.push(val);nm.push(`${v}_${h}`);}if(!ok)break;}
-    if(!ok||vec.length===0)continue;y.push(yy);X.push(vec);ids.push(p.id);names=nm;
-  }
-  if(!names||y.length<names.length+5)return null;
+    let ok=true;for(const t of commonTerms){if(termValue(t,mr,p,cfg.series)==null){ok=false;break;}}if(!ok)continue;
+    const vec=terms.map(t=>termValue(t,mr,p,cfg.series));if(vec.some(v=>v==null))continue;
+    y.push(yy);X.push(vec);ids.push(p.id);}
+  if(y.length<terms.length+5)return null;
   const res=panelFE(y,X,ids,null);if(!res)return null;
-  res.names=names;res.wald=jointWald(res.beta,res.vcov,0);res.adj=res.withinR2;res.r2=res.withinR2;return res;
+  res.wald=jointWald(res.beta,res.vcov,0);res.adj=res.withinR2;res.r2=res.withinR2;return res;
 }
-const fitEx1=(sh,blocks,cfg)=>cfg.level==='panel'?fitEx1Panel(sh,cfg):fitEx1TS(sh,blocks,cfg);
 
 function renderEx1(){
-  syncEx1();const cfg=ex1Cfg();
+  syncEx1();const cfg=ex1Cfg();const panel=cfg.level==='panel';
   el('head-title').textContent='Exercise 1 — Are monetary-policy surprises predictable?';
-  el('head-sub').innerHTML=`Each surprise (LHS) regressed on pre-meeting information. <b>RTN</b> = response to news (market/Bauer–Swanson controls, optionally Greenbook forecaster controls and realized FRED macro); <b>CBI</b> = central-bank information (Fed − private forecast gaps). Series = <b>${seriesLabel(cfg.series)}</b>; ${cfg.level==='panel'?'panel — individual forecasters, forecaster FE, clustered SE (within-R²)':'time series — HC1 SE'}.`;
-
-  const cur=ex1Blocks(cfg);
-  const specs=[
-    {id:'cur',label:'Current spec',blocks:cur,cur:true},
-    {id:'mkt',label:'RTN (market)',blocks:[{t:'market'}]},
-    {id:'cbi',label:'CBI (cpi+rgdp)',blocks:[{t:'cbi',v:'cpi',hs:HZ},{t:'cbi',v:'rgdp',hs:HZ}]},
-    {id:'both',label:'RTN+CBI',blocks:[{t:'market'},{t:'cbi',v:'cpi',hs:HZ},{t:'cbi',v:'rgdp',hs:HZ}]},
+  el('head-sub').textContent='';
+  const curT=ex1Terms(cfg);
+  const rtnT=termsFrom(cfg.market,cfg.gb,cfg.fred,[],cfg.hs);
+  const cbiRefT=termsFrom([], [], [], ['cpi','rgdp'], HZ);
+  const cols=[
+    {id:'cur',label:'Current spec',terms:curT,cur:true},
+    {id:'rtn',label:'RTN',terms:rtnT},
+    {id:'cbi',label:'CBI (cpi+rgdp)',terms:cbiRefT},
+    {id:'both',label:'RTN+CBI',terms:[...rtnT,...cbiRefT]},
   ];
-  let html=`<div class="card"><h4>${cfg.level==='panel'?'Within-R²':'Adjusted R²'} by surprise × predictor set</h4>
+  // common sample = union of all displayed columns' terms
+  const union=[];const seen=new Set();
+  for(const c of cols)for(const t of c.terms){const key=JSON.stringify(t);if(!seen.has(key)){seen.add(key);union.push(t);}}
+  let html=`<div class="card"><h4>${panel?'Within-R²':'Adjusted R²'} by surprise × predictor set${' '}<span class="sub">(common listwise sample across columns)</span></h4>
     <table><thead><tr><th>Surprise (LHS)</th>`;
-  for(const s of specs)html+=`<th class="${s.cur?'hi':''}">${s.label}</th>`;
+  for(const c of cols)html+=`<th class="${c.cur?'hi':''}">${c.label}</th>`;
   html+=`</tr></thead><tbody>`;
-  for(const sh of SHOCKS){html+=`<tr><td>${shockLabel(sh)}</td>`;
-    for(const s of specs){
-      const res=cfg.level==='panel'
-        ? (s.cur?fitEx1Panel(sh,cfg):fitEx1Panel(sh,{...cfg,market:s.blocks.some(b=>b.t==='market'),gb:false,fred:false,cbi:s.blocks.filter(b=>b.t==='cbi').map(b=>b.v),hs:HZ}))
-        : fitEx1TS(sh,s.blocks,cfg);
-      const star=res&&res.wald?starP(res.wald.p):"";
-      html+=`<td class="${s.cur?'hi':''}">${res?`${fmt(res.adj)}${star}<div class="sub">n=${res.n}</div>`:'—'}</td>`;
-    }
+  for(const sh of SHOCKS){const res=ex1TableRow(sh,cfg,cols.map(c=>c.terms),union);
+    html+=`<tr><td>${shockLabel(sh)}</td>`;
+    res.forEach((r,j)=>{const star=r&&r.wald?starP(r.wald.p):"";html+=`<td class="${cols[j].cur?'hi':''}">${r?`${fmt(r.adj)}${star}<div class="sub">n=${r.n}</div>`:'—'}</td>`;});
     html+=`</tr>`;}
-  html+=`</tbody></table><p class="sub" style="margin-top:8px">Current spec: ${describeSpec(cfg)}. Stars: joint ${cfg.level==='panel'?'cluster-robust':'HC1'} Wald test of all RHS coefficients (* 10% · ** 5% · *** 1%).</p></div>`;
+  html+=`</tbody></table><p class="sub" style="margin-top:8px">Current spec: ${describeSpec(cfg)}. Stars: joint ${panel?'cluster-robust':'HC1'} Wald test (* 10% ** 5% *** 1%).</p></div>`;
 
-  const dl=el('ex1-detail-lhs').value;const det=fitEx1(dl,cur,cfg);
+  // detail
+  const dl=el('ex1-detail-lhs').value;
+  const det=panel?fitPanel(dl,curT,cfg,curT):ex1TableRow(dl,cfg,[curT],curT)[0];
   html+=`<div class="card"><h4>Regression detail — ${shockLabel(dl)} on current spec</h4>`;
   if(!det)html+=`<p class="muted">Not enough complete observations for this configuration.</p>`;
-  else{const panel=cfg.level==='panel';const se=panel?det.se:det.seR;const lbl=panel?det.names:['(intercept)',...det.names];
-    html+=`<table><thead><tr><th>Regressor</th><th>Coef.</th><th>${panel?'Cluster SE':'HC1 SE'}</th><th>t</th><th></th></tr></thead><tbody>`;
+  else{const se=panel?det.se:det.seR;const names=termNames(curT);const lbl=panel?names:['(intercept)',...names];
+    html+=`<table><thead><tr><th>Regressor</th><th>Coef.</th><th>${panel?'Cluster SE':'HC1 SE'}</th><th>t</th></tr></thead><tbody>`;
     for(let j=0;j<det.beta.length;j++){const t=det.beta[j]/se[j];const isInt=!panel&&j===0;
-      html+=`<tr><td>${lbl[j]}</td><td>${fmt(det.beta[j])}</td><td>${fmt(se[j],3)}</td><td>${fmt(t,2)}</td><td>${isInt?'':starT(t)}</td></tr>`;}
+      html+=`<tr><td>${lbl[j]}</td><td>${fmt(det.beta[j])}</td><td>${fmt(se[j],3)}</td><td>${fmt(t,2)}${isInt?'':starT(t)}</td></tr>`;}
     html+=`</tbody></table>`;const w=det.wald;
-    html+=`<p class="stat" style="margin-top:10px">${panel?'within-R²':'R²'} <b>${fmt(det.r2)}</b>${panel?'':` · adjusted R² <b>${fmt(det.adj)}</b>`} · N <b>${det.n}</b>${panel?` · forecasters <b>${det.nG}</b>`:''}${w?` · joint Wald χ²(${w.df}) <b>${fmt(w.W,1)}</b> (p ${w.p<0.001?'<0.001':'='+fmt(w.p,3)})${starP(w.p)}`:''}</p>
-      <p class="sub">${panel?'Forecaster fixed effects; cluster-robust (by forecaster) SEs — matches reghdfe … absorb(idn) vce(cluster idn).':'HC1 heteroskedasticity-robust SEs.'} Stars * 10% ** 5% *** 1%.</p>`;}
+    html+=`<p class="stat" style="margin-top:10px">${panel?'within-R²':'R²'} <b>${fmt(det.r2)}</b>${panel?` · forecasters <b>${det.nG}</b>`:` · adjusted R² <b>${fmt(det.adj)}</b>`} · N <b>${det.n}</b>${w?` · joint Wald χ²(${w.df}) <b>${fmt(w.W,1)}</b> (p ${w.p<0.001?'<0.001':'='+fmt(w.p,3)})${starP(w.p)}`:''}</p>
+      <p class="sub">${panel?'Forecaster fixed effects; cluster-robust SEs (by forecaster).':'HC1 robust SEs.'} Stars * 10% ** 5% *** 1%.</p>`;}
   html+=`</div>`;
   el('view-ex1').innerHTML=html;
 }
-function describeSpec(cfg){const p=[];if(cfg.market)p.push('RTN:market');if(cfg.gb)p.push('RTN:greenbook');if(cfg.fred)p.push('RTN:fred');
-  if(cfg.cbi.length)p.push('CBI['+cfg.cbi.join(',')+']');return (p.join(' + ')||'(empty)')+` · h={${cfg.hs.join(',')}}`;}
+function termNames(T){return T.map(t=>t.kind==='gb'?`gb_${t.v}_${t.h}`:t.kind==='cbi'?`${t.v}_${t.h}`:t.name);}
+function describeSpec(cfg){const p=[];
+  if(cfg.market.length)p.push(`RTN-market(${cfg.market.length})`);
+  if(cfg.gb.length)p.push(`RTN-greenbook(${cfg.gb.join('/')})`);
+  if(cfg.fred.length)p.push(`RTN-fred(${cfg.fred.length})`);
+  if(cfg.cbi.length)p.push('CBI['+cfg.cbi.join(',')+']');
+  return (p.join(' + ')||'(empty)')+` · h={${cfg.hs.join(',')}}`;}
 
 /* ============================ EXERCISE 2 ============================ */
 function ex2Cfg(){return{
@@ -331,30 +351,29 @@ function ex2Cfg(){return{
   h:+HZ.filter(h=>el('ex2-horizon').querySelector(`input[value="${h}"]`)?.checked)[0],
   irfShock:el('ex2-irf-shock').value, irfH:+el('ex2-irf-h').value,
   tf:document.querySelector('input[name="ex2tf"]:checked').value,
+  convMode:document.querySelector('input[name="ex2cm"]:checked').value,
   minYear:+el('ex2-minyear').value, noZlb:el('ex2-nozlb').checked,
 };}
 const tf=(v,t)=>t==='abs'?Math.abs(v):v;
-/* scheduled-only TS rows with df_h present for the chosen series */
 function ex2TsRows(cfg,h){return DATA.monthly.filter(r=>{const S=r.series[cfg.series];
   return S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[h]!=null && r.scheduled!==false && r.year>=cfg.minYear && (!cfg.noZlb||r.nzlb);})
   .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:r.shocks}));}
-function ex2PanelRows(cfg,h){const ms=new Map(DATA.monthly.map(r=>[r.month,r]));
-  return DATA.panel.filter(p=>p.cbi.ffr&&p.cbi.ffr[h]!=null && p.scheduled!==false && p.year>=cfg.minYear && (!cfg.noZlb||p.nzlb))
-    .map(p=>({id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:(ms.get(p.month)||{}).shocks||{}}));}
+function ex2PanelRows(cfg,h){return DATA.panel.filter(p=>p.cbi.ffr&&p.cbi.ffr[h]!=null && p.scheduled!==false && p.year>=cfg.minYear && (!cfg.noZlb||p.nzlb))
+  .map(p=>({id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:(MByMonth.get(p.month)||{}).shocks||{}}));}
 
 function renderEx2(){
   syncEx2();const cfg=ex2Cfg();const tfv=cfg.tf;const gapName=`${tfv==='abs'?'|df_':'df_'}${cfg.h}${tfv==='abs'?'|':''}`;
   el('head-title').innerHTML='Exercise 2 — Do Fed &amp; private rate expectations align?';
-  el('head-sub').innerHTML=`Dependent variable is the rate-forecast disagreement <code>df_h = E<sup>F</sup>[i<sub>t+h</sub>] − E<sup>M</sup>[i<sub>t+h</sub>]</code> (Greenbook − Blue Chip FFR, ${seriesLabel(cfg.series)}). Scheduled meetings only. Shocks from <code>jk_source_old</code>, standardized to 1 SD (standshock). ${cfg.level==='panel'?'Panel: individual forecasters, forecaster FE, clustered SE.':'Time series, HC1 SE.'}`;
+  el('head-sub').innerHTML=`Dependent variable: <code>df_h = E<sup>F</sup>[i<sub>t+h</sub>] − E<sup>M</sup>[i<sub>t+h</sub>]</code> (Greenbook − Blue Chip FFR, ${seriesLabel(cfg.series)}). Scheduled meetings only; shocks from <code>jk_source_old</code> (standshock, 1 SD).`;
 
-  // 1) IRF (main plot, first) — cumulative LP of D[tf(df_h)] on the standardized shock
+  // 1) IRF (top)
   let html=`<div class="card"><h4>Impulse response — change in ${gapName} (h=${cfg.h}) following a 1 SD ${shockLabel(cfg.irfShock)} surprise · ${cfg.level==='panel'?'panel':'time series'}</h4>
     <div id="ex2-irf" class="chart" role="img" aria-label="Local-projection impulse response of the rate-forecast disagreement to the selected monetary surprise, 90% band"></div>
-    <p class="sub">Cumulative local projection (flpdecomp / <code>disaglp.do</code>): D.${gapName} on the surprise, ${cfg.level==='panel'?'forecaster FE, cluster-robust':'HC0-robust'} SE, 90% band, ${cfg.irfH} meetings ahead. Shock standardized to 1 SD via standshock. Only one shock at a time — pick it in the sidebar.</p></div>`;
+    <p class="sub">Cumulative local projection (flpdecomp / <code>disaglp.do</code>): D.${gapName} on the surprise, ${cfg.level==='panel'?'forecaster FE, cluster-robust':'HC0-robust'} SE, 90% band, ${cfg.irfH} meetings ahead. One shock at a time (sidebar).</p></div>`;
 
-  // 2) GAP ON SURPRISES (under the IRF) — every surprise, one RHS per regression
+  // 2) GAP ON SURPRISES (under IRF) — every surprise, one RHS each
   html+=`<div class="card"><h4>Disagreement on surprises — ${gapName} at h=${cfg.h} · ${cfg.level==='panel'?'panel (forecaster FE, clustered)':'time series (HC1)'}</h4>
-    <table><thead><tr><th>Surprise (RHS)</th><th>β</th><th>SE</th><th>t</th><th></th><th>N</th><th>${cfg.level==='panel'?'within-R²':'R²'}</th></tr></thead><tbody>`;
+    <table><thead><tr><th>Surprise (RHS)</th><th>β</th><th>SE</th><th>t</th><th>N</th><th>${cfg.level==='panel'?'within-R²':'R²'}</th></tr></thead><tbody>`;
   for(const sh of SHOCKS){let b,s,t,N,R2,ok=true;
     if(cfg.level==='ts'){const rows=ex2TsRows(cfg,cfg.h).filter(r=>r.shocks[sh]!=null);
       const res=rows.length>6?ols(rows.map(r=>tf(r.df,tfv)),rows.map(r=>[r.shocks[sh]])):null;
@@ -362,39 +381,31 @@ function renderEx2(){
     else{const rows=ex2PanelRows(cfg,cfg.h).filter(r=>r.shocks[sh]!=null);
       const res=rows.length>6?panelFE(rows.map(r=>tf(r.df,tfv)),rows.map(r=>[r.shocks[sh]]),rows.map(r=>r.id),rows.map(r=>r.month)):null;
       if(!res)ok=false;else{b=res.beta[0];s=res.se[0];t=b/s;N=res.n;R2=res.withinR2;}}
-    html+=ok?`<tr><td>${shockLabel(sh)}</td><td>${fmt(b)}</td><td>${fmt(s,3)}</td><td>${fmt(t,2)}</td><td>${starT(t)}</td><td>${N}</td><td>${fmt(R2)}</td></tr>`
-            :`<tr><td>${shockLabel(sh)}</td><td colspan="6" class="muted">insufficient data</td></tr>`;}
-  html+=`</tbody></table><p class="sub" style="margin-top:8px">Each row is a separate regression of the disagreement on a single surprise (one RHS each): reg E<sup>F</sup>[i<sub>t+${cfg.h}</sub>]−E<sup>M</sup>[i<sub>t+${cfg.h}</sub>] on that surprise.</p></div>`;
+    html+=ok?`<tr><td>${shockLabel(sh)}</td><td>${fmt(b)}</td><td>${fmt(s,3)}</td><td>${fmt(t,2)}${starT(t)}</td><td>${N}</td><td>${fmt(R2)}</td></tr>`
+            :`<tr><td>${shockLabel(sh)}</td><td colspan="5" class="muted">insufficient data</td></tr>`;}
+  html+=`</tbody></table><p class="sub" style="margin-top:8px">Each row is a separate single-RHS regression of E<sup>F</sup>[i<sub>t+${cfg.h}</sub>]−E<sup>M</sup>[i<sub>t+${cfg.h}</sub>] on that surprise.</p></div>`;
 
-  // 3) CONVERGENCE (bottom)
-  const conv=ex2TsRows(cfg,cfg.h);const byYear=new Map();
-  for(const r of conv){if(!byYear.has(r.year))byYear.set(r.year,[]);byYear.get(r.year).push(tf(r.df,tfv));}
-  const yrs=[...byYear.keys()].sort((a,b)=>a-b);const means=yrs.map(y=>byYear.get(y).reduce((s,v)=>s+v,0)/byYear.get(y).length);
-  const tr=yrs.length>2?(()=>{const rr=ols(means,yrs.map(y=>[y]));return rr?{slope:rr.beta[1],t:rr.beta[1]/rr.seR[1],n:rr.n,b0:rr.beta[0]}:null;})():null;
-  html+=`<div class="card"><h4>Trend in the disagreement over time — ${gapName}, ${seriesLabel(cfg.series)}</h4>
-    <div id="ex2-conv" class="chart" role="img" aria-label="Annual mean rate-forecast disagreement over time with linear trend"></div>
-    ${tr?`<p class="stat" style="margin-top:8px">Trend in annual-mean ${gapName}: <b>${fmt(tr.slope,4)}</b>/yr (t=<b>${fmt(tr.t,2)}</b>${starT(tr.t)}, N=${tr.n} yrs).${tfv==='abs'?(tr.slope<0?' Gap shrinking — converging.':' Gap widening.'):''}</p>`:'<p class="muted">Insufficient data for a trend.</p>'}</div>`;
+  // 3) TREND (bottom): annual mean (default) or all observations
+  html+=`<div class="card"><h4>Trend in the disagreement over time — ${gapName}, ${seriesLabel(cfg.series)} <span class="sub">(${cfg.convMode==='annual'?'annual mean':'all observations'})</span></h4>
+    <div id="ex2-conv" class="chart" role="img" aria-label="Rate-forecast disagreement over time with linear trend"></div><div id="ex2-conv-stat"></div></div>`;
   el('view-ex2').innerHTML=html;
 
-  // ---- IRF computation ----
-  const ordered=DATA.monthly.filter(r=>{const S=r.series[cfg.series];return r.scheduled!==false && S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[cfg.h]!=null;})
-    .sort((a,b)=>a.month<b.month?-1:1);
+  // ---- IRF: ordered scheduled meetings; D[tf(df_h)]; shock _std as-is (dum standshocked over full series) ----
+  const ordered=DATA.monthly.filter(r=>{const S=r.series[cfg.series];return r.scheduled!==false && S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[cfg.h]!=null;}).sort((a,b)=>a.month<b.month?-1:1);
   const lvl=ordered.map(r=>tf(r.series[cfg.series].cbi.ffr[cfg.h],tfv));
   const ddis=lvl.map((v,i)=>i===0?null:v-lvl[i-1]);
   const inSample=ordered.map(r=>r.year>=cfg.minYear&&(!cfg.noZlb||r.nzlb));
-  let xs=ordered.map((r,i)=>inSample[i]?shockValue(r,cfg.irfShock):null);
-  xs=standshock(xs);   // normalize the shock to 1 SD (standshock)
+  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock));
+  if(cfg.irfShock==='dum')xfull=standshock(xfull);            // _std already 1 SD; standshock dum over full series
+  const xs=xfull.map((v,i)=>inSample[i]?v:null);
   let irf;
   if(cfg.level==='panel'){
-    // per-forecaster sequences of D[tf(df_h)] and the (shared) standardized shock
-    const ms=new Map(ordered.map((r,i)=>[r.month,{x:xs[i]}]));
+    const xByMonth=new Map(ordered.map((r,i)=>[r.month,xs[i]]));
     const byId=new Map();
-    for(const p of DATA.panel){if(p.scheduled===false)continue;const S=p.cbi.ffr;if(!S||S[cfg.h]==null)continue;
-      if(!byId.has(p.id))byId.set(p.id,[]);byId.get(p.id).push({month:p.month,v:tf(S[cfg.h],tfv)});}
+    for(const p of DATA.panel){if(p.scheduled===false)continue;const S=p.cbi.ffr;if(!S||S[cfg.h]==null)continue;if(!byId.has(p.id))byId.set(p.id,[]);byId.get(p.id).push({month:p.month,v:tf(S[cfg.h],tfv)});}
     const seqById=new Map();
-    for(const [id,arr] of byId){if(arr.length<3)continue;arr.sort((a,b)=>a.month<b.month?-1:1);
-      const v=arr.map(o=>o.v);const dd=v.map((x,i)=>i===0?null:x-v[i-1]);
-      const x=arr.map(o=>(ms.get(o.month)||{}).x ?? null);seqById.set(id,{ddis:dd,x});}
+    for(const [id,arr] of byId){if(arr.length<3)continue;arr.sort((a,b)=>a.month<b.month?-1:1);const v=arr.map(o=>o.v);
+      seqById.set(id,{ddis:v.map((x,i)=>i===0?null:x-v[i-1]),x:arr.map(o=>xByMonth.has(o.month)?xByMonth.get(o.month):null)});}
     irf=lpcumPanel(seqById,cfg.irfH);
   }else irf=lpcum(ddis,xs,cfg.irfH);
   const tt=irf.map(d=>d.h);
@@ -402,27 +413,41 @@ function renderEx2(){
     {x:tt,y:irf.map(d=>d.hi),type:'scatter',mode:'lines',line:{width:0},showlegend:false,hoverinfo:'skip'},
     {x:tt,y:irf.map(d=>d.lo),type:'scatter',mode:'lines',fill:'tonexty',fillcolor:'rgba(22,124,128,0.15)',line:{width:0},name:'90% CI'},
     {x:tt,y:irf.map(d=>d.b),type:'scatter',mode:'lines+markers',line:{color:'#167c80',width:2.5},marker:{size:5},name:shockLabel(cfg.irfShock)},
-  ],{margin:{l:56,r:14,t:10,b:44},xaxis:{title:'Meetings ahead',dtick:1},yaxis:{title:`Cumulative Δ ${gapName} (pp)`,zeroline:true,zerolinecolor:'#000'},
-     legend:{orientation:'h',y:1.12},font:{family:'Inter',size:12}},{displayModeBar:false,responsive:true});
-  const trLine=tr?yrs.map(y=>tr.b0+tr.slope*y):[];
-  Plotly.newPlot('ex2-conv',[
-    {x:yrs,y:means,type:'scatter',mode:'lines+markers',name:`annual mean ${gapName}`,line:{color:'#167c80',width:2},marker:{size:6}},
-    ...(tr?[{x:yrs,y:trLine,type:'scatter',mode:'lines',name:'trend',line:{color:'#b66d12',dash:'dash',width:2}}]:[]),
-  ],{margin:{l:54,r:14,t:10,b:42},xaxis:{title:'year'},yaxis:{title:gapName+' (pp)',zeroline:true},
-     legend:{orientation:'h',y:1.12},font:{family:'Inter',size:12}},{displayModeBar:false,responsive:true});
+  ],{margin:{l:56,r:14,t:10,b:44},xaxis:{title:'Meetings ahead',dtick:1,range:[-0.25,cfg.irfH+0.25],zeroline:false},
+     yaxis:{title:`Cumulative Δ ${gapName} (pp)`,zeroline:true,zerolinecolor:'#000'},legend:{orientation:'h',y:1.12},font:{family:'Inter',size:12}},{displayModeBar:false,responsive:true});
+
+  // ---- TREND plot ----
+  const conv=ex2TsRows(cfg,cfg.h);
+  if(cfg.convMode==='annual'){
+    const byYear=new Map();for(const r of conv){if(!byYear.has(r.year))byYear.set(r.year,[]);byYear.get(r.year).push(tf(r.df,tfv));}
+    const yrs=[...byYear.keys()].sort((a,b)=>a-b);const means=yrs.map(y=>byYear.get(y).reduce((s,v)=>s+v,0)/byYear.get(y).length);
+    const tr=yrs.length>2?(()=>{const rr=ols(means,yrs.map(y=>[y]));return rr?{slope:rr.beta[1],t:rr.beta[1]/rr.seR[1],n:rr.n,b0:rr.beta[0]}:null;})():null;
+    el('ex2-conv-stat').innerHTML=tr?`<p class="stat" style="margin-top:8px">Trend in annual-mean ${gapName}: <b>${fmt(tr.slope,4)}</b>/yr (t=<b>${fmt(tr.t,2)}</b>${starT(tr.t)}, N=${tr.n} yrs).${tfv==='abs'?(tr.slope<0?' Gap shrinking — converging.':' Gap widening.'):''}</p>`:'<p class="muted">Insufficient data for a trend.</p>';
+    Plotly.newPlot('ex2-conv',[
+      {x:yrs,y:means,type:'scatter',mode:'lines+markers',name:`annual mean ${gapName}`,line:{color:'#167c80',width:2},marker:{size:6}},
+      ...(tr?[{x:yrs,y:yrs.map(y=>tr.b0+tr.slope*y),type:'scatter',mode:'lines',name:'trend',line:{color:'#b66d12',dash:'dash',width:2}}]:[]),
+    ],{margin:{l:54,r:14,t:10,b:42},xaxis:{title:'year'},yaxis:{title:gapName+' (pp)',zeroline:true},legend:{orientation:'h',y:1.12},font:{family:'Inter',size:12}},{displayModeBar:false,responsive:true});
+  }else{
+    const obs=conv.map(r=>({x:r.month+'-15',y:tf(r.df,tfv)})).sort((a,b)=>a.x<b.x?-1:1);
+    const xd=obs.map(o=>o.x),yd=obs.map(o=>o.y);
+    const xs2=obs.map((_,i)=>i);const tr=obs.length>3?ols(yd,xs2.map(v=>[v])):null;
+    el('ex2-conv-stat').innerHTML=`<p class="sub" style="margin-top:8px">All ${obs.length} scheduled-meeting observations of ${gapName}.</p>`;
+    Plotly.newPlot('ex2-conv',[
+      {x:xd,y:yd,type:'scatter',mode:'lines+markers',name:gapName,line:{color:'#167c80',width:1},marker:{size:3}},
+      ...(tr?[{x:xd,y:xs2.map(v=>tr.beta[0]+tr.beta[1]*v),type:'scatter',mode:'lines',name:'trend',line:{color:'#b66d12',dash:'dash',width:2}}]:[]),
+    ],{margin:{l:54,r:14,t:10,b:42},xaxis:{title:'meeting',type:'date'},yaxis:{title:gapName+' (pp)',zeroline:true},legend:{orientation:'h',y:1.12},font:{family:'Inter',size:12}},{displayModeBar:false,responsive:true});
+  }
 }
 
 /* ===================== controls / wiring ===================== */
 function syncEx1(){
   const panel=document.querySelector('input[name="ex1lvl"]:checked').value==='panel';
-  el('ex1-level-note').textContent=panel
-    ? 'Panel: meeting-level surprise on forecaster-specific CBI gaps (cpi/rgdp/FFR) with forecaster FE, clustered by forecaster — like reghdfe … absorb(idn) vce(cluster idn). Unemployment, Greenbook & FRED blocks are time-series only.'
-    : 'Time series: one consensus observation per meeting; HC1 robust SEs.';
+  // panel uses the BCFF individual-forecaster file only
+  el('ex1-series').querySelectorAll('input').forEach(i=>{if(i.value!=='bcff'){i.disabled=panel;if(panel&&i.checked)el('ex1-series').querySelector('input[value="bcff"]').checked=true;}});
+  // unemployment CBI: needs a private UR forecast (available for every series via BCEI)
   const series=document.querySelector('input[name="ex1series"]:checked').value;
   const hasUn=DATA.monthly.some(r=>r.series[series]?.cbi?.un);
-  const unBox=el('ex1-cbi').querySelector('input[value="un"]');
-  if(unBox){const dis=panel||!hasUn;unBox.disabled=dis;if(dis)unBox.checked=false;}
-  for(const id of['ex1-rtn-gb','ex1-rtn-fred']){const b=el(id);if(b){b.disabled=panel;if(panel)b.checked=false;}}
+  const unBox=el('ex1-cbi').querySelector('input[value="un"]');if(unBox){unBox.disabled=!hasUn;if(!hasUn)unBox.checked=false;}
 }
 function syncEx2(){
   const panel=document.querySelector('input[name="ex2lvl"]:checked').value==='panel';
@@ -432,13 +457,25 @@ function buildControls(){
   const fs=Object.keys(DATA.forecast_series);
   el('ex1-series').innerHTML=fs.map((k,i)=>`<label><input type="radio" name="ex1series" value="${k}" ${i===0?'checked':''}><span>${seriesLabel(k)}</span></label>`).join('');
   el('ex2-series').innerHTML=fs.map((k,i)=>`<label><input type="radio" name="ex2series" value="${k}" ${i===0?'checked':''}><span>${seriesLabel(k)}</span></label>`).join('');
+  el('rtn-market-list').innerHTML=DATA.rtn_controls.map(c=>`<label><input type="checkbox" value="${c}" checked>${c}</label>`).join('');
+  el('rtn-gb-list').innerHTML=GB_VARS.map(v=>`<label><input type="checkbox" value="${v.k}">${v.lbl}</label>`).join('');
+  el('rtn-fred-list').innerHTML=DATA.fred_controls.map(c=>`<label><input type="checkbox" value="${c}">${c}</label>`).join('');
   el('ex1-cbi').innerHTML=CBI_VARS.map(v=>`<label class="check-row"><input type="checkbox" value="${v.k}" ${v.def?'checked':''}><span>${v.lbl}</span></label>`).join('');
   el('ex1-horizons').innerHTML=HZ.map(h=>`<label><input type="checkbox" value="${h}" checked>${h}</label>`).join('');
   el('ex2-horizon').innerHTML=HZ.map(h=>`<label><input type="radio" name="ex2h" value="${h}" ${h===4?'checked':''}>${h}</label>`).join('');
   el('ex1-detail-lhs').innerHTML=SHOCKS.map(k=>`<option value="${k}" ${k==='ff4_std'?'selected':''}>${shockLabel(k)}</option>`).join('');
   el('ex2-irf-shock').innerHTML=["mp1_std","ff4_std","ed4_std","mps_std","dum"].map(k=>`<option value="${k}" ${k==='mp1_std'?'selected':''}>${shockLabel(k)}</option>`).join('');
+  // master "All" toggles drive their group's individual checkboxes
+  for(const [allId,listId] of [['rtn-market-all','rtn-market-list'],['rtn-gb-all','rtn-gb-list'],['rtn-fred-all','rtn-fred-list']]){
+    const all=el(allId),list=el(listId);
+    // sync only; the generic aside-input listener triggers rerender
+    all.addEventListener('change',()=>list.querySelectorAll('input').forEach(i=>i.checked=all.checked));
+    list.addEventListener('change',()=>{const boxes=[...list.querySelectorAll('input')];all.checked=boxes.every(b=>b.checked);});
+    // init individual boxes to match master default
+    list.querySelectorAll('input').forEach(i=>i.checked=all.checked);
+  }
   el('stamp').innerHTML=`Snapshot ${DATA.meta.built_at.slice(0,10)} · ${DATA.monthly.length} months · ${DATA.panel.length} panel obs · <code>${DATA.meta.repo}</code>`;
-  el('foot').innerHTML=`Shocks &amp; Bauer–Swanson controls from <code>jk_source_old</code> (paulbousquet/GBMPSurprise); forecasts &amp; FRED macro from <code>${DATA.meta.repo}</code>. <b>RTN</b>=response to news; <b>CBI</b>=central-bank information (Fed−private gaps); <code>df_h</code>=E<sup>F</sup>[i]−E<sup>M</sup>[i]. BCFF cpi/rgdp gaps apply the <code>monthlydisag.do</code> bcff_time shift; df is plain ffr−ff; combined aligned by construction. HC1 (or cluster-robust) SEs throughout. <span class="muted">${DATA.meta.construction_note}</span>`;
+  el('foot').innerHTML=`Shocks &amp; Bauer–Swanson controls from <code>jk_source_old</code> (paulbousquet/GBMPSurprise); forecasts &amp; FRED macro from <code>${DATA.meta.repo}</code>. <b>RTN</b>=response to news; <b>CBI</b>=central-bank information (Fed−private gaps); <code>df_h</code>=E<sup>F</sup>[i]−E<sup>M</sup>[i]. BCFF cpi/rgdp gaps apply the <code>monthlydisag.do</code> bcff_time shift; df is plain ffr−ff; combined aligned by construction. HC1 / cluster-robust SEs. <span class="muted">${DATA.meta.construction_note}</span>`;
 }
 let view='ex1';
 function rerender(){view==='ex1'?renderEx1():renderEx2();if(window.lucide)window.lucide.createIcons();}
@@ -448,6 +485,7 @@ function activate(v){view=v;
   el('view-ex1').style.display=v==='ex1'?'':'none';el('view-ex2').style.display=v==='ex2'?'':'none';rerender();}
 async function init(){
   try{DATA=await fetch('reps-data.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('Failed to load reps-data.json');return r.json();});
+    MByMonth=new Map(DATA.monthly.map(r=>[r.month,r]));
     buildControls();
     document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>activate(t.dataset.view)));
     document.querySelectorAll('aside input, aside select').forEach(e=>e.addEventListener('change',rerender));
