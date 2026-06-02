@@ -118,9 +118,10 @@
         <div class="seg" id="ex2-convmode">
           <label><input type="radio" name="ex2cm" value="annual" checked><span>Annual mean</span></label>
           <label><input type="radio" name="ex2cm" value="raw"><span>All obs</span></label></div></div>
-      <div class="group"><h3>Sample (scheduled only)</h3>
+      <div class="group"><h3>Sample</h3>
         <div class="field"><label for="ex2-minyear">Min year</label><input type="number" id="ex2-minyear" value="1988" min="1985" max="2025" aria-label="Exercise 2 minimum year"></div>
-        <label class="check-row"><input type="checkbox" id="ex2-nozlb"><span>Exclude ZLB / Covid windows</span></label></div>
+        <label class="check-row"><input type="checkbox" id="ex2-nozlb"><span>Exclude ZLB / Covid windows</span></label>
+        <label class="check-row"><input type="checkbox" id="ex2-unsched"><span>Include unscheduled meetings</span></label></div>
     </div>
     <div class="stamp" id="stamp"></div>
   </aside>
@@ -248,13 +249,17 @@ const seriesLabel=k=>DATA.forecast_series[k]?.label||k;
    (irfs.html: main / month-last / month-first / month-sum), then standshock'd over that
    forecast series' merged sample. GSS PCs are global (monthly). */
 const _shockCache={};
-function shockByMonth(series,mode){
-  const key=series+"|"+mode; if(_shockCache[key])return _shockCache[key];
+function shockByMonth(series,mode,inclUnsched=true){
+  const key=series+"|"+mode+"|"+(inclUnsched?1:0); if(_shockCache[key])return _shockCache[key];
   const byM=new Map();
   for(const e of DATA.events){if(!byM.has(e.month))byM.set(e.month,[]);byM.get(e.month).push(e);}
   const recs=[];
-  for(const [mo,list] of byM){
-    list.sort((a,b)=>a.date<b.date?-1:1);let pick;
+  for(const [mo,list0] of byM){
+    list0.sort((a,b)=>a.date<b.date?-1:1);let pick;
+    // "main" is defined by jk_source_old main==1 (the verified scheduled-meeting concept) and is
+    // left untouched; for the calendar modes, excluding unscheduled drops events with scheduled!=1.
+    const list=(inclUnsched||mode==="main")?list0:list0.filter(e=>e.scheduled===1);
+    if(!list.length)continue;
     if(mode==="main"){const m=list.filter(e=>e.main===1);if(!m.length)continue;pick=m[m.length-1];}
     else if(mode==="month-first")pick=list[0];
     else if(mode==="month-sum"){pick={};for(const k of["mp1","ff4","ed4","mps"]){let s=null;for(const e of list)if(e[k]!=null)s=(s||0)+e[k];pick[k]=s;}}
@@ -268,9 +273,9 @@ function shockByMonth(series,mode){
     mp1_std:std.mp1[i],ff4_std:std.ff4[i],ed4_std:std.ed4[i],mps_std:std.mps[i]}));
   _shockCache[key]=map; return map;
 }
-function shockValue(r,k,series,mode){
+function shockValue(r,k,series,mode,inclUnsched=true){
   if(k==="gss_pc1"||k==="gss_pc2")return r.shocks?.[k]??null;
-  const sm=shockByMonth(series,mode||"main").get(r.month);
+  const sm=shockByMonth(series,mode||"main",inclUnsched).get(r.month);
   if(k==="dum"){const a=sm?.ff4_std,b=sm?.ed4_std;if(a==null||b==null)return null;const s=0.5*(Math.sign(a)+Math.sign(b));return s===0.5?1:s===-0.5?-1:s;}
   return sm?.[k]??null;}
 
@@ -318,18 +323,18 @@ function ex1TableRow(shock,cfg,colTerms,commonTerms){
   if(cfg.level==='panel')return colTerms.map(terms=>fitPanel(shock,terms,cfg,commonTerms));
   const rows=ex1SampleRows(cfg);
   const idx=[];const cache=[];
-  for(const r of rows){const yy=shockValue(r,shock,cfg.series,cfg.agg);if(yy==null)continue;
+  for(const r of rows){const yy=shockValue(r,shock,cfg.series,cfg.agg,cfg.unsched);if(yy==null)continue;
     let ok=true;for(const t of commonTerms){const v=termValue(t,r,null,cfg.series);if(v==null){ok=false;break;}}
     if(ok)cache.push(r);}
   return colTerms.map(terms=>{if(!terms.length)return null;
-    const y=cache.map(r=>shockValue(r,shock,cfg.series,cfg.agg));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
+    const y=cache.map(r=>shockValue(r,shock,cfg.series,cfg.agg,cfg.unsched));const X=cache.map(r=>terms.map(t=>termValue(t,r,null,cfg.series)));
     if(y.length<terms.length+3)return null;const res=ols(y,X);if(!res)return null;res.wald=jointWald(res.beta,res.vcov,1);return res;});
 }
 /* panel fit on a common forecaster-obs sample */
 function fitPanel(shock,terms,cfg,commonTerms){
   if(!terms.length)return null;
   const y=[],X=[],ids=[];
-  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock,'bcff',cfg.agg);if(yy==null)continue;
+  for(const p of DATA.panel){const mr=MByMonth.get(p.month);if(!mr)continue;const yy=shockValue(mr,shock,'bcff',cfg.agg,cfg.unsched);if(yy==null)continue;
     if(mr.year<cfg.minYear)continue;if(cfg.noZlb&&!p.nzlb)continue;if(!cfg.unsched&&p.scheduled===false)continue;
     let ok=true;for(const t of commonTerms){if(termValue(t,mr,p,cfg.series)==null){ok=false;break;}}if(!ok)continue;
     const vec=terms.map(t=>termValue(t,mr,p,cfg.series));if(vec.some(v=>v==null))continue;
@@ -397,13 +402,14 @@ function ex2Cfg(){return{
   tf:document.querySelector('input[name="ex2tf"]:checked').value,
   convMode:document.querySelector('input[name="ex2cm"]:checked').value,
   minYear:+el('ex2-minyear').value, noZlb:el('ex2-nozlb').checked, agg:el('ex2-agg').value,
+  unsched:el('ex2-unsched').checked,
 };}
 const tf=(v,t)=>t==='abs'?Math.abs(v):v;
 function ex2TsRows(cfg,h){return DATA.monthly.filter(r=>{const S=r.series[cfg.series];
-  return S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[h]!=null && r.scheduled!==false && r.year>=cfg.minYear && (!cfg.noZlb||r.nzlb);})
-  .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:Object.fromEntries(SHOCKS.map(k=>[k,shockValue(r,k,cfg.series,cfg.agg)]))}));}
-function ex2PanelRows(cfg,h){return DATA.panel.filter(p=>p.cbi.ffr&&p.cbi.ffr[h]!=null && p.scheduled!==false && p.year>=cfg.minYear && (!cfg.noZlb||p.nzlb))
-  .map(p=>{const mr=MByMonth.get(p.month);return{id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:mr?Object.fromEntries(SHOCKS.map(k=>[k,shockValue(mr,k,'bcff',cfg.agg)])):{}};});}
+  return S&&S.cbi&&S.cbi.ffr&&S.cbi.ffr[h]!=null && (cfg.unsched||r.scheduled!==false) && r.year>=cfg.minYear && (!cfg.noZlb||r.nzlb);})
+  .map(r=>({year:r.year,month:r.month,df:r.series[cfg.series].cbi.ffr[h],shocks:Object.fromEntries(SHOCKS.map(k=>[k,shockValue(r,k,cfg.series,cfg.agg,cfg.unsched)]))}));}
+function ex2PanelRows(cfg,h){return DATA.panel.filter(p=>p.cbi.ffr&&p.cbi.ffr[h]!=null && (cfg.unsched||p.scheduled!==false) && p.year>=cfg.minYear && (!cfg.noZlb||p.nzlb))
+  .map(p=>{const mr=MByMonth.get(p.month);return{id:p.id,month:p.month,df:p.cbi.ffr[h],shocks:mr?Object.fromEntries(SHOCKS.map(k=>[k,shockValue(mr,k,'bcff',cfg.agg,cfg.unsched)])):{}};});}
 
 function renderEx2(){
   syncEx2();const cfg=ex2Cfg();const tfv=cfg.tf;const gapName=`${tfv==='abs'?'|df_':'df_'}${cfg.h}${tfv==='abs'?'|':''}`;
@@ -437,18 +443,18 @@ function renderEx2(){
   // ---- IRF: ordered scheduled meetings; D[tf(df_h)]; shock _std as-is (dum standshocked over full series) ----
   // LP series = consensus months that carry the aggregated shock (= the .do merge sample);
   // df can be missing within (gaps are spanned, matching lpdecomp's cum-window dropping).
-  const sm=shockByMonth(cfg.series,cfg.agg);
+  const sm=shockByMonth(cfg.series,cfg.agg,cfg.unsched);
   const ordered=DATA.monthly.filter(r=>sm.has(r.month) && r.series[cfg.series]).sort((a,b)=>a.month<b.month?-1:1);
   const lvl=ordered.map(r=>{const v=r.series[cfg.series].cbi?.ffr?.[cfg.h];return v==null?null:tf(v,tfv);});
   const ddis=lvl.map((v,i)=>(i===0||v==null||lvl[i-1]==null)?null:v-lvl[i-1]);
   const inSample=ordered.map(r=>r.year>=cfg.minYear&&(!cfg.noZlb||r.nzlb));
-  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock,cfg.series,cfg.agg));
+  let xfull=ordered.map(r=>shockValue(r,cfg.irfShock,cfg.series,cfg.agg,cfg.unsched));
   const xs=xfull.map((v,i)=>inSample[i]?v:null);
   let irf;
   if(cfg.level==='panel'){
     const xByMonth=new Map(ordered.map((r,i)=>[r.month,xs[i]]));
     const byId=new Map();
-    for(const p of DATA.panel){if(p.scheduled===false)continue;const S=p.cbi.ffr;if(!S||S[cfg.h]==null)continue;if(!byId.has(p.id))byId.set(p.id,[]);byId.get(p.id).push({month:p.month,v:tf(S[cfg.h],tfv)});}
+    for(const p of DATA.panel){if(!cfg.unsched&&p.scheduled===false)continue;const S=p.cbi.ffr;if(!S||S[cfg.h]==null)continue;if(!byId.has(p.id))byId.set(p.id,[]);byId.get(p.id).push({month:p.month,v:tf(S[cfg.h],tfv)});}
     const seqById=new Map();
     for(const [id,arr] of byId){if(arr.length<3)continue;arr.sort((a,b)=>a.month<b.month?-1:1);const v=arr.map(o=>o.v);
       seqById.set(id,{ddis:v.map((x,i)=>i===0?null:x-v[i-1]),x:arr.map(o=>xByMonth.has(o.month)?xByMonth.get(o.month):null)});}
@@ -477,7 +483,7 @@ function renderEx2(){
     const obs=conv.map(r=>({x:r.month+'-15',y:tf(r.df,tfv)})).sort((a,b)=>a.x<b.x?-1:1);
     const xd=obs.map(o=>o.x),yd=obs.map(o=>o.y);
     const xs2=obs.map((_,i)=>i);const tr=obs.length>3?ols(yd,xs2.map(v=>[v])):null;
-    el('ex2-conv-stat').innerHTML=`<p class="sub" style="margin-top:8px">All ${obs.length} scheduled-meeting observations of ${gapName}.</p>`;
+    el('ex2-conv-stat').innerHTML=`<p class="sub" style="margin-top:8px">All ${obs.length} ${cfg.unsched?'meeting':'scheduled-meeting'} observations of ${gapName}.</p>`;
     Plotly.newPlot('ex2-conv',[
       {x:xd,y:yd,type:'scatter',mode:'lines+markers',name:gapName,line:{color:'#167c80',width:1},marker:{size:3}},
       ...(tr?[{x:xd,y:xs2.map(v=>tr.beta[0]+tr.beta[1]*v),type:'scatter',mode:'lines',name:'trend',line:{color:'#b66d12',dash:'dash',width:2}}]:[]),
