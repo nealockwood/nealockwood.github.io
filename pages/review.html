@@ -149,7 +149,10 @@
       <div class="panel panel-card" id="runPanel" style="display:none;">
         <div class="row" style="justify-content: space-between; align-items: center;">
           <h2>Current Run</h2>
-          <button id="refreshBtn" class="secondary">Refresh</button>
+          <div class="row" style="align-items:center; gap:12px;">
+            <label class="small" style="display:inline-flex; align-items:center; gap:6px; margin:0;"><input type="checkbox" id="autoAdvance" checked> Auto-advance</label>
+            <button id="refreshBtn" class="secondary">Refresh</button>
+          </div>
         </div>
         <div class="badge-row" id="queueBadges"></div>
         <div class="done-box" id="queueDone"></div>
@@ -185,6 +188,7 @@
     const queuePanel = document.getElementById("queuePanel");
     const actionBar = document.getElementById("actionBar");
     const refreshBtn = document.getElementById("refreshBtn");
+    const autoAdvanceEl = document.getElementById("autoAdvance");
     const queueBadges = document.getElementById("queueBadges");
     const queueDone = document.getElementById("queueDone");
     const runMeta = document.getElementById("runMeta");
@@ -382,8 +386,12 @@
         suggestionList.innerHTML = "No suggestions in this category.";
         return;
       }
+      // Sink decided (accepted/rejected) suggestions to the bottom so the next pending one surfaces.
+      const rank = (s) => (decisions[s.id] && decisions[s.id].status !== "pending") ? 1 : 0;
+      filtered.sort((a, b) => rank(a) - rank(b));
       suggestionList.className = "suggestion-list";
-      suggestionList.innerHTML = filtered.map((s, index) => {
+      suggestionList.innerHTML = filtered.map((s) => {
+        const num = run.suggestions.indexOf(s) + 1;
         const d = decisions[s.id] || { status: "pending", replacement_text: s.replacement_text || "" };
         const diff = buildDiffHtml(s.original_text || "", d.replacement_text);
         const ctxBefore = escapeHtml((s.context_before || "").slice(-140));
@@ -392,7 +400,7 @@
           '<div class="suggestion-card" data-status="' + escapeHtml(d.status) + '" data-suggestion-id="' + escapeHtml(s.id) + '">' +
             '<div class="suggestion-head">' +
               '<div class="suggestion-title">' +
-                "<strong>#" + (index + 1) + "</strong>" +
+                "<strong>#" + num + "</strong>" +
                 '<span class="pill ' + escapeHtml(d.status) + '">' + escapeHtml(d.status) + "</span>" +
                 '<span class="pill ' + escapeHtml(s.category) + '">' + escapeHtml(s.category) + "</span>" +
               "</div>" +
@@ -432,6 +440,13 @@
           // "save" only persists the edited text
           saveDecisions();
           renderBadges(); renderDone(); renderSuggestions();
+          if ((action === "accept" || action === "reject") && autoAdvanceEl.checked) {
+            requestAnimationFrame(() => {
+              const next = suggestionList.querySelector('.suggestion-card[data-status="pending"]');
+              if (next) next.scrollIntoView({ behavior: "smooth", block: "start" });
+              else queueDone.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+          }
         });
       });
     }
@@ -517,6 +532,8 @@
       setStatus("Token forgotten from this browser.", "info");
     });
     refreshBtn.addEventListener("click", loadRun);
+    autoAdvanceEl.checked = localStorage.getItem("paper-review-autoadvance") !== "0";
+    autoAdvanceEl.addEventListener("change", () => localStorage.setItem("paper-review-autoadvance", autoAdvanceEl.checked ? "1" : "0"));
     sendBtn.addEventListener("click", () => send(false));
     publishBtn.addEventListener("click", () => send(true));
 
