@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paper Review</title>
+  <style>
+    :root {
+      --bg: #0d1118;
+      --panel: #151b26;
+      --panel-2: #1b2433;
+      --line: #2d3647;
+      --text: #edf2ff;
+      --muted: #95a3c0;
+      --accent: #7cc9ff;
+      --accept: #57d1a9;
+      --reject: #ff8d8d;
+      --warning: #f4cb77;
+      --content: #f3aa63;
+      --shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
+      --radius: 16px;
+      --mono: "Cascadia Code", "SF Mono", Consolas, monospace;
+      --sans: -apple-system, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text); font-family: var(--sans);
+      background:
+        radial-gradient(circle at top right, rgba(124,201,255,0.1), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(87,209,169,0.07), transparent 24%),
+        var(--bg);
+    }
+    .page { max-width: 1080px; margin: 0 auto; padding: 24px; }
+    .header { display: grid; gap: 10px; margin-bottom: 20px; }
+    .header h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.04em; }
+    .header p { margin: 0; color: var(--muted); max-width: 78ch; }
+    .status {
+      min-height: 40px; border: 1px solid var(--line); border-radius: 999px;
+      padding: 10px 14px; background: rgba(21,27,38,0.78); color: var(--muted);
+      backdrop-filter: blur(10px); display: flex; align-items: center; gap: 10px;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }
+    .status::before {
+      content: ""; width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+      opacity: 0.2; background: currentColor;
+    }
+    .status[data-state="loading"] { color: var(--text); border-color: rgba(124,201,255,0.42); background: rgba(124,201,255,0.1); }
+    .status[data-state="loading"]::before { opacity: 1; background: transparent; border: 2px solid rgba(124,201,255,0.28); border-top-color: var(--accent); animation: status-spin 0.8s linear infinite; }
+    .status[data-state="success"] { color: #dfffee; border-color: rgba(87,209,169,0.42); background: rgba(87,209,169,0.18); }
+    .status[data-state="success"]::before { opacity: 1; background: var(--accept); box-shadow: 0 0 0 4px rgba(87,209,169,0.18); }
+    .status[data-state="error"] { color: #ffe2e2; border-color: rgba(255,141,141,0.4); background: rgba(255,141,141,0.12); }
+    .status[data-state="error"]::before { opacity: 1; background: var(--reject); box-shadow: 0 0 0 4px rgba(255,141,141,0.14); }
+    @keyframes status-spin { to { transform: rotate(360deg); } }
+    .stack { display: grid; gap: 18px; }
+    .panel { border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(180deg, rgba(27,36,51,0.97), rgba(21,27,38,0.98)); box-shadow: var(--shadow); }
+    .panel-card { padding: 18px; display: grid; gap: 14px; }
+    h2, h3, h4 { margin: 0; letter-spacing: -0.03em; }
+    .field { display: grid; gap: 8px; }
+    label { color: var(--muted); font-size: 0.91rem; }
+    input[type="text"], input[type="password"], textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px;
+      font: inherit; color: var(--text); background: rgba(10,13,20,0.78);
+    }
+    textarea { min-height: 92px; resize: vertical; line-height: 1.55; font-family: var(--mono); font-size: 0.92rem; }
+    .replacement-editor { min-height: 92px; }
+    .small { color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; }
+    button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      border: 0; border-radius: 999px; padding: 9px 15px; background: var(--accent);
+      color: #08111a; font: inherit; font-size: 0.92rem; font-weight: 650; cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease;
+      box-shadow: 0 8px 22px rgba(124,201,255,0.16);
+    }
+    button:hover { transform: translateY(-1px); }
+    button.secondary { background: rgba(12,16,24,0.6); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+    button.accept { background: var(--accept); box-shadow: 0 8px 22px rgba(87,209,169,0.18); }
+    button.reject { background: rgba(255,141,141,0.08); color: var(--reject); border: 1px solid rgba(255,141,141,0.28); box-shadow: none; }
+    button.publish { background: var(--warning); color: #1c1403; box-shadow: 0 8px 22px rgba(244,203,119,0.18); }
+    button:disabled { opacity: 0.48; cursor: not-allowed; transform: none; box-shadow: none; }
+    .badge-row, .filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(10,13,20,0.45); color: var(--muted); font-size: 0.88rem; }
+    .filter-chip { cursor: pointer; font-weight: 600; transition: border-color 120ms ease, color 120ms ease, background 120ms ease; display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(10,13,20,0.45); color: var(--muted); font-size: 0.88rem; }
+    .filter-chip.active { background: rgba(124,201,255,0.12); color: var(--text); border-color: rgba(124,201,255,0.34); }
+    .meta-list { display: grid; gap: 6px; }
+    .meta-list div { color: var(--muted); font-size: 0.91rem; overflow-wrap: anywhere; }
+    .done-box { display: none; gap: 6px; border: 1px solid rgba(87,209,169,0.34); border-radius: 14px; padding: 12px 13px; background: rgba(87,209,169,0.12); color: #dfffee; }
+    .done-box.open { display: grid; }
+    .suggestions-panel { padding: 18px; display: grid; gap: 16px; }
+    .suggestion-list { display: grid; gap: 12px; }
+    .suggestion-card { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: rgba(10,13,20,0.44); }
+    .suggestion-card[data-status="accepted"] { border-color: rgba(87,209,169,0.4); }
+    .suggestion-card[data-status="rejected"] { border-color: rgba(255,141,141,0.32); opacity: 0.8; }
+    .suggestion-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .suggestion-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .pill { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); text-transform: capitalize; }
+    .pill.pending { color: var(--warning); border-color: rgba(244,203,119,0.34); }
+    .pill.accepted { color: var(--accept); border-color: rgba(87,209,169,0.34); }
+    .pill.rejected { color: var(--reject); border-color: rgba(255,141,141,0.28); }
+    .pill.grammar { color: var(--accent); border-color: rgba(124,201,255,0.34); }
+    .pill.style { color: var(--warning); border-color: rgba(244,203,119,0.34); }
+    .pill.content { color: var(--content); border-color: rgba(243,170,99,0.34); }
+    .diff-grid { display: grid; gap: 8px; }
+    .diff-label { font-size: 0.77rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .diff-box { border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: rgba(27,36,51,0.72); white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 0.92rem; line-height: 1.66; }
+    .diff-before { border-left: 3px solid rgba(255,141,141,0.58); }
+    .diff-after { border-left: 3px solid rgba(87,209,169,0.58); }
+    .diff-removed { color: #ffc4c4; background: rgba(255,141,141,0.18); border-radius: 4px; padding: 0 1px; font-weight: 700; }
+    .diff-added { color: #c7ffe8; background: rgba(87,209,169,0.18); border-radius: 4px; padding: 0 1px; font-weight: 700; }
+    .empty { padding: 28px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 14px; background: rgba(10,13,20,0.26); }
+    .action-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; padding: 14px; margin-top: 4px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(13,17,24,0.92); backdrop-filter: blur(10px); }
+    .action-bar button { min-width: 200px; padding: 12px 18px; }
+    .tokenmask { font-family: var(--mono); }
+    a { color: var(--accent); }
+    @media (max-width: 720px) {
+      .page { padding: 14px; }
+      .action-bar button { width: 100%; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>Paper Review</h1>
+      <p>Review AI suggestions from any device. Accept, reject, or edit each one, then send your decisions back to the Mac, which publishes the accepted edits to Overleaf.</p>
+      <div class="status" id="status">Enter your token to connect.</div>
+    </div>
+
+    <div class="stack">
+      <!-- Connection -->
+      <div class="panel panel-card" id="connectionPanel">
+        <h2>Connection</h2>
+        <div class="field">
+          <label for="repoInput">Private bridge repo (owner/name)</label>
+          <input id="repoInput" type="text" placeholder="nealockwood/paper-review" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="tokenInput">Fine-grained GitHub token (Contents: read/write on that repo)</label>
+          <input id="tokenInput" type="password" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
+        </div>
+        <div class="row">
+          <button id="connectBtn">Connect &amp; Load</button>
+          <button id="forgetBtn" class="secondary">Forget Token</button>
+        </div>
+        <div class="small" id="connHelp">The token is stored only in this browser (localStorage) and sent only to api.github.com. Mint one at GitHub → Settings → Developer settings → Fine-grained tokens, scoped to only the bridge repo with Contents = Read and write.</div>
+      </div>
+
+      <!-- Run info -->
+      <div class="panel panel-card" id="runPanel" style="display:none;">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <h2>Current Run</h2>
+          <button id="refreshBtn" class="secondary">Refresh</button>
+        </div>
+        <div class="badge-row" id="queueBadges"></div>
+        <div class="done-box" id="queueDone"></div>
+        <div class="meta-list" id="runMeta"></div>
+        <div class="filter-row" id="suggestionFilters"></div>
+      </div>
+
+      <!-- Queue -->
+      <div class="panel suggestions-panel" id="queuePanel" style="display:none;">
+        <h2>Suggestion Queue</h2>
+        <div class="small">Edits you type in a card are remembered. Accept / reject / edit each one, then send your decisions with the bar at the bottom.</div>
+        <div id="suggestionList" class="empty">No active review run yet.</div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-bar" id="actionBar" style="display:none;">
+        <button id="sendBtn" class="secondary">Send Decisions (no publish)</button>
+        <button id="publishBtn" class="publish">Send + Publish Accepted</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CFG_KEY = "paper-review-cfg-v1";
+    const DEFAULT_REPO = "nealockwood/paper-review";
+
+    const statusNode = document.getElementById("status");
+    const repoInput = document.getElementById("repoInput");
+    const tokenInput = document.getElementById("tokenInput");
+    const connectBtn = document.getElementById("connectBtn");
+    const forgetBtn = document.getElementById("forgetBtn");
+    const runPanel = document.getElementById("runPanel");
+    const queuePanel = document.getElementById("queuePanel");
+    const actionBar = document.getElementById("actionBar");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const queueBadges = document.getElementById("queueBadges");
+    const queueDone = document.getElementById("queueDone");
+    const runMeta = document.getElementById("runMeta");
+    const suggestionFilters = document.getElementById("suggestionFilters");
+    const suggestionList = document.getElementById("suggestionList");
+    const sendBtn = document.getElementById("sendBtn");
+    const publishBtn = document.getElementById("publishBtn");
+
+    let cfg = { repo: DEFAULT_REPO, token: "" };
+    let run = null;                 // parsed inbox/suggestions.json
+    let decisions = {};             // id -> { status, replacement_text }
+    let activeFilter = "all";
+
+    // ---------- helpers ----------
+    function setStatus(message, state = "info") {
+      statusNode.textContent = message;
+      statusNode.dataset.state = state;
+    }
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+    function utf8ToBase64(str) {
+      const bytes = new TextEncoder().encode(str);
+      let bin = ""; const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(bin);
+    }
+    function decisionsKey() { return "paper-review-decisions-" + (run && run.run_id ? run.run_id : "none"); }
+
+    // ---------- GitHub Contents API ----------
+    function apiBase() { return "https://api.github.com/repos/" + cfg.repo + "/contents/"; }
+    function ghHeaders(raw) {
+      return {
+        "Authorization": "Bearer " + cfg.token,
+        "Accept": raw ? "application/vnd.github.raw+json" : "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      };
+    }
+    async function ghGetRaw(path) {
+      const res = await fetch(apiBase() + path + "?ref=main&t=" + Date.now(), { headers: ghHeaders(true), cache: "no-store" });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("GitHub " + res.status + ": " + (await res.text()).slice(0, 200));
+      return await res.text();
+    }
+    async function ghGetSha(path) {
+      const res = await fetch(apiBase() + path + "?ref=main&t=" + Date.now(), { headers: ghHeaders(false), cache: "no-store" });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("GitHub " + res.status + ": " + (await res.text()).slice(0, 200));
+      const data = await res.json();
+      return data.sha;
+    }
+    async function ghPutJson(path, obj, message) {
+      const sha = await ghGetSha(path);
+      const body = {
+        message: message,
+        content: utf8ToBase64(JSON.stringify(obj, null, 2) + "\n"),
+        branch: "main",
+      };
+      if (sha) body.sha = sha;
+      const res = await fetch(apiBase() + path, { method: "PUT", headers: ghHeaders(false), body: JSON.stringify(body) });
+      if (!res.ok) throw new Error("GitHub " + res.status + ": " + (await res.text()).slice(0, 240));
+      return await res.json();
+    }
+
+    // ---------- config persistence ----------
+    function saveCfg() { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+    function loadCfg() {
+      const raw = localStorage.getItem(CFG_KEY);
+      if (raw) { try { cfg = Object.assign(cfg, JSON.parse(raw)); } catch (e) {} }
+      repoInput.value = cfg.repo || DEFAULT_REPO;
+      tokenInput.value = cfg.token || "";
+    }
+    function saveDecisions() {
+      try { localStorage.setItem(decisionsKey(), JSON.stringify(decisions)); } catch (e) {}
+    }
+    function loadDecisions() {
+      decisions = {};
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(decisionsKey()) || "{}"); } catch (e) {}
+      (run.suggestions || []).forEach((s) => {
+        const prior = saved[s.id];
+        decisions[s.id] = {
+          status: prior ? prior.status : (s.status || "pending"),
+          replacement_text: prior ? prior.replacement_text : (s.replacement_text || ""),
+        };
+      });
+    }
+
+    // ---------- load run ----------
+    async function loadRun() {
+      setStatus("Loading suggestions...", "loading");
+      try {
+        const text = await ghGetRaw("inbox/suggestions.json");
+        if (text === null) { setStatus("No inbox file found in the repo yet.", "error"); return; }
+        const parsed = JSON.parse(text);
+        if (!parsed.run_id || !(parsed.suggestions || []).length) {
+          run = parsed;
+          runPanel.style.display = "";
+          queuePanel.style.display = "";
+          actionBar.style.display = "none";
+          renderNoRun();
+          setStatus("Connected. No active run — the Mac has not pushed suggestions yet.", "success");
+          return;
+        }
+        run = parsed;
+        loadDecisions();
+        runPanel.style.display = "";
+        queuePanel.style.display = "";
+        actionBar.style.display = "flex";
+        renderAll();
+        setStatus("Loaded run " + run.run_id + " — " + run.suggestions.length + " suggestions.", "success");
+      } catch (e) {
+        setStatus(e.message, "error");
+      }
+    }
+
+    function renderNoRun() {
+      queueBadges.innerHTML = '<div class="badge">No active run</div>';
+      queueDone.className = "done-box";
+      runMeta.innerHTML = "<div>The Mac will push a run here when Claude finishes generating suggestions. Hit Refresh to check.</div>";
+      suggestionFilters.innerHTML = "";
+      suggestionList.className = "empty";
+      suggestionList.innerHTML = "No active review run yet.";
+    }
+
+    // ---------- counts / state ----------
+    function counts() {
+      const c = { total: 0, pending: 0, accepted: 0, rejected: 0 };
+      (run.suggestions || []).forEach((s) => {
+        c.total += 1;
+        const st = decisions[s.id] ? decisions[s.id].status : "pending";
+        c[st] = (c[st] || 0) + 1;
+      });
+      return c;
+    }
+
+    function renderAll() {
+      renderBadges();
+      renderDone();
+      renderMeta();
+      renderFilters();
+      renderSuggestions();
+    }
+
+    function renderBadges() {
+      const c = counts();
+      queueBadges.innerHTML = [
+        c.total + " total", c.pending + " pending", c.accepted + " accepted", c.rejected + " rejected",
+      ].map((t) => '<div class="badge">' + escapeHtml(t) + "</div>").join("");
+    }
+    function renderDone() {
+      const c = counts();
+      if (c.total && c.pending === 0) {
+        queueDone.className = "done-box open";
+        queueDone.innerHTML = "<div><strong>All reviewed.</strong></div><div>Every suggestion has a decision. Send them with the bar at the bottom.</div>";
+      } else { queueDone.className = "done-box"; queueDone.innerHTML = ""; }
+    }
+    function renderMeta() {
+      runMeta.innerHTML =
+        "<div><strong>Run:</strong> " + escapeHtml(run.run_id) + "</div>" +
+        "<div><strong>Source:</strong> " + escapeHtml(run.source_path || "—") + "</div>" +
+        "<div><strong>Generated:</strong> " + escapeHtml(run.generated_at || "—") + "</div>";
+    }
+    function renderFilters() {
+      const c = { all: run.suggestions.length, grammar: 0, style: 0, content: 0 };
+      run.suggestions.forEach((s) => { if (c[s.category] !== undefined) c[s.category] += 1; });
+      const filters = [["all", "All (" + c.all + ")"], ["grammar", "Grammar (" + c.grammar + ")"], ["style", "Style (" + c.style + ")"], ["content", "Content (" + c.content + ")"]];
+      suggestionFilters.innerHTML = filters.map(([k, label]) => {
+        return '<button class="filter-chip ' + (activeFilter === k ? "active" : "") + '" data-filter="' + k + '">' + escapeHtml(label) + "</button>";
+      }).join("");
+      suggestionFilters.querySelectorAll("button[data-filter]").forEach((b) => {
+        b.addEventListener("click", () => { activeFilter = b.dataset.filter; renderFilters(); renderSuggestions(); });
+      });
+    }
+
+    function syncDraftsFromDOM() {
+      suggestionList.querySelectorAll("textarea[data-id]").forEach((ta) => {
+        if (decisions[ta.dataset.id]) decisions[ta.dataset.id].replacement_text = ta.value;
+      });
+    }
+
+    function renderSuggestions() {
+      if (!run.suggestions.length) {
+        suggestionList.className = "empty";
+        suggestionList.innerHTML = "No imported suggestions yet.";
+        return;
+      }
+      const filtered = run.suggestions.filter((s) => activeFilter === "all" || s.category === activeFilter);
+      if (!filtered.length) {
+        suggestionList.className = "empty";
+        suggestionList.innerHTML = "No suggestions in this category.";
+        return;
+      }
+      suggestionList.className = "suggestion-list";
+      suggestionList.innerHTML = filtered.map((s, index) => {
+        const d = decisions[s.id] || { status: "pending", replacement_text: s.replacement_text || "" };
+        const diff = buildDiffHtml(s.original_text || "", d.replacement_text);
+        const ctxBefore = escapeHtml((s.context_before || "").slice(-140));
+        const ctxAfter = escapeHtml((s.context_after || "").slice(0, 140));
+        return (
+          '<div class="suggestion-card" data-status="' + escapeHtml(d.status) + '" data-suggestion-id="' + escapeHtml(s.id) + '">' +
+            '<div class="suggestion-head">' +
+              '<div class="suggestion-title">' +
+                "<strong>#" + (index + 1) + "</strong>" +
+                '<span class="pill ' + escapeHtml(d.status) + '">' + escapeHtml(d.status) + "</span>" +
+                '<span class="pill ' + escapeHtml(s.category) + '">' + escapeHtml(s.category) + "</span>" +
+              "</div>" +
+              '<div class="row">' +
+                '<button class="secondary" data-action="save" data-id="' + escapeHtml(s.id) + '">Save Edit</button>' +
+                '<button class="accept" data-action="accept" data-id="' + escapeHtml(s.id) + '">Accept</button>' +
+                '<button class="reject" data-action="reject" data-id="' + escapeHtml(s.id) + '">Reject</button>' +
+                '<button class="secondary" data-action="reset" data-id="' + escapeHtml(s.id) + '">Reset</button>' +
+              "</div>" +
+            "</div>" +
+            '<div class="small">Why: ' + escapeHtml(s.rationale || "No rationale provided.") + "</div>" +
+            '<div class="diff-grid">' +
+              '<div class="diff-label">Original</div>' +
+              '<div class="diff-box diff-before">' + diff.beforeHtml + "</div>" +
+              '<div class="diff-label">Replacement</div>' +
+              '<div class="diff-box diff-after">' + diff.afterHtml + "</div>" +
+            "</div>" +
+            '<div class="field">' +
+              "<label>Edit replacement text</label>" +
+              '<textarea class="replacement-editor" data-id="' + escapeHtml(s.id) + '">' + escapeHtml(d.replacement_text) + "</textarea>" +
+            "</div>" +
+            (s.context_before || s.context_after ? '<div class="small">Context: ' + ctxBefore + "<strong>[target]</strong>" + ctxAfter + "</div>" : "") +
+          "</div>"
+        );
+      }).join("");
+
+      suggestionList.querySelectorAll("button[data-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.id;
+          const action = button.dataset.action;
+          const ta = suggestionList.querySelector('textarea[data-id="' + CSS.escape(id) + '"]');
+          if (!decisions[id]) decisions[id] = { status: "pending", replacement_text: "" };
+          if (ta) decisions[id].replacement_text = ta.value;
+          if (action === "accept") decisions[id].status = "accepted";
+          else if (action === "reject") decisions[id].status = "rejected";
+          else if (action === "reset") decisions[id].status = "pending";
+          // "save" only persists the edited text
+          saveDecisions();
+          renderBadges(); renderDone(); renderSuggestions();
+        });
+      });
+    }
+
+    // ---------- diff (ported from local UI) ----------
+    function buildDiffHtml(original, replacement) {
+      const a = tokenize(original), b = tokenize(replacement);
+      const matrix = buildLcsMatrix(a, b);
+      const ops = backtrackDiff(a, b, matrix);
+      let beforeHtml = "", afterHtml = "";
+      for (const op of ops) {
+        if (op.type === "equal") { beforeHtml += escapeHtml(op.value); afterHtml += escapeHtml(op.value); }
+        else if (op.type === "remove") { beforeHtml += '<span class="diff-removed">' + escapeHtml(op.value) + "</span>"; }
+        else if (op.type === "add") { afterHtml += '<span class="diff-added">' + escapeHtml(op.value) + "</span>"; }
+      }
+      return { beforeHtml, afterHtml };
+    }
+    function tokenize(value) { return String(value).match(/\s+|\\[A-Za-z@]+|[A-Za-z0-9_'-]+|./g) || []; }
+    function buildLcsMatrix(a, b) {
+      const rows = a.length + 1, cols = b.length + 1;
+      const m = Array.from({ length: rows }, () => Array(cols).fill(0));
+      for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) {
+        m[i][j] = a[i] === b[j] ? m[i + 1][j + 1] + 1 : Math.max(m[i + 1][j], m[i][j + 1]);
+      }
+      return m;
+    }
+    function backtrackDiff(a, b, m) {
+      const ops = []; let i = 0, j = 0;
+      while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) { ops.push({ type: "equal", value: a[i] }); i++; j++; }
+        else if (m[i + 1][j] >= m[i][j + 1]) { ops.push({ type: "remove", value: a[i] }); i++; }
+        else { ops.push({ type: "add", value: b[j] }); j++; }
+      }
+      while (i < a.length) { ops.push({ type: "remove", value: a[i] }); i++; }
+      while (j < b.length) { ops.push({ type: "add", value: b[j] }); j++; }
+      return ops;
+    }
+
+    // ---------- send decisions ----------
+    async function send(publish) {
+      if (!run || !run.run_id) { setStatus("No active run to send.", "error"); return; }
+      syncDraftsFromDOM();
+      saveDecisions();
+      const payload = {
+        run_id: run.run_id,
+        decided_at: new Date().toISOString(),
+        publish: !!publish,
+        decisions: run.suggestions.map((s) => ({
+          id: s.id,
+          status: decisions[s.id] ? decisions[s.id].status : "pending",
+          replacement_text: decisions[s.id] ? decisions[s.id].replacement_text : (s.replacement_text || ""),
+        })),
+      };
+      const c = counts();
+      if (publish && !confirm("Publish " + c.accepted + " accepted edit(s) to Overleaf now?")) return;
+      const btn = publish ? publishBtn : sendBtn;
+      const label = btn.textContent;
+      btn.disabled = true; sendBtn.disabled = true; publishBtn.disabled = true;
+      setStatus(publish ? "Sending + requesting publish..." : "Sending decisions...", "loading");
+      try {
+        await ghPutJson("outbox/decisions.json", payload, (publish ? "publish" : "decisions") + " for " + run.run_id);
+        setStatus(publish
+          ? "Sent. The Mac will publish " + c.accepted + " accepted edit(s) within ~20s."
+          : "Decisions sent. Claude can now see your choices.", "success");
+      } catch (e) {
+        setStatus(e.message, "error");
+      } finally {
+        btn.textContent = label; sendBtn.disabled = false; publishBtn.disabled = false;
+      }
+    }
+
+    // ---------- wire up ----------
+    connectBtn.addEventListener("click", () => {
+      cfg.repo = (repoInput.value.trim() || DEFAULT_REPO);
+      cfg.token = tokenInput.value.trim();
+      if (!cfg.token) { setStatus("Enter a token first.", "error"); return; }
+      saveCfg();
+      loadRun();
+    });
+    forgetBtn.addEventListener("click", () => {
+      cfg.token = ""; tokenInput.value = ""; saveCfg();
+      runPanel.style.display = "none"; queuePanel.style.display = "none"; actionBar.style.display = "none";
+      setStatus("Token forgotten from this browser.", "info");
+    });
+    refreshBtn.addEventListener("click", loadRun);
+    sendBtn.addEventListener("click", () => send(false));
+    publishBtn.addEventListener("click", () => send(true));
+
+    (function init() {
+      loadCfg();
+      if (cfg.token) { setStatus("Reconnecting...", "loading"); loadRun(); }
+      else { setStatus("Enter your token to connect.", "info"); }
+    })();
+  </script>
+</body>
+</html>
