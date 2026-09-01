@@ -28,13 +28,11 @@ def fetch(url: str) -> bytes:
         return response.read()
 
 
-def resultset_link(issue: str) -> str | None:
-    query = urllib.parse.urlencode(
-        {
-            "ListingsForm[issue]": issue,
-            "ListingsForm[in_active]": "1",
-        }
-    )
+def resultset_link(issue: str, archived: bool) -> str | None:
+    params = {"ListingsForm[issue]": issue}
+    if archived:
+        params["ListingsForm[in_active]"] = "1"
+    query = urllib.parse.urlencode(params)
     page_url = f"{BASE_URL}/joe/listings?{query}"
     page = fetch(page_url).decode("utf-8", errors="replace")
     match = re.search(r'href="([^"]*resultset_xls_output\.php[^"]*)"', page)
@@ -44,19 +42,47 @@ def resultset_link(issue: str) -> str | None:
     return urllib.parse.urljoin(BASE_URL, link)
 
 
-def download_issue(issue: str, output_dir: Path) -> int | None:
-    link = resultset_link(issue)
+def read_export(issue: str, archived: bool, output: Path) -> pd.DataFrame | None:
+    link = resultset_link(issue, archived=archived)
     if not link:
-        print(f"{issue}: no XLS export link", file=sys.stderr)
+        label = "archived" if archived else "active"
+        print(f"{issue}: no {label} XLS export link", file=sys.stderr)
         return None
 
-    output = output_dir / f"joe_resultset_{issue}.xlsx"
     output.write_bytes(fetch(link))
-    rows = len(pd.read_excel(output))
-    print(f"{issue}: {rows} rows")
-    if rows == 0:
-        output.unlink(missing_ok=True)
+    frame = pd.read_excel(output)
+    frame["aea_resultset"] = "archived" if archived else "active"
+    return frame
+
+
+def download_issue(issue: str, output_dir: Path) -> int | None:
+    active_path = output_dir / f".joe_resultset_{issue}_active.xlsx"
+    archived_path = output_dir / f".joe_resultset_{issue}_archived.xlsx"
+    frames = [
+        frame
+        for frame in (
+            read_export(issue, archived=False, output=active_path),
+            read_export(issue, archived=True, output=archived_path),
+        )
+        if frame is not None and not frame.empty
+    ]
+    active_path.unlink(missing_ok=True)
+    archived_path.unlink(missing_ok=True)
+
+    if not frames:
+        print(f"{issue}: no rows")
         return 0
+
+    combined = pd.concat(frames, ignore_index=True)
+    if "jp_id" in combined:
+        combined = combined.drop_duplicates(subset=["jp_id"], keep="first")
+    else:
+        combined = combined.drop_duplicates(keep="first")
+
+    output = output_dir / f"joe_resultset_{issue}.xlsx"
+    combined.to_excel(output, index=False)
+    rows = len(combined)
+    print(f"{issue}: {rows} rows")
     return rows
 
 
