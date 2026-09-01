@@ -18,13 +18,17 @@ MAX_WEEK = 54
 
 CATEGORIES = [
     ("all", "All postings"),
+    ("us_tenure", "US tenure track"),
     ("finance", "Finance"),
+    ("jel_e", "JEL E"),
+    ("jel_c", "JEL C"),
     ("fed", "Fed / regulators"),
     ("us", "United States"),
     ("non_us", "Non-US"),
     ("tenure", "Tenure track"),
     ("non_tenure", "Non-tenure academic"),
     ("industry", "Industry"),
+    ("custom", "Custom"),
 ]
 
 
@@ -68,6 +72,10 @@ def contains(series: pd.Series, pattern: str) -> pd.Series:
     return series.fillna("").astype(str).str.contains(pattern, case=False, regex=True)
 
 
+def jel_code(df: pd.DataFrame, code: str) -> pd.Series:
+    return contains(column(df, "JEL_Classifications"), rf"(?:^|\n)\s*{code}(?:\b|\d| -)")
+
+
 def category_frames(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     text = (
         column(df, "jp_institution").fillna("").astype(str)
@@ -79,7 +87,9 @@ def category_frames(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     locations = column(df, "locations").fillna("").astype(str)
     sections = column(df, "jp_section").fillna("").astype(str)
 
-    finance = contains(column(df, "JEL_Classifications"), r"(?:^|\n)\s*G(?:\b|\d| -)")
+    finance = jel_code(df, "G")
+    jel_e = jel_code(df, "E")
+    jel_c = jel_code(df, "C")
     fed = text.str.contains(
         r"Federal Reserve|Board of Governors|FDIC|Federal Deposit Insurance|"
         r"Office of the Comptroller|Comptroller of the Currency|bank regulator",
@@ -88,22 +98,33 @@ def category_frames(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     )
     us = locations.str.contains(r"\bUNITED STATES\b", case=False, regex=True)
     tenure = sections.str.contains(r"tenure", case=False, regex=True)
+    us_tenure = us & sections.str.contains(
+        r"full-time academic.*tenure", case=False, regex=True
+    )
     non_tenure = sections.str.contains(
         r"visiting|temporary|part-time|part time|adjunct|post[- ]?doc|postdoctoral",
         case=False,
         regex=True,
     ) & ~sections.str.contains(r"nonacademic", case=False, regex=True)
     industry = sections.str.contains(r"nonacademic", case=False, regex=True)
+    custom = (
+        sections.str.strip().ne("")
+        & column(df, "JEL_Classifications").fillna("").astype(str).str.strip().ne("")
+    )
 
     return {
         "all": df,
+        "us_tenure": df[us_tenure],
         "finance": df[finance],
+        "jel_e": df[jel_e],
+        "jel_c": df[jel_c],
         "fed": df[fed],
         "us": df[us],
         "non_us": df[~us],
         "tenure": df[tenure],
         "non_tenure": df[non_tenure],
         "industry": df[industry],
+        "custom": df[custom],
     }
 
 
