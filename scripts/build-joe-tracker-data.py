@@ -76,6 +76,13 @@ def jel_code(df: pd.DataFrame, code: str) -> pd.Series:
     return contains(column(df, "JEL_Classifications"), rf"(?:^|\n)\s*{code}(?:\b|\d| -)")
 
 
+def any_jel_code(df: pd.DataFrame, codes: tuple[str, ...]) -> pd.Series:
+    mask = pd.Series(False, index=df.index)
+    for code in codes:
+        mask = mask | jel_code(df, code)
+    return mask
+
+
 def category_frames(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     text = (
         column(df, "jp_institution").fillna("").astype(str)
@@ -107,10 +114,12 @@ def category_frames(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         regex=True,
     ) & ~sections.str.contains(r"nonacademic", case=False, regex=True)
     industry = sections.str.contains(r"nonacademic", case=False, regex=True)
-    custom = (
-        sections.str.strip().ne("")
-        & column(df, "JEL_Classifications").fillna("").astype(str).str.strip().ne("")
+    custom_country = locations.str.contains(
+        r"\b(?:UNITED STATES|UNITED KINGDOM|ITALY|SPAIN|FRANCE|SWITZERLAND|CANADA)\b",
+        case=False,
+        regex=True,
     )
+    custom = custom_country & any_jel_code(df, ("00", "A", "C", "E", "G", "Y", "Z"))
 
     return {
         "all": df,

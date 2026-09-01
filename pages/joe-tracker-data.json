@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-01T19:11:55.279906+00:00",
+  "generatedAt": "2026-09-01T19:19:18.060102+00:00",
   "startWeek": 31,
   "maxWeek": 54,
   "source": "AEA JOE native XLS result sets",
@@ -17604,768 +17604,315 @@
     {
       "id": "custom",
       "title": "Custom",
-      "observations": 19414,
-      "latestYearTotal": 161,
+      "observations": 10028,
+      "latestYearTotal": 88,
       "latestWeek": 36,
       "years": [
         {
           "year": 2015,
-          "total": 1534,
+          "total": 824,
           "latestWeek": 54,
           "rows": [
             {
               "week": 31,
-              "count": 40.0,
-              "cumulative": 40.0,
-              "rolling4": 40.0
+              "count": 29.0,
+              "cumulative": 29.0,
+              "rolling4": 29.0
             },
             {
               "week": 32,
-              "count": 24.0,
-              "cumulative": 64.0,
-              "rolling4": 64.0
+              "count": 10.0,
+              "cumulative": 39.0,
+              "rolling4": 39.0
             },
             {
               "week": 33,
-              "count": 40.0,
-              "cumulative": 104.0,
-              "rolling4": 104.0
+              "count": 22.0,
+              "cumulative": 61.0,
+              "rolling4": 61.0
             },
             {
               "week": 34,
-              "count": 40.0,
-              "cumulative": 144.0,
-              "rolling4": 144.0
+              "count": 27.0,
+              "cumulative": 88.0,
+              "rolling4": 88.0
             },
             {
               "week": 35,
-              "count": 41.0,
-              "cumulative": 185.0,
-              "rolling4": 145.0
+              "count": 27.0,
+              "cumulative": 115.0,
+              "rolling4": 86.0
             },
             {
               "week": 36,
-              "count": 39.0,
-              "cumulative": 224.0,
-              "rolling4": 160.0
+              "count": 19.0,
+              "cumulative": 134.0,
+              "rolling4": 95.0
             },
             {
               "week": 37,
-              "count": 54.0,
-              "cumulative": 278.0,
-              "rolling4": 174.0
+              "count": 32.0,
+              "cumulative": 166.0,
+              "rolling4": 105.0
             },
             {
               "week": 38,
-              "count": 90.0,
-              "cumulative": 368.0,
-              "rolling4": 224.0
+              "count": 47.0,
+              "cumulative": 213.0,
+              "rolling4": 125.0
             },
             {
               "week": 39,
-              "count": 97.0,
-              "cumulative": 465.0,
-              "rolling4": 280.0
+              "count": 45.0,
+              "cumulative": 258.0,
+              "rolling4": 143.0
             },
             {
               "week": 40,
-              "count": 160.0,
-              "cumulative": 625.0,
-              "rolling4": 401.0
+              "count": 94.0,
+              "cumulative": 352.0,
+              "rolling4": 218.0
             },
             {
               "week": 41,
-              "count": 140.0,
-              "cumulative": 765.0,
-              "rolling4": 487.0
+              "count": 78.0,
+              "cumulative": 430.0,
+              "rolling4": 264.0
             },
             {
               "week": 42,
-              "count": 181.0,
-              "cumulative": 946.0,
-              "rolling4": 578.0
+              "count": 91.0,
+              "cumulative": 521.0,
+              "rolling4": 308.0
             },
             {
               "week": 43,
-              "count": 100.0,
-              "cumulative": 1046.0,
-              "rolling4": 581.0
+              "count": 39.0,
+              "cumulative": 560.0,
+              "rolling4": 302.0
             },
             {
               "week": 44,
-              "count": 110.0,
-              "cumulative": 1156.0,
-              "rolling4": 531.0
+              "count": 62.0,
+              "cumulative": 622.0,
+              "rolling4": 270.0
             },
             {
               "week": 45,
-              "count": 85.0,
-              "cumulative": 1241.0,
-              "rolling4": 476.0
+              "count": 50.0,
+              "cumulative": 672.0,
+              "rolling4": 242.0
             },
             {
               "week": 46,
-              "count": 64.0,
-              "cumulative": 1305.0,
-              "rolling4": 359.0
+              "count": 39.0,
+              "cumulative": 711.0,
+              "rolling4": 190.0
             },
             {
               "week": 47,
-              "count": 44.0,
-              "cumulative": 1349.0,
-              "rolling4": 303.0
+              "count": 20.0,
+              "cumulative": 731.0,
+              "rolling4": 171.0
             },
             {
               "week": 48,
-              "count": 40.0,
-              "cumulative": 1389.0,
-              "rolling4": 233.0
+              "count": 18.0,
+              "cumulative": 749.0,
+              "rolling4": 127.0
             },
             {
               "week": 49,
-              "count": 37.0,
-              "cumulative": 1426.0,
-              "rolling4": 185.0
+              "count": 19.0,
+              "cumulative": 768.0,
+              "rolling4": 96.0
             },
             {
               "week": 50,
-              "count": 27.0,
-              "cumulative": 1453.0,
-              "rolling4": 148.0
+              "count": 11.0,
+              "cumulative": 779.0,
+              "rolling4": 68.0
             },
             {
               "week": 51,
-              "count": 37.0,
-              "cumulative": 1490.0,
-              "rolling4": 141.0
+              "count": 19.0,
+              "cumulative": 798.0,
+              "rolling4": 67.0
             },
             {
               "week": 52,
-              "count": 27.0,
-              "cumulative": 1517.0,
-              "rolling4": 128.0
+              "count": 15.0,
+              "cumulative": 813.0,
+              "rolling4": 64.0
             },
             {
               "week": 53,
-              "count": 11.0,
-              "cumulative": 1528.0,
-              "rolling4": 102.0
+              "count": 6.0,
+              "cumulative": 819.0,
+              "rolling4": 51.0
             },
             {
               "week": 54,
-              "count": 6.0,
-              "cumulative": 1534.0,
-              "rolling4": 81.0
+              "count": 5.0,
+              "cumulative": 824.0,
+              "rolling4": 45.0
             }
           ]
         },
         {
           "year": 2016,
-          "total": 1437,
+          "total": 777,
           "latestWeek": 54,
           "rows": [
             {
               "week": 31,
-              "count": 67.0,
-              "cumulative": 67.0,
-              "rolling4": 67.0
+              "count": 45.0,
+              "cumulative": 45.0,
+              "rolling4": 45.0
             },
             {
               "week": 32,
-              "count": 40.0,
-              "cumulative": 107.0,
-              "rolling4": 107.0
+              "count": 23.0,
+              "cumulative": 68.0,
+              "rolling4": 68.0
             },
             {
               "week": 33,
-              "count": 23.0,
-              "cumulative": 130.0,
-              "rolling4": 130.0
+              "count": 18.0,
+              "cumulative": 86.0,
+              "rolling4": 86.0
             },
             {
               "week": 34,
-              "count": 33.0,
-              "cumulative": 163.0,
-              "rolling4": 163.0
+              "count": 23.0,
+              "cumulative": 109.0,
+              "rolling4": 109.0
             },
             {
               "week": 35,
-              "count": 40.0,
-              "cumulative": 203.0,
-              "rolling4": 136.0
+              "count": 28.0,
+              "cumulative": 137.0,
+              "rolling4": 92.0
             },
             {
               "week": 36,
-              "count": 54.0,
-              "cumulative": 257.0,
-              "rolling4": 150.0
+              "count": 32.0,
+              "cumulative": 169.0,
+              "rolling4": 101.0
             },
             {
               "week": 37,
-              "count": 78.0,
-              "cumulative": 335.0,
-              "rolling4": 205.0
+              "count": 44.0,
+              "cumulative": 213.0,
+              "rolling4": 127.0
             },
             {
               "week": 38,
-              "count": 110.0,
-              "cumulative": 445.0,
-              "rolling4": 282.0
+              "count": 64.0,
+              "cumulative": 277.0,
+              "rolling4": 168.0
             },
             {
               "week": 39,
-              "count": 112.0,
-              "cumulative": 557.0,
-              "rolling4": 354.0
+              "count": 59.0,
+              "cumulative": 336.0,
+              "rolling4": 199.0
             },
             {
               "week": 40,
-              "count": 125.0,
-              "cumulative": 682.0,
-              "rolling4": 425.0
+              "count": 66.0,
+              "cumulative": 402.0,
+              "rolling4": 233.0
             },
             {
               "week": 41,
-              "count": 117.0,
-              "cumulative": 799.0,
-              "rolling4": 464.0
+              "count": 59.0,
+              "cumulative": 461.0,
+              "rolling4": 248.0
             },
             {
               "week": 42,
-              "count": 110.0,
-              "cumulative": 909.0,
-              "rolling4": 464.0
+              "count": 46.0,
+              "cumulative": 507.0,
+              "rolling4": 230.0
             },
             {
               "week": 43,
-              "count": 92.0,
-              "cumulative": 1001.0,
-              "rolling4": 444.0
+              "count": 50.0,
+              "cumulative": 557.0,
+              "rolling4": 221.0
             },
             {
               "week": 44,
-              "count": 102.0,
-              "cumulative": 1103.0,
-              "rolling4": 421.0
+              "count": 41.0,
+              "cumulative": 598.0,
+              "rolling4": 196.0
             },
             {
               "week": 45,
-              "count": 67.0,
-              "cumulative": 1170.0,
-              "rolling4": 371.0
+              "count": 40.0,
+              "cumulative": 638.0,
+              "rolling4": 177.0
             },
             {
               "week": 46,
-              "count": 61.0,
-              "cumulative": 1231.0,
-              "rolling4": 322.0
+              "count": 28.0,
+              "cumulative": 666.0,
+              "rolling4": 159.0
             },
             {
               "week": 47,
-              "count": 45.0,
-              "cumulative": 1276.0,
-              "rolling4": 275.0
+              "count": 15.0,
+              "cumulative": 681.0,
+              "rolling4": 124.0
             },
             {
               "week": 48,
-              "count": 42.0,
-              "cumulative": 1318.0,
-              "rolling4": 215.0
+              "count": 21.0,
+              "cumulative": 702.0,
+              "rolling4": 104.0
             },
             {
               "week": 49,
-              "count": 37.0,
-              "cumulative": 1355.0,
-              "rolling4": 185.0
+              "count": 22.0,
+              "cumulative": 724.0,
+              "rolling4": 86.0
             },
             {
               "week": 50,
-              "count": 22.0,
-              "cumulative": 1377.0,
-              "rolling4": 146.0
+              "count": 13.0,
+              "cumulative": 737.0,
+              "rolling4": 71.0
             },
             {
               "week": 51,
-              "count": 32.0,
-              "cumulative": 1409.0,
-              "rolling4": 133.0
-            },
-            {
-              "week": 52,
-              "count": 17.0,
-              "cumulative": 1426.0,
-              "rolling4": 108.0
-            },
-            {
-              "week": 53,
-              "count": 5.0,
-              "cumulative": 1431.0,
+              "count": 20.0,
+              "cumulative": 757.0,
               "rolling4": 76.0
             },
             {
+              "week": 52,
+              "count": 13.0,
+              "cumulative": 770.0,
+              "rolling4": 68.0
+            },
+            {
+              "week": 53,
+              "count": 3.0,
+              "cumulative": 773.0,
+              "rolling4": 49.0
+            },
+            {
               "week": 54,
-              "count": 6.0,
-              "cumulative": 1437.0,
-              "rolling4": 60.0
+              "count": 4.0,
+              "cumulative": 777.0,
+              "rolling4": 40.0
             }
           ]
         },
         {
           "year": 2017,
-          "total": 1520,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 65.0,
-              "cumulative": 65.0,
-              "rolling4": 65.0
-            },
-            {
-              "week": 32,
-              "count": 37.0,
-              "cumulative": 102.0,
-              "rolling4": 102.0
-            },
-            {
-              "week": 33,
-              "count": 33.0,
-              "cumulative": 135.0,
-              "rolling4": 135.0
-            },
-            {
-              "week": 34,
-              "count": 36.0,
-              "cumulative": 171.0,
-              "rolling4": 171.0
-            },
-            {
-              "week": 35,
-              "count": 47.0,
-              "cumulative": 218.0,
-              "rolling4": 153.0
-            },
-            {
-              "week": 36,
-              "count": 62.0,
-              "cumulative": 280.0,
-              "rolling4": 178.0
-            },
-            {
-              "week": 37,
-              "count": 79.0,
-              "cumulative": 359.0,
-              "rolling4": 224.0
-            },
-            {
-              "week": 38,
-              "count": 97.0,
-              "cumulative": 456.0,
-              "rolling4": 285.0
-            },
-            {
-              "week": 39,
-              "count": 118.0,
-              "cumulative": 574.0,
-              "rolling4": 356.0
-            },
-            {
-              "week": 40,
-              "count": 152.0,
-              "cumulative": 726.0,
-              "rolling4": 446.0
-            },
-            {
-              "week": 41,
-              "count": 127.0,
-              "cumulative": 853.0,
-              "rolling4": 494.0
-            },
-            {
-              "week": 42,
-              "count": 102.0,
-              "cumulative": 955.0,
-              "rolling4": 499.0
-            },
-            {
-              "week": 43,
-              "count": 91.0,
-              "cumulative": 1046.0,
-              "rolling4": 472.0
-            },
-            {
-              "week": 44,
-              "count": 92.0,
-              "cumulative": 1138.0,
-              "rolling4": 412.0
-            },
-            {
-              "week": 45,
-              "count": 80.0,
-              "cumulative": 1218.0,
-              "rolling4": 365.0
-            },
-            {
-              "week": 46,
-              "count": 49.0,
-              "cumulative": 1267.0,
-              "rolling4": 312.0
-            },
-            {
-              "week": 47,
-              "count": 60.0,
-              "cumulative": 1327.0,
-              "rolling4": 281.0
-            },
-            {
-              "week": 48,
-              "count": 46.0,
-              "cumulative": 1373.0,
-              "rolling4": 235.0
-            },
-            {
-              "week": 49,
-              "count": 44.0,
-              "cumulative": 1417.0,
-              "rolling4": 199.0
-            },
-            {
-              "week": 50,
-              "count": 37.0,
-              "cumulative": 1454.0,
-              "rolling4": 187.0
-            },
-            {
-              "week": 51,
-              "count": 37.0,
-              "cumulative": 1491.0,
-              "rolling4": 164.0
-            },
-            {
-              "week": 52,
-              "count": 14.0,
-              "cumulative": 1505.0,
-              "rolling4": 132.0
-            },
-            {
-              "week": 53,
-              "count": 9.0,
-              "cumulative": 1514.0,
-              "rolling4": 97.0
-            },
-            {
-              "week": 54,
-              "count": 6.0,
-              "cumulative": 1520.0,
-              "rolling4": 66.0
-            }
-          ]
-        },
-        {
-          "year": 2018,
-          "total": 1548,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 54.0,
-              "cumulative": 54.0,
-              "rolling4": 54.0
-            },
-            {
-              "week": 32,
-              "count": 32.0,
-              "cumulative": 86.0,
-              "rolling4": 86.0
-            },
-            {
-              "week": 33,
-              "count": 34.0,
-              "cumulative": 120.0,
-              "rolling4": 120.0
-            },
-            {
-              "week": 34,
-              "count": 44.0,
-              "cumulative": 164.0,
-              "rolling4": 164.0
-            },
-            {
-              "week": 35,
-              "count": 45.0,
-              "cumulative": 209.0,
-              "rolling4": 155.0
-            },
-            {
-              "week": 36,
-              "count": 39.0,
-              "cumulative": 248.0,
-              "rolling4": 162.0
-            },
-            {
-              "week": 37,
-              "count": 75.0,
-              "cumulative": 323.0,
-              "rolling4": 203.0
-            },
-            {
-              "week": 38,
-              "count": 93.0,
-              "cumulative": 416.0,
-              "rolling4": 252.0
-            },
-            {
-              "week": 39,
-              "count": 141.0,
-              "cumulative": 557.0,
-              "rolling4": 348.0
-            },
-            {
-              "week": 40,
-              "count": 153.0,
-              "cumulative": 710.0,
-              "rolling4": 462.0
-            },
-            {
-              "week": 41,
-              "count": 129.0,
-              "cumulative": 839.0,
-              "rolling4": 516.0
-            },
-            {
-              "week": 42,
-              "count": 91.0,
-              "cumulative": 930.0,
-              "rolling4": 514.0
-            },
-            {
-              "week": 43,
-              "count": 120.0,
-              "cumulative": 1050.0,
-              "rolling4": 493.0
-            },
-            {
-              "week": 44,
-              "count": 99.0,
-              "cumulative": 1149.0,
-              "rolling4": 439.0
-            },
-            {
-              "week": 45,
-              "count": 88.0,
-              "cumulative": 1237.0,
-              "rolling4": 398.0
-            },
-            {
-              "week": 46,
-              "count": 64.0,
-              "cumulative": 1301.0,
-              "rolling4": 371.0
-            },
-            {
-              "week": 47,
-              "count": 69.0,
-              "cumulative": 1370.0,
-              "rolling4": 320.0
-            },
-            {
-              "week": 48,
-              "count": 26.0,
-              "cumulative": 1396.0,
-              "rolling4": 247.0
-            },
-            {
-              "week": 49,
-              "count": 32.0,
-              "cumulative": 1428.0,
-              "rolling4": 191.0
-            },
-            {
-              "week": 50,
-              "count": 40.0,
-              "cumulative": 1468.0,
-              "rolling4": 167.0
-            },
-            {
-              "week": 51,
-              "count": 49.0,
-              "cumulative": 1517.0,
-              "rolling4": 147.0
-            },
-            {
-              "week": 52,
-              "count": 14.0,
-              "cumulative": 1531.0,
-              "rolling4": 135.0
-            },
-            {
-              "week": 53,
-              "count": 7.0,
-              "cumulative": 1538.0,
-              "rolling4": 110.0
-            },
-            {
-              "week": 54,
-              "count": 10.0,
-              "cumulative": 1548.0,
-              "rolling4": 80.0
-            }
-          ]
-        },
-        {
-          "year": 2019,
-          "total": 1445,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 59.0,
-              "cumulative": 59.0,
-              "rolling4": 59.0
-            },
-            {
-              "week": 32,
-              "count": 16.0,
-              "cumulative": 75.0,
-              "rolling4": 75.0
-            },
-            {
-              "week": 33,
-              "count": 36.0,
-              "cumulative": 111.0,
-              "rolling4": 111.0
-            },
-            {
-              "week": 34,
-              "count": 36.0,
-              "cumulative": 147.0,
-              "rolling4": 147.0
-            },
-            {
-              "week": 35,
-              "count": 39.0,
-              "cumulative": 186.0,
-              "rolling4": 127.0
-            },
-            {
-              "week": 36,
-              "count": 61.0,
-              "cumulative": 247.0,
-              "rolling4": 172.0
-            },
-            {
-              "week": 37,
-              "count": 86.0,
-              "cumulative": 333.0,
-              "rolling4": 222.0
-            },
-            {
-              "week": 38,
-              "count": 105.0,
-              "cumulative": 438.0,
-              "rolling4": 291.0
-            },
-            {
-              "week": 39,
-              "count": 117.0,
-              "cumulative": 555.0,
-              "rolling4": 369.0
-            },
-            {
-              "week": 40,
-              "count": 111.0,
-              "cumulative": 666.0,
-              "rolling4": 419.0
-            },
-            {
-              "week": 41,
-              "count": 118.0,
-              "cumulative": 784.0,
-              "rolling4": 451.0
-            },
-            {
-              "week": 42,
-              "count": 119.0,
-              "cumulative": 903.0,
-              "rolling4": 465.0
-            },
-            {
-              "week": 43,
-              "count": 111.0,
-              "cumulative": 1014.0,
-              "rolling4": 459.0
-            },
-            {
-              "week": 44,
-              "count": 95.0,
-              "cumulative": 1109.0,
-              "rolling4": 443.0
-            },
-            {
-              "week": 45,
-              "count": 68.0,
-              "cumulative": 1177.0,
-              "rolling4": 393.0
-            },
-            {
-              "week": 46,
-              "count": 52.0,
-              "cumulative": 1229.0,
-              "rolling4": 326.0
-            },
-            {
-              "week": 47,
-              "count": 45.0,
-              "cumulative": 1274.0,
-              "rolling4": 260.0
-            },
-            {
-              "week": 48,
-              "count": 39.0,
-              "cumulative": 1313.0,
-              "rolling4": 204.0
-            },
-            {
-              "week": 49,
-              "count": 29.0,
-              "cumulative": 1342.0,
-              "rolling4": 165.0
-            },
-            {
-              "week": 50,
-              "count": 41.0,
-              "cumulative": 1383.0,
-              "rolling4": 154.0
-            },
-            {
-              "week": 51,
-              "count": 30.0,
-              "cumulative": 1413.0,
-              "rolling4": 139.0
-            },
-            {
-              "week": 52,
-              "count": 23.0,
-              "cumulative": 1436.0,
-              "rolling4": 123.0
-            },
-            {
-              "week": 53,
-              "count": 2.0,
-              "cumulative": 1438.0,
-              "rolling4": 96.0
-            },
-            {
-              "week": 54,
-              "count": 7.0,
-              "cumulative": 1445.0,
-              "rolling4": 62.0
-            }
-          ]
-        },
-        {
-          "year": 2020,
-          "total": 1067,
+          "total": 750,
           "latestWeek": 54,
           "rows": [
             {
@@ -18376,897 +17923,746 @@
             },
             {
               "week": 32,
-              "count": 8.0,
-              "cumulative": 43.0,
-              "rolling4": 43.0
+              "count": 18.0,
+              "cumulative": 53.0,
+              "rolling4": 53.0
             },
             {
               "week": 33,
-              "count": 15.0,
-              "cumulative": 58.0,
-              "rolling4": 58.0
-            },
-            {
-              "week": 34,
-              "count": 28.0,
-              "cumulative": 86.0,
-              "rolling4": 86.0
-            },
-            {
-              "week": 35,
-              "count": 22.0,
-              "cumulative": 108.0,
-              "rolling4": 73.0
-            },
-            {
-              "week": 36,
-              "count": 32.0,
-              "cumulative": 140.0,
-              "rolling4": 97.0
-            },
-            {
-              "week": 37,
-              "count": 30.0,
-              "cumulative": 170.0,
-              "rolling4": 112.0
-            },
-            {
-              "week": 38,
-              "count": 33.0,
-              "cumulative": 203.0,
-              "rolling4": 117.0
-            },
-            {
-              "week": 39,
-              "count": 50.0,
-              "cumulative": 253.0,
-              "rolling4": 145.0
-            },
-            {
-              "week": 40,
-              "count": 67.0,
-              "cumulative": 320.0,
-              "rolling4": 180.0
-            },
-            {
-              "week": 41,
-              "count": 66.0,
-              "cumulative": 386.0,
-              "rolling4": 216.0
-            },
-            {
-              "week": 42,
-              "count": 95.0,
-              "cumulative": 481.0,
-              "rolling4": 278.0
-            },
-            {
-              "week": 43,
-              "count": 79.0,
-              "cumulative": 560.0,
-              "rolling4": 307.0
-            },
-            {
-              "week": 44,
-              "count": 67.0,
-              "cumulative": 627.0,
-              "rolling4": 307.0
-            },
-            {
-              "week": 45,
-              "count": 92.0,
-              "cumulative": 719.0,
-              "rolling4": 333.0
-            },
-            {
-              "week": 46,
-              "count": 76.0,
-              "cumulative": 795.0,
-              "rolling4": 314.0
-            },
-            {
-              "week": 47,
-              "count": 31.0,
-              "cumulative": 826.0,
-              "rolling4": 266.0
-            },
-            {
-              "week": 48,
-              "count": 60.0,
-              "cumulative": 886.0,
-              "rolling4": 259.0
-            },
-            {
-              "week": 49,
-              "count": 44.0,
-              "cumulative": 930.0,
-              "rolling4": 211.0
-            },
-            {
-              "week": 50,
-              "count": 46.0,
-              "cumulative": 976.0,
-              "rolling4": 181.0
-            },
-            {
-              "week": 51,
-              "count": 33.0,
-              "cumulative": 1009.0,
-              "rolling4": 183.0
-            },
-            {
-              "week": 52,
-              "count": 24.0,
-              "cumulative": 1033.0,
-              "rolling4": 147.0
-            },
-            {
-              "week": 53,
-              "count": 27.0,
-              "cumulative": 1060.0,
-              "rolling4": 130.0
-            },
-            {
-              "week": 54,
-              "count": 7.0,
-              "cumulative": 1067.0,
-              "rolling4": 91.0
-            }
-          ]
-        },
-        {
-          "year": 2021,
-          "total": 1361,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 7.0,
-              "cumulative": 7.0,
-              "rolling4": 7.0
-            },
-            {
-              "week": 32,
-              "count": 20.0,
-              "cumulative": 27.0,
-              "rolling4": 27.0
-            },
-            {
-              "week": 33,
-              "count": 36.0,
+              "count": 10.0,
               "cumulative": 63.0,
               "rolling4": 63.0
             },
             {
               "week": 34,
-              "count": 30.0,
-              "cumulative": 93.0,
-              "rolling4": 93.0
+              "count": 16.0,
+              "cumulative": 79.0,
+              "rolling4": 79.0
             },
             {
               "week": 35,
-              "count": 43.0,
-              "cumulative": 136.0,
-              "rolling4": 129.0
+              "count": 30.0,
+              "cumulative": 109.0,
+              "rolling4": 74.0
             },
             {
               "week": 36,
-              "count": 58.0,
-              "cumulative": 194.0,
-              "rolling4": 167.0
+              "count": 35.0,
+              "cumulative": 144.0,
+              "rolling4": 91.0
             },
             {
               "week": 37,
-              "count": 52.0,
-              "cumulative": 246.0,
-              "rolling4": 183.0
+              "count": 44.0,
+              "cumulative": 188.0,
+              "rolling4": 125.0
             },
             {
               "week": 38,
-              "count": 80.0,
-              "cumulative": 326.0,
-              "rolling4": 233.0
+              "count": 46.0,
+              "cumulative": 234.0,
+              "rolling4": 155.0
             },
             {
               "week": 39,
-              "count": 76.0,
-              "cumulative": 402.0,
-              "rolling4": 266.0
+              "count": 57.0,
+              "cumulative": 291.0,
+              "rolling4": 182.0
             },
             {
               "week": 40,
-              "count": 107.0,
-              "cumulative": 509.0,
-              "rolling4": 315.0
+              "count": 68.0,
+              "cumulative": 359.0,
+              "rolling4": 215.0
             },
             {
               "week": 41,
-              "count": 107.0,
-              "cumulative": 616.0,
-              "rolling4": 370.0
-            },
-            {
-              "week": 42,
-              "count": 115.0,
-              "cumulative": 731.0,
-              "rolling4": 405.0
-            },
-            {
-              "week": 43,
-              "count": 111.0,
-              "cumulative": 842.0,
-              "rolling4": 440.0
-            },
-            {
-              "week": 44,
-              "count": 98.0,
-              "cumulative": 940.0,
-              "rolling4": 431.0
-            },
-            {
-              "week": 45,
-              "count": 88.0,
-              "cumulative": 1028.0,
-              "rolling4": 412.0
-            },
-            {
-              "week": 46,
-              "count": 67.0,
-              "cumulative": 1095.0,
-              "rolling4": 364.0
-            },
-            {
-              "week": 47,
-              "count": 54.0,
-              "cumulative": 1149.0,
-              "rolling4": 307.0
-            },
-            {
-              "week": 48,
-              "count": 31.0,
-              "cumulative": 1180.0,
+              "count": 69.0,
+              "cumulative": 428.0,
               "rolling4": 240.0
             },
             {
+              "week": 42,
+              "count": 52.0,
+              "cumulative": 480.0,
+              "rolling4": 246.0
+            },
+            {
+              "week": 43,
+              "count": 50.0,
+              "cumulative": 530.0,
+              "rolling4": 239.0
+            },
+            {
+              "week": 44,
+              "count": 37.0,
+              "cumulative": 567.0,
+              "rolling4": 208.0
+            },
+            {
+              "week": 45,
+              "count": 35.0,
+              "cumulative": 602.0,
+              "rolling4": 174.0
+            },
+            {
+              "week": 46,
+              "count": 19.0,
+              "cumulative": 621.0,
+              "rolling4": 141.0
+            },
+            {
+              "week": 47,
+              "count": 30.0,
+              "cumulative": 651.0,
+              "rolling4": 121.0
+            },
+            {
+              "week": 48,
+              "count": 22.0,
+              "cumulative": 673.0,
+              "rolling4": 106.0
+            },
+            {
               "week": 49,
-              "count": 57.0,
-              "cumulative": 1237.0,
-              "rolling4": 209.0
+              "count": 23.0,
+              "cumulative": 696.0,
+              "rolling4": 94.0
             },
             {
               "week": 50,
-              "count": 36.0,
-              "cumulative": 1273.0,
-              "rolling4": 178.0
+              "count": 18.0,
+              "cumulative": 714.0,
+              "rolling4": 93.0
             },
             {
               "week": 51,
-              "count": 43.0,
-              "cumulative": 1316.0,
-              "rolling4": 167.0
+              "count": 18.0,
+              "cumulative": 732.0,
+              "rolling4": 81.0
             },
             {
               "week": 52,
-              "count": 20.0,
-              "cumulative": 1336.0,
-              "rolling4": 156.0
+              "count": 7.0,
+              "cumulative": 739.0,
+              "rolling4": 66.0
             },
             {
               "week": 53,
-              "count": 22.0,
-              "cumulative": 1358.0,
-              "rolling4": 121.0
+              "count": 9.0,
+              "cumulative": 748.0,
+              "rolling4": 52.0
+            },
+            {
+              "week": 54,
+              "count": 2.0,
+              "cumulative": 750.0,
+              "rolling4": 36.0
+            }
+          ]
+        },
+        {
+          "year": 2018,
+          "total": 819,
+          "latestWeek": 54,
+          "rows": [
+            {
+              "week": 31,
+              "count": 32.0,
+              "cumulative": 32.0,
+              "rolling4": 32.0
+            },
+            {
+              "week": 32,
+              "count": 18.0,
+              "cumulative": 50.0,
+              "rolling4": 50.0
+            },
+            {
+              "week": 33,
+              "count": 21.0,
+              "cumulative": 71.0,
+              "rolling4": 71.0
+            },
+            {
+              "week": 34,
+              "count": 27.0,
+              "cumulative": 98.0,
+              "rolling4": 98.0
+            },
+            {
+              "week": 35,
+              "count": 25.0,
+              "cumulative": 123.0,
+              "rolling4": 91.0
+            },
+            {
+              "week": 36,
+              "count": 26.0,
+              "cumulative": 149.0,
+              "rolling4": 99.0
+            },
+            {
+              "week": 37,
+              "count": 42.0,
+              "cumulative": 191.0,
+              "rolling4": 120.0
+            },
+            {
+              "week": 38,
+              "count": 52.0,
+              "cumulative": 243.0,
+              "rolling4": 145.0
+            },
+            {
+              "week": 39,
+              "count": 67.0,
+              "cumulative": 310.0,
+              "rolling4": 187.0
+            },
+            {
+              "week": 40,
+              "count": 88.0,
+              "cumulative": 398.0,
+              "rolling4": 249.0
+            },
+            {
+              "week": 41,
+              "count": 65.0,
+              "cumulative": 463.0,
+              "rolling4": 272.0
+            },
+            {
+              "week": 42,
+              "count": 40.0,
+              "cumulative": 503.0,
+              "rolling4": 260.0
+            },
+            {
+              "week": 43,
+              "count": 57.0,
+              "cumulative": 560.0,
+              "rolling4": 250.0
+            },
+            {
+              "week": 44,
+              "count": 38.0,
+              "cumulative": 598.0,
+              "rolling4": 200.0
+            },
+            {
+              "week": 45,
+              "count": 45.0,
+              "cumulative": 643.0,
+              "rolling4": 180.0
+            },
+            {
+              "week": 46,
+              "count": 39.0,
+              "cumulative": 682.0,
+              "rolling4": 179.0
+            },
+            {
+              "week": 47,
+              "count": 33.0,
+              "cumulative": 715.0,
+              "rolling4": 155.0
+            },
+            {
+              "week": 48,
+              "count": 15.0,
+              "cumulative": 730.0,
+              "rolling4": 132.0
+            },
+            {
+              "week": 49,
+              "count": 19.0,
+              "cumulative": 749.0,
+              "rolling4": 106.0
+            },
+            {
+              "week": 50,
+              "count": 21.0,
+              "cumulative": 770.0,
+              "rolling4": 88.0
+            },
+            {
+              "week": 51,
+              "count": 32.0,
+              "cumulative": 802.0,
+              "rolling4": 87.0
+            },
+            {
+              "week": 52,
+              "count": 6.0,
+              "cumulative": 808.0,
+              "rolling4": 78.0
+            },
+            {
+              "week": 53,
+              "count": 5.0,
+              "cumulative": 813.0,
+              "rolling4": 64.0
+            },
+            {
+              "week": 54,
+              "count": 6.0,
+              "cumulative": 819.0,
+              "rolling4": 49.0
+            }
+          ]
+        },
+        {
+          "year": 2019,
+          "total": 683,
+          "latestWeek": 54,
+          "rows": [
+            {
+              "week": 31,
+              "count": 26.0,
+              "cumulative": 26.0,
+              "rolling4": 26.0
+            },
+            {
+              "week": 32,
+              "count": 10.0,
+              "cumulative": 36.0,
+              "rolling4": 36.0
+            },
+            {
+              "week": 33,
+              "count": 17.0,
+              "cumulative": 53.0,
+              "rolling4": 53.0
+            },
+            {
+              "week": 34,
+              "count": 18.0,
+              "cumulative": 71.0,
+              "rolling4": 71.0
+            },
+            {
+              "week": 35,
+              "count": 16.0,
+              "cumulative": 87.0,
+              "rolling4": 61.0
+            },
+            {
+              "week": 36,
+              "count": 34.0,
+              "cumulative": 121.0,
+              "rolling4": 85.0
+            },
+            {
+              "week": 37,
+              "count": 47.0,
+              "cumulative": 168.0,
+              "rolling4": 115.0
+            },
+            {
+              "week": 38,
+              "count": 65.0,
+              "cumulative": 233.0,
+              "rolling4": 162.0
+            },
+            {
+              "week": 39,
+              "count": 65.0,
+              "cumulative": 298.0,
+              "rolling4": 211.0
+            },
+            {
+              "week": 40,
+              "count": 53.0,
+              "cumulative": 351.0,
+              "rolling4": 230.0
+            },
+            {
+              "week": 41,
+              "count": 54.0,
+              "cumulative": 405.0,
+              "rolling4": 237.0
+            },
+            {
+              "week": 42,
+              "count": 55.0,
+              "cumulative": 460.0,
+              "rolling4": 227.0
+            },
+            {
+              "week": 43,
+              "count": 42.0,
+              "cumulative": 502.0,
+              "rolling4": 204.0
+            },
+            {
+              "week": 44,
+              "count": 40.0,
+              "cumulative": 542.0,
+              "rolling4": 191.0
+            },
+            {
+              "week": 45,
+              "count": 38.0,
+              "cumulative": 580.0,
+              "rolling4": 175.0
+            },
+            {
+              "week": 46,
+              "count": 21.0,
+              "cumulative": 601.0,
+              "rolling4": 141.0
+            },
+            {
+              "week": 47,
+              "count": 17.0,
+              "cumulative": 618.0,
+              "rolling4": 116.0
+            },
+            {
+              "week": 48,
+              "count": 13.0,
+              "cumulative": 631.0,
+              "rolling4": 89.0
+            },
+            {
+              "week": 49,
+              "count": 10.0,
+              "cumulative": 641.0,
+              "rolling4": 61.0
+            },
+            {
+              "week": 50,
+              "count": 16.0,
+              "cumulative": 657.0,
+              "rolling4": 56.0
+            },
+            {
+              "week": 51,
+              "count": 13.0,
+              "cumulative": 670.0,
+              "rolling4": 52.0
+            },
+            {
+              "week": 52,
+              "count": 9.0,
+              "cumulative": 679.0,
+              "rolling4": 48.0
+            },
+            {
+              "week": 54,
+              "count": 4.0,
+              "cumulative": 683.0,
+              "rolling4": 42.0
+            }
+          ]
+        },
+        {
+          "year": 2020,
+          "total": 521,
+          "latestWeek": 54,
+          "rows": [
+            {
+              "week": 31,
+              "count": 15.0,
+              "cumulative": 15.0,
+              "rolling4": 15.0
+            },
+            {
+              "week": 32,
+              "count": 3.0,
+              "cumulative": 18.0,
+              "rolling4": 18.0
+            },
+            {
+              "week": 33,
+              "count": 4.0,
+              "cumulative": 22.0,
+              "rolling4": 22.0
+            },
+            {
+              "week": 34,
+              "count": 17.0,
+              "cumulative": 39.0,
+              "rolling4": 39.0
+            },
+            {
+              "week": 35,
+              "count": 13.0,
+              "cumulative": 52.0,
+              "rolling4": 37.0
+            },
+            {
+              "week": 36,
+              "count": 15.0,
+              "cumulative": 67.0,
+              "rolling4": 49.0
+            },
+            {
+              "week": 37,
+              "count": 13.0,
+              "cumulative": 80.0,
+              "rolling4": 58.0
+            },
+            {
+              "week": 38,
+              "count": 19.0,
+              "cumulative": 99.0,
+              "rolling4": 60.0
+            },
+            {
+              "week": 39,
+              "count": 29.0,
+              "cumulative": 128.0,
+              "rolling4": 76.0
+            },
+            {
+              "week": 40,
+              "count": 28.0,
+              "cumulative": 156.0,
+              "rolling4": 89.0
+            },
+            {
+              "week": 41,
+              "count": 33.0,
+              "cumulative": 189.0,
+              "rolling4": 109.0
+            },
+            {
+              "week": 42,
+              "count": 50.0,
+              "cumulative": 239.0,
+              "rolling4": 140.0
+            },
+            {
+              "week": 43,
+              "count": 38.0,
+              "cumulative": 277.0,
+              "rolling4": 149.0
+            },
+            {
+              "week": 44,
+              "count": 24.0,
+              "cumulative": 301.0,
+              "rolling4": 145.0
+            },
+            {
+              "week": 45,
+              "count": 43.0,
+              "cumulative": 344.0,
+              "rolling4": 155.0
+            },
+            {
+              "week": 46,
+              "count": 38.0,
+              "cumulative": 382.0,
+              "rolling4": 143.0
+            },
+            {
+              "week": 47,
+              "count": 12.0,
+              "cumulative": 394.0,
+              "rolling4": 117.0
+            },
+            {
+              "week": 48,
+              "count": 29.0,
+              "cumulative": 423.0,
+              "rolling4": 122.0
+            },
+            {
+              "week": 49,
+              "count": 23.0,
+              "cumulative": 446.0,
+              "rolling4": 102.0
+            },
+            {
+              "week": 50,
+              "count": 26.0,
+              "cumulative": 472.0,
+              "rolling4": 90.0
+            },
+            {
+              "week": 51,
+              "count": 19.0,
+              "cumulative": 491.0,
+              "rolling4": 97.0
+            },
+            {
+              "week": 52,
+              "count": 13.0,
+              "cumulative": 504.0,
+              "rolling4": 81.0
+            },
+            {
+              "week": 53,
+              "count": 14.0,
+              "cumulative": 518.0,
+              "rolling4": 72.0
             },
             {
               "week": 54,
               "count": 3.0,
-              "cumulative": 1361.0,
-              "rolling4": 88.0
+              "cumulative": 521.0,
+              "rolling4": 49.0
+            }
+          ]
+        },
+        {
+          "year": 2021,
+          "total": 698,
+          "latestWeek": 54,
+          "rows": [
+            {
+              "week": 31,
+              "count": 2.0,
+              "cumulative": 2.0,
+              "rolling4": 2.0
+            },
+            {
+              "week": 32,
+              "count": 6.0,
+              "cumulative": 8.0,
+              "rolling4": 8.0
+            },
+            {
+              "week": 33,
+              "count": 19.0,
+              "cumulative": 27.0,
+              "rolling4": 27.0
+            },
+            {
+              "week": 34,
+              "count": 17.0,
+              "cumulative": 44.0,
+              "rolling4": 44.0
+            },
+            {
+              "week": 35,
+              "count": 22.0,
+              "cumulative": 66.0,
+              "rolling4": 64.0
+            },
+            {
+              "week": 36,
+              "count": 25.0,
+              "cumulative": 91.0,
+              "rolling4": 83.0
+            },
+            {
+              "week": 37,
+              "count": 30.0,
+              "cumulative": 121.0,
+              "rolling4": 94.0
+            },
+            {
+              "week": 38,
+              "count": 45.0,
+              "cumulative": 166.0,
+              "rolling4": 122.0
+            },
+            {
+              "week": 39,
+              "count": 36.0,
+              "cumulative": 202.0,
+              "rolling4": 136.0
+            },
+            {
+              "week": 40,
+              "count": 59.0,
+              "cumulative": 261.0,
+              "rolling4": 170.0
+            },
+            {
+              "week": 41,
+              "count": 64.0,
+              "cumulative": 325.0,
+              "rolling4": 204.0
+            },
+            {
+              "week": 42,
+              "count": 61.0,
+              "cumulative": 386.0,
+              "rolling4": 220.0
+            },
+            {
+              "week": 43,
+              "count": 51.0,
+              "cumulative": 437.0,
+              "rolling4": 235.0
+            },
+            {
+              "week": 44,
+              "count": 46.0,
+              "cumulative": 483.0,
+              "rolling4": 222.0
+            },
+            {
+              "week": 45,
+              "count": 40.0,
+              "cumulative": 523.0,
+              "rolling4": 198.0
+            },
+            {
+              "week": 46,
+              "count": 40.0,
+              "cumulative": 563.0,
+              "rolling4": 177.0
+            },
+            {
+              "week": 47,
+              "count": 27.0,
+              "cumulative": 590.0,
+              "rolling4": 153.0
+            },
+            {
+              "week": 48,
+              "count": 10.0,
+              "cumulative": 600.0,
+              "rolling4": 117.0
+            },
+            {
+              "week": 49,
+              "count": 32.0,
+              "cumulative": 632.0,
+              "rolling4": 109.0
+            },
+            {
+              "week": 50,
+              "count": 15.0,
+              "cumulative": 647.0,
+              "rolling4": 84.0
+            },
+            {
+              "week": 51,
+              "count": 25.0,
+              "cumulative": 672.0,
+              "rolling4": 82.0
+            },
+            {
+              "week": 52,
+              "count": 11.0,
+              "cumulative": 683.0,
+              "rolling4": 83.0
+            },
+            {
+              "week": 53,
+              "count": 13.0,
+              "cumulative": 696.0,
+              "rolling4": 64.0
+            },
+            {
+              "week": 54,
+              "count": 2.0,
+              "cumulative": 698.0,
+              "rolling4": 51.0
             }
           ]
         },
         {
           "year": 2022,
-          "total": 1479,
+          "total": 744,
           "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 71.0,
-              "cumulative": 71.0,
-              "rolling4": 71.0
-            },
-            {
-              "week": 32,
-              "count": 31.0,
-              "cumulative": 102.0,
-              "rolling4": 102.0
-            },
-            {
-              "week": 33,
-              "count": 47.0,
-              "cumulative": 149.0,
-              "rolling4": 149.0
-            },
-            {
-              "week": 34,
-              "count": 22.0,
-              "cumulative": 171.0,
-              "rolling4": 171.0
-            },
-            {
-              "week": 35,
-              "count": 68.0,
-              "cumulative": 239.0,
-              "rolling4": 168.0
-            },
-            {
-              "week": 36,
-              "count": 70.0,
-              "cumulative": 309.0,
-              "rolling4": 207.0
-            },
-            {
-              "week": 37,
-              "count": 81.0,
-              "cumulative": 390.0,
-              "rolling4": 241.0
-            },
-            {
-              "week": 38,
-              "count": 89.0,
-              "cumulative": 479.0,
-              "rolling4": 308.0
-            },
-            {
-              "week": 39,
-              "count": 96.0,
-              "cumulative": 575.0,
-              "rolling4": 336.0
-            },
-            {
-              "week": 40,
-              "count": 114.0,
-              "cumulative": 689.0,
-              "rolling4": 380.0
-            },
-            {
-              "week": 41,
-              "count": 109.0,
-              "cumulative": 798.0,
-              "rolling4": 408.0
-            },
-            {
-              "week": 42,
-              "count": 124.0,
-              "cumulative": 922.0,
-              "rolling4": 443.0
-            },
-            {
-              "week": 43,
-              "count": 108.0,
-              "cumulative": 1030.0,
-              "rolling4": 455.0
-            },
-            {
-              "week": 44,
-              "count": 100.0,
-              "cumulative": 1130.0,
-              "rolling4": 441.0
-            },
-            {
-              "week": 45,
-              "count": 89.0,
-              "cumulative": 1219.0,
-              "rolling4": 421.0
-            },
-            {
-              "week": 46,
-              "count": 50.0,
-              "cumulative": 1269.0,
-              "rolling4": 347.0
-            },
-            {
-              "week": 47,
-              "count": 51.0,
-              "cumulative": 1320.0,
-              "rolling4": 290.0
-            },
-            {
-              "week": 48,
-              "count": 34.0,
-              "cumulative": 1354.0,
-              "rolling4": 224.0
-            },
-            {
-              "week": 49,
-              "count": 31.0,
-              "cumulative": 1385.0,
-              "rolling4": 166.0
-            },
-            {
-              "week": 50,
-              "count": 34.0,
-              "cumulative": 1419.0,
-              "rolling4": 150.0
-            },
-            {
-              "week": 51,
-              "count": 24.0,
-              "cumulative": 1443.0,
-              "rolling4": 123.0
-            },
-            {
-              "week": 52,
-              "count": 21.0,
-              "cumulative": 1464.0,
-              "rolling4": 110.0
-            },
-            {
-              "week": 53,
-              "count": 3.0,
-              "cumulative": 1467.0,
-              "rolling4": 82.0
-            },
-            {
-              "week": 54,
-              "count": 12.0,
-              "cumulative": 1479.0,
-              "rolling4": 60.0
-            }
-          ]
-        },
-        {
-          "year": 2023,
-          "total": 1282,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 59.0,
-              "cumulative": 59.0,
-              "rolling4": 59.0
-            },
-            {
-              "week": 32,
-              "count": 26.0,
-              "cumulative": 85.0,
-              "rolling4": 85.0
-            },
-            {
-              "week": 33,
-              "count": 49.0,
-              "cumulative": 134.0,
-              "rolling4": 134.0
-            },
-            {
-              "week": 34,
-              "count": 43.0,
-              "cumulative": 177.0,
-              "rolling4": 177.0
-            },
-            {
-              "week": 35,
-              "count": 46.0,
-              "cumulative": 223.0,
-              "rolling4": 164.0
-            },
-            {
-              "week": 36,
-              "count": 39.0,
-              "cumulative": 262.0,
-              "rolling4": 177.0
-            },
-            {
-              "week": 37,
-              "count": 68.0,
-              "cumulative": 330.0,
-              "rolling4": 196.0
-            },
-            {
-              "week": 38,
-              "count": 59.0,
-              "cumulative": 389.0,
-              "rolling4": 212.0
-            },
-            {
-              "week": 39,
-              "count": 115.0,
-              "cumulative": 504.0,
-              "rolling4": 281.0
-            },
-            {
-              "week": 40,
-              "count": 101.0,
-              "cumulative": 605.0,
-              "rolling4": 343.0
-            },
-            {
-              "week": 41,
-              "count": 83.0,
-              "cumulative": 688.0,
-              "rolling4": 358.0
-            },
-            {
-              "week": 42,
-              "count": 99.0,
-              "cumulative": 787.0,
-              "rolling4": 398.0
-            },
-            {
-              "week": 43,
-              "count": 102.0,
-              "cumulative": 889.0,
-              "rolling4": 385.0
-            },
-            {
-              "week": 44,
-              "count": 76.0,
-              "cumulative": 965.0,
-              "rolling4": 360.0
-            },
-            {
-              "week": 45,
-              "count": 49.0,
-              "cumulative": 1014.0,
-              "rolling4": 326.0
-            },
-            {
-              "week": 46,
-              "count": 67.0,
-              "cumulative": 1081.0,
-              "rolling4": 294.0
-            },
-            {
-              "week": 47,
-              "count": 41.0,
-              "cumulative": 1122.0,
-              "rolling4": 233.0
-            },
-            {
-              "week": 48,
-              "count": 25.0,
-              "cumulative": 1147.0,
-              "rolling4": 182.0
-            },
-            {
-              "week": 49,
-              "count": 52.0,
-              "cumulative": 1199.0,
-              "rolling4": 185.0
-            },
-            {
-              "week": 50,
-              "count": 26.0,
-              "cumulative": 1225.0,
-              "rolling4": 144.0
-            },
-            {
-              "week": 51,
-              "count": 19.0,
-              "cumulative": 1244.0,
-              "rolling4": 122.0
-            },
-            {
-              "week": 52,
-              "count": 18.0,
-              "cumulative": 1262.0,
-              "rolling4": 115.0
-            },
-            {
-              "week": 53,
-              "count": 10.0,
-              "cumulative": 1272.0,
-              "rolling4": 73.0
-            },
-            {
-              "week": 54,
-              "count": 10.0,
-              "cumulative": 1282.0,
-              "rolling4": 57.0
-            }
-          ]
-        },
-        {
-          "year": 2024,
-          "total": 1204,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 54.0,
-              "cumulative": 54.0,
-              "rolling4": 54.0
-            },
-            {
-              "week": 32,
-              "count": 11.0,
-              "cumulative": 65.0,
-              "rolling4": 65.0
-            },
-            {
-              "week": 33,
-              "count": 29.0,
-              "cumulative": 94.0,
-              "rolling4": 94.0
-            },
-            {
-              "week": 34,
-              "count": 36.0,
-              "cumulative": 130.0,
-              "rolling4": 130.0
-            },
-            {
-              "week": 35,
-              "count": 36.0,
-              "cumulative": 166.0,
-              "rolling4": 112.0
-            },
-            {
-              "week": 36,
-              "count": 53.0,
-              "cumulative": 219.0,
-              "rolling4": 154.0
-            },
-            {
-              "week": 37,
-              "count": 73.0,
-              "cumulative": 292.0,
-              "rolling4": 198.0
-            },
-            {
-              "week": 38,
-              "count": 80.0,
-              "cumulative": 372.0,
-              "rolling4": 242.0
-            },
-            {
-              "week": 39,
-              "count": 74.0,
-              "cumulative": 446.0,
-              "rolling4": 280.0
-            },
-            {
-              "week": 40,
-              "count": 94.0,
-              "cumulative": 540.0,
-              "rolling4": 321.0
-            },
-            {
-              "week": 41,
-              "count": 99.0,
-              "cumulative": 639.0,
-              "rolling4": 347.0
-            },
-            {
-              "week": 42,
-              "count": 98.0,
-              "cumulative": 737.0,
-              "rolling4": 365.0
-            },
-            {
-              "week": 43,
-              "count": 76.0,
-              "cumulative": 813.0,
-              "rolling4": 367.0
-            },
-            {
-              "week": 44,
-              "count": 69.0,
-              "cumulative": 882.0,
-              "rolling4": 342.0
-            },
-            {
-              "week": 45,
-              "count": 74.0,
-              "cumulative": 956.0,
-              "rolling4": 317.0
-            },
-            {
-              "week": 46,
-              "count": 52.0,
-              "cumulative": 1008.0,
-              "rolling4": 271.0
-            },
-            {
-              "week": 47,
-              "count": 43.0,
-              "cumulative": 1051.0,
-              "rolling4": 238.0
-            },
-            {
-              "week": 48,
-              "count": 39.0,
-              "cumulative": 1090.0,
-              "rolling4": 208.0
-            },
-            {
-              "week": 49,
-              "count": 29.0,
-              "cumulative": 1119.0,
-              "rolling4": 163.0
-            },
-            {
-              "week": 50,
-              "count": 24.0,
-              "cumulative": 1143.0,
-              "rolling4": 135.0
-            },
-            {
-              "week": 51,
-              "count": 31.0,
-              "cumulative": 1174.0,
-              "rolling4": 123.0
-            },
-            {
-              "week": 52,
-              "count": 23.0,
-              "cumulative": 1197.0,
-              "rolling4": 107.0
-            },
-            {
-              "week": 53,
-              "count": 6.0,
-              "cumulative": 1203.0,
-              "rolling4": 84.0
-            },
-            {
-              "week": 54,
-              "count": 1.0,
-              "cumulative": 1204.0,
-              "rolling4": 61.0
-            }
-          ]
-        },
-        {
-          "year": 2025,
-          "total": 966,
-          "latestWeek": 54,
-          "rows": [
-            {
-              "week": 31,
-              "count": 57.0,
-              "cumulative": 57.0,
-              "rolling4": 57.0
-            },
-            {
-              "week": 32,
-              "count": 5.0,
-              "cumulative": 62.0,
-              "rolling4": 62.0
-            },
-            {
-              "week": 33,
-              "count": 24.0,
-              "cumulative": 86.0,
-              "rolling4": 86.0
-            },
-            {
-              "week": 34,
-              "count": 26.0,
-              "cumulative": 112.0,
-              "rolling4": 112.0
-            },
-            {
-              "week": 35,
-              "count": 26.0,
-              "cumulative": 138.0,
-              "rolling4": 81.0
-            },
-            {
-              "week": 36,
-              "count": 20.0,
-              "cumulative": 158.0,
-              "rolling4": 96.0
-            },
-            {
-              "week": 37,
-              "count": 46.0,
-              "cumulative": 204.0,
-              "rolling4": 118.0
-            },
-            {
-              "week": 38,
-              "count": 64.0,
-              "cumulative": 268.0,
-              "rolling4": 156.0
-            },
-            {
-              "week": 39,
-              "count": 72.0,
-              "cumulative": 340.0,
-              "rolling4": 202.0
-            },
-            {
-              "week": 40,
-              "count": 59.0,
-              "cumulative": 399.0,
-              "rolling4": 241.0
-            },
-            {
-              "week": 41,
-              "count": 85.0,
-              "cumulative": 484.0,
-              "rolling4": 280.0
-            },
-            {
-              "week": 42,
-              "count": 65.0,
-              "cumulative": 549.0,
-              "rolling4": 281.0
-            },
-            {
-              "week": 43,
-              "count": 65.0,
-              "cumulative": 614.0,
-              "rolling4": 274.0
-            },
-            {
-              "week": 44,
-              "count": 71.0,
-              "cumulative": 685.0,
-              "rolling4": 286.0
-            },
-            {
-              "week": 45,
-              "count": 59.0,
-              "cumulative": 744.0,
-              "rolling4": 260.0
-            },
-            {
-              "week": 46,
-              "count": 46.0,
-              "cumulative": 790.0,
-              "rolling4": 241.0
-            },
-            {
-              "week": 47,
-              "count": 47.0,
-              "cumulative": 837.0,
-              "rolling4": 223.0
-            },
-            {
-              "week": 48,
-              "count": 32.0,
-              "cumulative": 869.0,
-              "rolling4": 184.0
-            },
-            {
-              "week": 49,
-              "count": 21.0,
-              "cumulative": 890.0,
-              "rolling4": 146.0
-            },
-            {
-              "week": 50,
-              "count": 30.0,
-              "cumulative": 920.0,
-              "rolling4": 130.0
-            },
-            {
-              "week": 51,
-              "count": 21.0,
-              "cumulative": 941.0,
-              "rolling4": 104.0
-            },
-            {
-              "week": 52,
-              "count": 18.0,
-              "cumulative": 959.0,
-              "rolling4": 90.0
-            },
-            {
-              "week": 54,
-              "count": 7.0,
-              "cumulative": 966.0,
-              "rolling4": 76.0
-            }
-          ]
-        },
-        {
-          "year": 2026,
-          "total": 161,
-          "latestWeek": 36,
           "rows": [
             {
               "week": 31,
@@ -19282,27 +18678,619 @@
             },
             {
               "week": 33,
-              "count": 33.0,
-              "cumulative": 80.0,
-              "rolling4": 80.0
+              "count": 22.0,
+              "cumulative": 69.0,
+              "rolling4": 69.0
             },
             {
               "week": 34,
-              "count": 24.0,
-              "cumulative": 104.0,
-              "rolling4": 104.0
+              "count": 9.0,
+              "cumulative": 78.0,
+              "rolling4": 78.0
             },
             {
               "week": 35,
-              "count": 32.0,
-              "cumulative": 136.0,
-              "rolling4": 102.0
+              "count": 33.0,
+              "cumulative": 111.0,
+              "rolling4": 77.0
             },
             {
               "week": 36,
+              "count": 27.0,
+              "cumulative": 138.0,
+              "rolling4": 91.0
+            },
+            {
+              "week": 37,
+              "count": 41.0,
+              "cumulative": 179.0,
+              "rolling4": 110.0
+            },
+            {
+              "week": 38,
+              "count": 51.0,
+              "cumulative": 230.0,
+              "rolling4": 152.0
+            },
+            {
+              "week": 39,
+              "count": 42.0,
+              "cumulative": 272.0,
+              "rolling4": 161.0
+            },
+            {
+              "week": 40,
+              "count": 69.0,
+              "cumulative": 341.0,
+              "rolling4": 203.0
+            },
+            {
+              "week": 41,
+              "count": 54.0,
+              "cumulative": 395.0,
+              "rolling4": 216.0
+            },
+            {
+              "week": 42,
+              "count": 68.0,
+              "cumulative": 463.0,
+              "rolling4": 233.0
+            },
+            {
+              "week": 43,
+              "count": 49.0,
+              "cumulative": 512.0,
+              "rolling4": 240.0
+            },
+            {
+              "week": 44,
+              "count": 52.0,
+              "cumulative": 564.0,
+              "rolling4": 223.0
+            },
+            {
+              "week": 45,
+              "count": 58.0,
+              "cumulative": 622.0,
+              "rolling4": 227.0
+            },
+            {
+              "week": 46,
+              "count": 21.0,
+              "cumulative": 643.0,
+              "rolling4": 180.0
+            },
+            {
+              "week": 47,
               "count": 25.0,
-              "cumulative": 161.0,
-              "rolling4": 114.0
+              "cumulative": 668.0,
+              "rolling4": 156.0
+            },
+            {
+              "week": 48,
+              "count": 18.0,
+              "cumulative": 686.0,
+              "rolling4": 122.0
+            },
+            {
+              "week": 49,
+              "count": 14.0,
+              "cumulative": 700.0,
+              "rolling4": 78.0
+            },
+            {
+              "week": 50,
+              "count": 14.0,
+              "cumulative": 714.0,
+              "rolling4": 71.0
+            },
+            {
+              "week": 51,
+              "count": 10.0,
+              "cumulative": 724.0,
+              "rolling4": 56.0
+            },
+            {
+              "week": 52,
+              "count": 11.0,
+              "cumulative": 735.0,
+              "rolling4": 49.0
+            },
+            {
+              "week": 53,
+              "count": 2.0,
+              "cumulative": 737.0,
+              "rolling4": 37.0
+            },
+            {
+              "week": 54,
+              "count": 7.0,
+              "cumulative": 744.0,
+              "rolling4": 30.0
+            }
+          ]
+        },
+        {
+          "year": 2023,
+          "total": 639,
+          "latestWeek": 54,
+          "rows": [
+            {
+              "week": 31,
+              "count": 27.0,
+              "cumulative": 27.0,
+              "rolling4": 27.0
+            },
+            {
+              "week": 32,
+              "count": 16.0,
+              "cumulative": 43.0,
+              "rolling4": 43.0
+            },
+            {
+              "week": 33,
+              "count": 20.0,
+              "cumulative": 63.0,
+              "rolling4": 63.0
+            },
+            {
+              "week": 34,
+              "count": 25.0,
+              "cumulative": 88.0,
+              "rolling4": 88.0
+            },
+            {
+              "week": 35,
+              "count": 25.0,
+              "cumulative": 113.0,
+              "rolling4": 86.0
+            },
+            {
+              "week": 36,
+              "count": 23.0,
+              "cumulative": 136.0,
+              "rolling4": 93.0
+            },
+            {
+              "week": 37,
+              "count": 32.0,
+              "cumulative": 168.0,
+              "rolling4": 105.0
+            },
+            {
+              "week": 38,
+              "count": 38.0,
+              "cumulative": 206.0,
+              "rolling4": 118.0
+            },
+            {
+              "week": 39,
+              "count": 59.0,
+              "cumulative": 265.0,
+              "rolling4": 152.0
+            },
+            {
+              "week": 40,
+              "count": 62.0,
+              "cumulative": 327.0,
+              "rolling4": 191.0
+            },
+            {
+              "week": 41,
+              "count": 56.0,
+              "cumulative": 383.0,
+              "rolling4": 215.0
+            },
+            {
+              "week": 42,
+              "count": 46.0,
+              "cumulative": 429.0,
+              "rolling4": 223.0
+            },
+            {
+              "week": 43,
+              "count": 54.0,
+              "cumulative": 483.0,
+              "rolling4": 218.0
+            },
+            {
+              "week": 44,
+              "count": 28.0,
+              "cumulative": 511.0,
+              "rolling4": 184.0
+            },
+            {
+              "week": 45,
+              "count": 23.0,
+              "cumulative": 534.0,
+              "rolling4": 151.0
+            },
+            {
+              "week": 46,
+              "count": 27.0,
+              "cumulative": 561.0,
+              "rolling4": 132.0
+            },
+            {
+              "week": 47,
+              "count": 12.0,
+              "cumulative": 573.0,
+              "rolling4": 90.0
+            },
+            {
+              "week": 48,
+              "count": 8.0,
+              "cumulative": 581.0,
+              "rolling4": 70.0
+            },
+            {
+              "week": 49,
+              "count": 25.0,
+              "cumulative": 606.0,
+              "rolling4": 72.0
+            },
+            {
+              "week": 50,
+              "count": 6.0,
+              "cumulative": 612.0,
+              "rolling4": 51.0
+            },
+            {
+              "week": 51,
+              "count": 9.0,
+              "cumulative": 621.0,
+              "rolling4": 48.0
+            },
+            {
+              "week": 52,
+              "count": 9.0,
+              "cumulative": 630.0,
+              "rolling4": 49.0
+            },
+            {
+              "week": 53,
+              "count": 5.0,
+              "cumulative": 635.0,
+              "rolling4": 29.0
+            },
+            {
+              "week": 54,
+              "count": 4.0,
+              "cumulative": 639.0,
+              "rolling4": 27.0
+            }
+          ]
+        },
+        {
+          "year": 2024,
+          "total": 605,
+          "latestWeek": 53,
+          "rows": [
+            {
+              "week": 31,
+              "count": 34.0,
+              "cumulative": 34.0,
+              "rolling4": 34.0
+            },
+            {
+              "week": 32,
+              "count": 8.0,
+              "cumulative": 42.0,
+              "rolling4": 42.0
+            },
+            {
+              "week": 33,
+              "count": 13.0,
+              "cumulative": 55.0,
+              "rolling4": 55.0
+            },
+            {
+              "week": 34,
+              "count": 19.0,
+              "cumulative": 74.0,
+              "rolling4": 74.0
+            },
+            {
+              "week": 35,
+              "count": 16.0,
+              "cumulative": 90.0,
+              "rolling4": 56.0
+            },
+            {
+              "week": 36,
+              "count": 30.0,
+              "cumulative": 120.0,
+              "rolling4": 78.0
+            },
+            {
+              "week": 37,
+              "count": 40.0,
+              "cumulative": 160.0,
+              "rolling4": 105.0
+            },
+            {
+              "week": 38,
+              "count": 46.0,
+              "cumulative": 206.0,
+              "rolling4": 132.0
+            },
+            {
+              "week": 39,
+              "count": 31.0,
+              "cumulative": 237.0,
+              "rolling4": 147.0
+            },
+            {
+              "week": 40,
+              "count": 43.0,
+              "cumulative": 280.0,
+              "rolling4": 160.0
+            },
+            {
+              "week": 41,
+              "count": 59.0,
+              "cumulative": 339.0,
+              "rolling4": 179.0
+            },
+            {
+              "week": 42,
+              "count": 53.0,
+              "cumulative": 392.0,
+              "rolling4": 186.0
+            },
+            {
+              "week": 43,
+              "count": 39.0,
+              "cumulative": 431.0,
+              "rolling4": 194.0
+            },
+            {
+              "week": 44,
+              "count": 31.0,
+              "cumulative": 462.0,
+              "rolling4": 182.0
+            },
+            {
+              "week": 45,
+              "count": 37.0,
+              "cumulative": 499.0,
+              "rolling4": 160.0
+            },
+            {
+              "week": 46,
+              "count": 27.0,
+              "cumulative": 526.0,
+              "rolling4": 134.0
+            },
+            {
+              "week": 47,
+              "count": 14.0,
+              "cumulative": 540.0,
+              "rolling4": 109.0
+            },
+            {
+              "week": 48,
+              "count": 16.0,
+              "cumulative": 556.0,
+              "rolling4": 94.0
+            },
+            {
+              "week": 49,
+              "count": 8.0,
+              "cumulative": 564.0,
+              "rolling4": 65.0
+            },
+            {
+              "week": 50,
+              "count": 13.0,
+              "cumulative": 577.0,
+              "rolling4": 51.0
+            },
+            {
+              "week": 51,
+              "count": 16.0,
+              "cumulative": 593.0,
+              "rolling4": 53.0
+            },
+            {
+              "week": 52,
+              "count": 7.0,
+              "cumulative": 600.0,
+              "rolling4": 44.0
+            },
+            {
+              "week": 53,
+              "count": 5.0,
+              "cumulative": 605.0,
+              "rolling4": 41.0
+            }
+          ]
+        },
+        {
+          "year": 2025,
+          "total": 450,
+          "latestWeek": 54,
+          "rows": [
+            {
+              "week": 31,
+              "count": 30.0,
+              "cumulative": 30.0,
+              "rolling4": 30.0
+            },
+            {
+              "week": 32,
+              "count": 3.0,
+              "cumulative": 33.0,
+              "rolling4": 33.0
+            },
+            {
+              "week": 33,
+              "count": 11.0,
+              "cumulative": 44.0,
+              "rolling4": 44.0
+            },
+            {
+              "week": 34,
+              "count": 13.0,
+              "cumulative": 57.0,
+              "rolling4": 57.0
+            },
+            {
+              "week": 35,
+              "count": 12.0,
+              "cumulative": 69.0,
+              "rolling4": 39.0
+            },
+            {
+              "week": 36,
+              "count": 13.0,
+              "cumulative": 82.0,
+              "rolling4": 49.0
+            },
+            {
+              "week": 37,
+              "count": 25.0,
+              "cumulative": 107.0,
+              "rolling4": 63.0
+            },
+            {
+              "week": 38,
+              "count": 42.0,
+              "cumulative": 149.0,
+              "rolling4": 92.0
+            },
+            {
+              "week": 39,
+              "count": 37.0,
+              "cumulative": 186.0,
+              "rolling4": 117.0
+            },
+            {
+              "week": 40,
+              "count": 27.0,
+              "cumulative": 213.0,
+              "rolling4": 131.0
+            },
+            {
+              "week": 41,
+              "count": 41.0,
+              "cumulative": 254.0,
+              "rolling4": 147.0
+            },
+            {
+              "week": 42,
+              "count": 31.0,
+              "cumulative": 285.0,
+              "rolling4": 136.0
+            },
+            {
+              "week": 43,
+              "count": 27.0,
+              "cumulative": 312.0,
+              "rolling4": 126.0
+            },
+            {
+              "week": 44,
+              "count": 28.0,
+              "cumulative": 340.0,
+              "rolling4": 127.0
+            },
+            {
+              "week": 45,
+              "count": 23.0,
+              "cumulative": 363.0,
+              "rolling4": 109.0
+            },
+            {
+              "week": 46,
+              "count": 14.0,
+              "cumulative": 377.0,
+              "rolling4": 92.0
+            },
+            {
+              "week": 47,
+              "count": 21.0,
+              "cumulative": 398.0,
+              "rolling4": 86.0
+            },
+            {
+              "week": 48,
+              "count": 19.0,
+              "cumulative": 417.0,
+              "rolling4": 77.0
+            },
+            {
+              "week": 49,
+              "count": 7.0,
+              "cumulative": 424.0,
+              "rolling4": 61.0
+            },
+            {
+              "week": 50,
+              "count": 7.0,
+              "cumulative": 431.0,
+              "rolling4": 54.0
+            },
+            {
+              "week": 51,
+              "count": 10.0,
+              "cumulative": 441.0,
+              "rolling4": 43.0
+            },
+            {
+              "week": 52,
+              "count": 5.0,
+              "cumulative": 446.0,
+              "rolling4": 29.0
+            },
+            {
+              "week": 54,
+              "count": 4.0,
+              "cumulative": 450.0,
+              "rolling4": 26.0
+            }
+          ]
+        },
+        {
+          "year": 2026,
+          "total": 88,
+          "latestWeek": 36,
+          "rows": [
+            {
+              "week": 31,
+              "count": 22.0,
+              "cumulative": 22.0,
+              "rolling4": 22.0
+            },
+            {
+              "week": 32,
+              "count": 7.0,
+              "cumulative": 29.0,
+              "rolling4": 29.0
+            },
+            {
+              "week": 33,
+              "count": 16.0,
+              "cumulative": 45.0,
+              "rolling4": 45.0
+            },
+            {
+              "week": 34,
+              "count": 13.0,
+              "cumulative": 58.0,
+              "rolling4": 58.0
+            },
+            {
+              "week": 35,
+              "count": 20.0,
+              "cumulative": 78.0,
+              "rolling4": 56.0
+            },
+            {
+              "week": 36,
+              "count": 10.0,
+              "cumulative": 88.0,
+              "rolling4": 59.0
             }
           ]
         }
