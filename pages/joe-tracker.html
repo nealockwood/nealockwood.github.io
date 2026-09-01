@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>JOE Job Market Tracker</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f5f7f4;
+  --panel: #ffffff;
+  --ink: #202723;
+  --muted: #65716c;
+  --line: #dce4dd;
+  --line-strong: #c6d1ca;
+  --accent: #1f6f78;
+  --accent-soft: #e5f1f2;
+  --gold: #aa741d;
+  --shadow: 0 14px 34px rgba(34, 43, 38, 0.08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+button, select { font: inherit; }
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.78);
+}
+h1, p { margin: 0; }
+h1 { font-size: 24px; line-height: 1.1; }
+.meta { margin-top: 5px; color: var(--muted); font-size: 12.5px; }
+.source {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  background: #fff;
+  white-space: nowrap;
+}
+.source:hover { border-color: var(--accent); color: var(--accent); }
+.layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+.controls, .panel, .stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.controls { align-self: start; padding: 16px; }
+.block + .block { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.label {
+  display: block;
+  margin-bottom: 8px;
+  color: #39443f;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0 9px;
+  background: #fff;
+  color: var(--ink);
+}
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #f8faf7;
+}
+.segmented button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+.segmented button.active {
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(28, 34, 31, 0.12);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.stat { padding: 14px; box-shadow: none; }
+.stat .k { color: var(--muted); font-size: 11.5px; text-transform: uppercase; }
+.stat .v { margin-top: 4px; font-size: 22px; font-weight: 750; }
+.panel { padding: 14px; min-width: 0; }
+#chart { width: 100%; height: 650px; }
+.table-wrap { overflow-x: auto; margin-top: 14px; }
+table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+tr.latest { background: var(--accent-soft); font-weight: 700; color: var(--accent); }
+.note { margin-top: 10px; color: var(--muted); font-size: 12px; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr; }
+  .topbar { align-items: flex-start; flex-direction: column; }
+  #chart { height: 520px; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>JOE Job Market Tracker</h1>
+    <p class="meta" id="stamp">Loading...</p>
+  </div>
+  <a class="source" href="https://www.aeaweb.org/joe/listings" target="_blank" rel="noreferrer">Source data</a>
+</header>
+<main class="layout">
+  <aside class="controls">
+    <div class="block">
+      <label class="label" for="category">Category</label>
+      <select id="category"></select>
+    </div>
+    <div class="block">
+      <span class="label">Series</span>
+      <div class="segmented" id="measure">
+        <button type="button" class="active" data-measure="cumulative">Cumulative</button>
+        <button type="button" data-measure="rolling4">Rolling 4wk</button>
+      </div>
+    </div>
+    <div class="block">
+      <span class="label">Comparison</span>
+      <div class="segmented" id="range">
+        <button type="button" class="active" data-range="all">All years</button>
+        <button type="button" data-range="recent">Recent</button>
+      </div>
+    </div>
+    <p class="note" id="source-note"></p>
+  </aside>
+  <section>
+    <div class="stats">
+      <div class="stat"><div class="k">Latest academic year</div><div class="v" id="latest-year">--</div></div>
+      <div class="stat"><div class="k">Latest total</div><div class="v" id="latest-total">--</div></div>
+      <div class="stat"><div class="k">Latest week</div><div class="v" id="latest-week">--</div></div>
+    </div>
+    <div class="panel">
+      <div id="chart"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Academic year</th><th>Latest week</th><th>Total postings</th></tr></thead>
+          <tbody id="summary"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+let DATA;
+const state = { category: "all", measure: "cumulative", range: "all" };
+const palette = ["#1f6f78", "#9f6a1a", "#4f6f46", "#8f4558", "#4d6fa7", "#6f5e34", "#477b69", "#7a5e91", "#766f6a", "#262b29", "#a9442b", "#26714d"];
+
+function fmtDate(value) {
+  return new Date(value).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function category() {
+  return DATA.categories.find(item => item.id === state.category) || DATA.categories[0];
+}
+
+function rowsForYear(year) {
+  const data = category().years.find(item => item.year === year);
+  return data ? data.rows : [];
+}
+
+function renderControls() {
+  const select = document.getElementById("category");
+  select.innerHTML = DATA.categories.map(item => `<option value="${item.id}">${item.title}</option>`).join("");
+  select.value = state.category;
+  select.addEventListener("change", event => {
+    state.category = event.target.value;
+    render();
+  });
+  document.querySelectorAll("#measure button").forEach(button => {
+    button.addEventListener("click", () => {
+      state.measure = button.dataset.measure;
+      render();
+    });
+  });
+  document.querySelectorAll("#range button").forEach(button => {
+    button.addEventListener("click", () => {
+      state.range = button.dataset.range;
+      render();
+    });
+  });
+}
+
+function render() {
+  document.querySelectorAll("#measure button").forEach(button => button.classList.toggle("active", button.dataset.measure === state.measure));
+  document.querySelectorAll("#range button").forEach(button => button.classList.toggle("active", button.dataset.range === state.range));
+
+  const cat = category();
+  const years = state.range === "recent" ? cat.years.slice(-6) : cat.years;
+  const latestYear = cat.latestYear;
+  const traces = years.map((yearData, index) => ({
+    x: yearData.rows.map(row => row.week),
+    y: yearData.rows.map(row => row[state.measure]),
+    mode: "lines+markers",
+    name: String(yearData.year),
+    line: {
+      width: yearData.year === latestYear ? 4 : 2,
+      color: yearData.year === latestYear ? "#121614" : palette[index % palette.length],
+      dash: yearData.year === latestYear ? "solid" : "solid"
+    },
+    marker: { size: yearData.year === latestYear ? 6 : 4 },
+    hovertemplate: "Academic year %{fullData.name}<br>Week %{x}<br>Postings %{y:.0f}<extra></extra>"
+  }));
+
+  const yTitle = state.measure === "cumulative" ? "Cumulative postings" : "Rolling 4-week postings";
+  Plotly.react("chart", traces, {
+    title: { text: cat.title, x: 0, xanchor: "left", font: { size: 17 } },
+    margin: { l: 58, r: 18, t: 48, b: 48 },
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    hovermode: "closest",
+    xaxis: { title: "Calendar week", range: [DATA.startWeek, DATA.maxWeek], dtick: 2, gridcolor: "#edf1ed" },
+    yaxis: { title: yTitle, rangemode: "tozero", gridcolor: "#edf1ed" },
+    legend: { title: { text: "Academic year" }, orientation: "v" }
+  }, { responsive: true, displayModeBar: false });
+
+  const latest = cat.years.find(item => item.year === latestYear);
+  document.getElementById("latest-year").textContent = latestYear || "--";
+  document.getElementById("latest-total").textContent = latest ? latest.total.toLocaleString() : "--";
+  document.getElementById("latest-week").textContent = latest?.latestWeek || "--";
+  document.getElementById("summary").innerHTML = cat.years.slice().reverse().map(item =>
+    `<tr class="${item.year === latestYear ? "latest" : ""}"><td>${item.year}</td><td>${item.latestWeek || ""}</td><td>${item.total.toLocaleString()}</td></tr>`
+  ).join("");
+}
+
+fetch("joe-tracker-data.json?ts=" + Date.now())
+  .then(response => {
+    if (!response.ok) throw new Error("Could not load joe-tracker-data.json");
+    return response.json();
+  })
+  .then(data => {
+    DATA = data;
+    document.getElementById("stamp").textContent = "Updated " + fmtDate(data.generatedAt);
+    document.getElementById("source-note").textContent = "Built from AEA JOE native XLS result sets.";
+    renderControls();
+    render();
+  })
+  .catch(error => {
+    document.getElementById("stamp").textContent = error.message;
+  });
+</script>
+</body>
+</html>
