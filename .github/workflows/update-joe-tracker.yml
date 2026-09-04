@@ -3,7 +3,8 @@ name: Update JOE tracker page
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 12 * * 1"
+    # Saturday 12:15 UTC (8:15 AM EDT / 7:15 AM EST), after the week's listings post
+    - cron: "15 12 * * 6"
 
 permissions:
   contents: write
