@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Check out Pages repo
         uses: actions/checkout@v4
+        with:
+          # Full history so the rebase-on-push-rejection below is well defined.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,4 +43,14 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pages/joe-tracker-data.json
           git commit -m "Update JOE tracker data"
-          git push
+          # The Twitter dashboard bot pushes to main about once an hour, so the
+          # base can move while the fetch/build steps run. Rebase and retry.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt); rebasing onto origin/main."
+            git pull --rebase
+          done
+          echo "Could not push after 5 attempts."
+          exit 1
