@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-09T15:19:40.429769+00:00",
+  "generatedAt": "2026-10-10T17:21:49.546316+00:00",
   "startWeek": 31,
   "maxWeek": 54,
   "source": "AEA JOE native XLS result sets",
@@ -34,8 +34,8 @@
     {
       "id": "all",
       "title": "All postings",
-      "observations": 19751,
-      "latestYearTotal": 497,
+      "observations": 19752,
+      "latestYearTotal": 498,
       "latestWeek": 41,
       "years": [
         {
@@ -1695,7 +1695,7 @@
         },
         {
           "year": 2026,
-          "total": 497,
+          "total": 498,
           "latestWeek": 41,
           "rows": [
             {
@@ -1760,9 +1760,9 @@
             },
             {
               "week": 41,
-              "count": 68.0,
-              "cumulative": 497.0,
-              "rolling4": 279.0
+              "count": 69.0,
+              "cumulative": 498.0,
+              "rolling4": 280.0
             }
           ]
         }
@@ -1772,8 +1772,8 @@
     {
       "id": "us_tenure",
       "title": "US tenure track",
-      "observations": 6860,
-      "latestYearTotal": 220,
+      "observations": 6861,
+      "latestYearTotal": 221,
       "latestWeek": 41,
       "years": [
         {
@@ -3409,7 +3409,7 @@
         },
         {
           "year": 2026,
-          "total": 220,
+          "total": 221,
           "latestWeek": 41,
           "rows": [
             {
@@ -3474,9 +3474,9 @@
             },
             {
               "week": 41,
-              "count": 35.0,
-              "cumulative": 220.0,
-              "rolling4": 129.0
+              "count": 36.0,
+              "cumulative": 221.0,
+              "rolling4": 130.0
             }
           ]
         }
@@ -6692,8 +6692,8 @@
     {
       "id": "jel_c",
       "title": "JEL C",
-      "observations": 2689,
-      "latestYearTotal": 56,
+      "observations": 2690,
+      "latestYearTotal": 57,
       "latestWeek": 41,
       "years": [
         {
@@ -8287,7 +8287,7 @@
         },
         {
           "year": 2026,
-          "total": 56,
+          "total": 57,
           "latestWeek": 41,
           "rows": [
             {
@@ -8352,9 +8352,9 @@
             },
             {
               "week": 41,
-              "count": 11.0,
-              "cumulative": 56.0,
-              "rolling4": 34.0
+              "count": 12.0,
+              "cumulative": 57.0,
+              "rolling4": 35.0
             }
           ]
         }
@@ -9352,8 +9352,8 @@
     {
       "id": "us",
       "title": "United States",
-      "observations": 13392,
-      "latestYearTotal": 362,
+      "observations": 13393,
+      "latestYearTotal": 363,
       "latestWeek": 41,
       "years": [
         {
@@ -11013,7 +11013,7 @@
         },
         {
           "year": 2026,
-          "total": 362,
+          "total": 363,
           "latestWeek": 41,
           "rows": [
             {
@@ -11078,9 +11078,9 @@
             },
             {
               "week": 41,
-              "count": 47.0,
-              "cumulative": 362.0,
-              "rolling4": 193.0
+              "count": 48.0,
+              "cumulative": 363.0,
+              "rolling4": 194.0
             }
           ]
         }
@@ -12798,8 +12798,8 @@
     {
       "id": "tenure",
       "title": "Tenure track",
-      "observations": 11472,
-      "latestYearTotal": 331,
+      "observations": 11473,
+      "latestYearTotal": 332,
       "latestWeek": 41,
       "years": [
         {
@@ -14453,7 +14453,7 @@
         },
         {
           "year": 2026,
-          "total": 331,
+          "total": 332,
           "latestWeek": 41,
           "rows": [
             {
@@ -14518,9 +14518,9 @@
             },
             {
               "week": 41,
-              "count": 49.0,
-              "cumulative": 331.0,
-              "rolling4": 197.0
+              "count": 50.0,
+              "cumulative": 332.0,
+              "rolling4": 198.0
             }
           ]
         }
@@ -17934,8 +17934,8 @@
     {
       "id": "custom",
       "title": "Custom",
-      "observations": 10212,
-      "latestYearTotal": 272,
+      "observations": 10213,
+      "latestYearTotal": 273,
       "latestWeek": 41,
       "years": [
         {
@@ -19583,7 +19583,7 @@
         },
         {
           "year": 2026,
-          "total": 272,
+          "total": 273,
           "latestWeek": 41,
           "rows": [
             {
@@ -19648,9 +19648,9 @@
             },
             {
               "week": 41,
-              "count": 42.0,
-              "cumulative": 272.0,
-              "rolling4": 154.0
+              "count": 43.0,
+              "cumulative": 273.0,
+              "rolling4": 155.0
             }
           ]
         }
