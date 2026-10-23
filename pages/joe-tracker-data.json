@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T15:31:51.511785+00:00",
+  "generatedAt": "2026-10-23T17:04:33.172371+00:00",
   "startWeek": 31,
   "maxWeek": 54,
   "source": "AEA JOE native XLS result sets",
@@ -34,9 +34,9 @@
     {
       "id": "all",
       "title": "All postings",
-      "observations": 19833,
-      "latestYearTotal": 579,
-      "latestWeek": 42,
+      "observations": 19902,
+      "latestYearTotal": 648,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -1695,8 +1695,8 @@
         },
         {
           "year": 2026,
-          "total": 579,
-          "latestWeek": 42,
+          "total": 648,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -1769,6 +1769,12 @@
               "count": 81.0,
               "cumulative": 579.0,
               "rolling4": 311.0
+            },
+            {
+              "week": 43,
+              "count": 69.0,
+              "cumulative": 648.0,
+              "rolling4": 291.0
             }
           ]
         }
@@ -1778,9 +1784,9 @@
     {
       "id": "us_tenure",
       "title": "US tenure track",
-      "observations": 6896,
-      "latestYearTotal": 256,
-      "latestWeek": 42,
+      "observations": 6919,
+      "latestYearTotal": 279,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -3415,8 +3421,8 @@
         },
         {
           "year": 2026,
-          "total": 256,
-          "latestWeek": 42,
+          "total": 279,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -3489,6 +3495,12 @@
               "count": 35.0,
               "cumulative": 256.0,
               "rolling4": 144.0
+            },
+            {
+              "week": 43,
+              "count": 23.0,
+              "cumulative": 279.0,
+              "rolling4": 121.0
             }
           ]
         }
@@ -3498,9 +3510,9 @@
     {
       "id": "finance",
       "title": "Finance",
-      "observations": 2598,
-      "latestYearTotal": 103,
-      "latestWeek": 42,
+      "observations": 2605,
+      "latestYearTotal": 110,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -5033,8 +5045,8 @@
         },
         {
           "year": 2026,
-          "total": 103,
-          "latestWeek": 42,
+          "total": 110,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -5107,6 +5119,12 @@
               "count": 10.0,
               "cumulative": 103.0,
               "rolling4": 67.0
+            },
+            {
+              "week": 43,
+              "count": 7.0,
+              "cumulative": 110.0,
+              "rolling4": 56.0
             }
           ]
         }
@@ -5116,9 +5134,9 @@
     {
       "id": "jel_e",
       "title": "JEL E",
-      "observations": 2806,
-      "latestYearTotal": 104,
-      "latestWeek": 42,
+      "observations": 2818,
+      "latestYearTotal": 116,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -6639,8 +6657,8 @@
         },
         {
           "year": 2026,
-          "total": 104,
-          "latestWeek": 42,
+          "total": 116,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -6707,6 +6725,12 @@
               "count": 20.0,
               "cumulative": 104.0,
               "rolling4": 66.0
+            },
+            {
+              "week": 43,
+              "count": 12.0,
+              "cumulative": 116.0,
+              "rolling4": 66.0
             }
           ]
         }
@@ -6716,9 +6740,9 @@
     {
       "id": "jel_c",
       "title": "JEL C",
-      "observations": 2700,
-      "latestYearTotal": 67,
-      "latestWeek": 42,
+      "observations": 2712,
+      "latestYearTotal": 79,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -8311,8 +8335,8 @@
         },
         {
           "year": 2026,
-          "total": 67,
-          "latestWeek": 42,
+          "total": 79,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -8385,6 +8409,12 @@
               "count": 10.0,
               "cumulative": 67.0,
               "rolling4": 37.0
+            },
+            {
+              "week": 43,
+              "count": 12.0,
+              "cumulative": 79.0,
+              "rolling4": 40.0
             }
           ]
         }
@@ -8394,9 +8424,9 @@
     {
       "id": "fed",
       "title": "Fed / regulators",
-      "observations": 396,
-      "latestYearTotal": 13,
-      "latestWeek": 42,
+      "observations": 398,
+      "latestYearTotal": 15,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -9341,8 +9371,8 @@
         },
         {
           "year": 2026,
-          "total": 13,
-          "latestWeek": 42,
+          "total": 15,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 34,
@@ -9379,6 +9409,12 @@
               "count": 2.0,
               "cumulative": 13.0,
               "rolling4": 6.0
+            },
+            {
+              "week": 43,
+              "count": 2.0,
+              "cumulative": 15.0,
+              "rolling4": 6.0
             }
           ]
         }
@@ -9388,9 +9424,9 @@
     {
       "id": "us",
       "title": "United States",
-      "observations": 13443,
-      "latestYearTotal": 413,
-      "latestWeek": 42,
+      "observations": 13483,
+      "latestYearTotal": 453,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -11049,8 +11085,8 @@
         },
         {
           "year": 2026,
-          "total": 413,
-          "latestWeek": 42,
+          "total": 453,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -11123,6 +11159,12 @@
               "count": 50.0,
               "cumulative": 413.0,
               "rolling4": 208.0
+            },
+            {
+              "week": 43,
+              "count": 40.0,
+              "cumulative": 453.0,
+              "rolling4": 180.0
             }
           ]
         }
@@ -11132,9 +11174,9 @@
     {
       "id": "non_us",
       "title": "Non-US",
-      "observations": 6390,
-      "latestYearTotal": 166,
-      "latestWeek": 42,
+      "observations": 6419,
+      "latestYearTotal": 195,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -12763,8 +12805,8 @@
         },
         {
           "year": 2026,
-          "total": 166,
-          "latestWeek": 42,
+          "total": 195,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -12837,6 +12879,12 @@
               "count": 31.0,
               "cumulative": 166.0,
               "rolling4": 103.0
+            },
+            {
+              "week": 43,
+              "count": 29.0,
+              "cumulative": 195.0,
+              "rolling4": 111.0
             }
           ]
         }
@@ -12846,9 +12894,9 @@
     {
       "id": "tenure",
       "title": "Tenure track",
-      "observations": 11534,
-      "latestYearTotal": 393,
-      "latestWeek": 42,
+      "observations": 11581,
+      "latestYearTotal": 440,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -14501,8 +14549,8 @@
         },
         {
           "year": 2026,
-          "total": 393,
-          "latestWeek": 42,
+          "total": 440,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -14575,6 +14623,12 @@
               "count": 61.0,
               "cumulative": 393.0,
               "rolling4": 226.0
+            },
+            {
+              "week": 43,
+              "count": 47.0,
+              "cumulative": 440.0,
+              "rolling4": 210.0
             }
           ]
         }
@@ -14584,9 +14638,9 @@
     {
       "id": "non_tenure",
       "title": "Non-tenure academic",
-      "observations": 4022,
-      "latestYearTotal": 91,
-      "latestWeek": 42,
+      "observations": 4032,
+      "latestYearTotal": 101,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -16191,8 +16245,8 @@
         },
         {
           "year": 2026,
-          "total": 91,
-          "latestWeek": 42,
+          "total": 101,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -16265,6 +16319,12 @@
               "count": 12.0,
               "cumulative": 91.0,
               "rolling4": 39.0
+            },
+            {
+              "week": 43,
+              "count": 10.0,
+              "cumulative": 101.0,
+              "rolling4": 42.0
             }
           ]
         }
@@ -16274,9 +16334,9 @@
     {
       "id": "industry",
       "title": "Industry",
-      "observations": 4277,
-      "latestYearTotal": 95,
-      "latestWeek": 42,
+      "observations": 4289,
+      "latestYearTotal": 107,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -17923,8 +17983,8 @@
         },
         {
           "year": 2026,
-          "total": 95,
-          "latestWeek": 42,
+          "total": 107,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -17991,6 +18051,12 @@
               "count": 8.0,
               "cumulative": 95.0,
               "rolling4": 46.0
+            },
+            {
+              "week": 43,
+              "count": 12.0,
+              "cumulative": 107.0,
+              "rolling4": 39.0
             }
           ]
         }
@@ -18000,9 +18066,9 @@
     {
       "id": "custom",
       "title": "Custom",
-      "observations": 10255,
-      "latestYearTotal": 315,
-      "latestWeek": 42,
+      "observations": 10287,
+      "latestYearTotal": 347,
+      "latestWeek": 43,
       "years": [
         {
           "year": 2015,
@@ -19649,8 +19715,8 @@
         },
         {
           "year": 2026,
-          "total": 315,
-          "latestWeek": 42,
+          "total": 347,
+          "latestWeek": 43,
           "rows": [
             {
               "week": 31,
@@ -19723,6 +19789,12 @@
               "count": 42.0,
               "cumulative": 315.0,
               "rolling4": 168.0
+            },
+            {
+              "week": 43,
+              "count": 32.0,
+              "cumulative": 347.0,
+              "rolling4": 152.0
             }
           ]
         }
