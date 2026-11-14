@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13T19:38:44.780677+00:00",
+  "generatedAt": "2026-11-14T18:00:24.155811+00:00",
   "startWeek": 31,
   "maxWeek": 54,
   "source": "AEA JOE native XLS result sets",
@@ -34,8 +34,8 @@
     {
       "id": "all",
       "title": "All postings",
-      "observations": 20055,
-      "latestYearTotal": 801,
+      "observations": 20059,
+      "latestYearTotal": 805,
       "latestWeek": 46,
       "years": [
         {
@@ -1695,7 +1695,7 @@
         },
         {
           "year": 2026,
-          "total": 801,
+          "total": 805,
           "latestWeek": 46,
           "rows": [
             {
@@ -1790,9 +1790,9 @@
             },
             {
               "week": 46,
-              "count": 39.0,
-              "cumulative": 801.0,
-              "rolling4": 222.0
+              "count": 43.0,
+              "cumulative": 805.0,
+              "rolling4": 226.0
             }
           ]
         }
@@ -1802,8 +1802,8 @@
     {
       "id": "us_tenure",
       "title": "US tenure track",
-      "observations": 6962,
-      "latestYearTotal": 322,
+      "observations": 6963,
+      "latestYearTotal": 323,
       "latestWeek": 46,
       "years": [
         {
@@ -3439,7 +3439,7 @@
         },
         {
           "year": 2026,
-          "total": 322,
+          "total": 323,
           "latestWeek": 46,
           "rows": [
             {
@@ -3534,9 +3534,9 @@
             },
             {
               "week": 46,
-              "count": 8.0,
-              "cumulative": 322.0,
-              "rolling4": 66.0
+              "count": 9.0,
+              "cumulative": 323.0,
+              "rolling4": 67.0
             }
           ]
         }
@@ -9526,8 +9526,8 @@
     {
       "id": "us",
       "title": "United States",
-      "observations": 13583,
-      "latestYearTotal": 553,
+      "observations": 13587,
+      "latestYearTotal": 557,
       "latestWeek": 46,
       "years": [
         {
@@ -11187,7 +11187,7 @@
         },
         {
           "year": 2026,
-          "total": 553,
+          "total": 557,
           "latestWeek": 46,
           "rows": [
             {
@@ -11282,9 +11282,9 @@
             },
             {
               "week": 46,
-              "count": 27.0,
-              "cumulative": 553.0,
-              "rolling4": 140.0
+              "count": 31.0,
+              "cumulative": 557.0,
+              "rolling4": 144.0
             }
           ]
         }
@@ -13032,8 +13032,8 @@
     {
       "id": "tenure",
       "title": "Tenure track",
-      "observations": 11660,
-      "latestYearTotal": 519,
+      "observations": 11661,
+      "latestYearTotal": 520,
       "latestWeek": 46,
       "years": [
         {
@@ -14687,7 +14687,7 @@
         },
         {
           "year": 2026,
-          "total": 519,
+          "total": 520,
           "latestWeek": 46,
           "rows": [
             {
@@ -14782,9 +14782,9 @@
             },
             {
               "week": 46,
-              "count": 16.0,
-              "cumulative": 519.0,
-              "rolling4": 126.0
+              "count": 17.0,
+              "cumulative": 520.0,
+              "rolling4": 127.0
             }
           ]
         }
@@ -16508,8 +16508,8 @@
     {
       "id": "industry",
       "title": "Industry",
-      "observations": 4320,
-      "latestYearTotal": 138,
+      "observations": 4323,
+      "latestYearTotal": 141,
       "latestWeek": 46,
       "years": [
         {
@@ -18157,7 +18157,7 @@
         },
         {
           "year": 2026,
-          "total": 138,
+          "total": 141,
           "latestWeek": 46,
           "rows": [
             {
@@ -18246,9 +18246,9 @@
             },
             {
               "week": 46,
-              "count": 12.0,
-              "cumulative": 138.0,
-              "rolling4": 43.0
+              "count": 15.0,
+              "cumulative": 141.0,
+              "rolling4": 46.0
             }
           ]
         }
